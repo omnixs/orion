@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testCases xmlns="http://www.omg.org/spec/DMN/20160719/testcase" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+	<modelName>0125-input-data-number-simple.dmn</modelName>
+	<labels>
+		<label>DMN 1.5 Section 7.2.2 - Input Data number type</label>
+		<label>FEEL Arithmetic with input variables</label>
+	</labels>
+	<testCase id="001">
+		<description>Testing number input data with arithmetic</description>
+		<inputNode name="Number">
+			<value xsi:type="xsd:decimal">5</value>
+		</inputNode>
+		<resultNode name="Result" type="decision">
+			<expected>
+				<value xsi:type="xsd:decimal">50</value>
+			</expected>
+		</resultNode>
+	</testCase>
+</testCases>

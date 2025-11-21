@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="type-conversion-test" name="Type Conversion Test" namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="decision1" name="StringToNumber">
+    <decisionTable id="decisionTable1" hitPolicy="UNIQUE">
+      <input id="input1" label="InputString">
+        <inputExpression id="inputExpression1" typeRef="string">
+          <text>InputString</text>
+        </inputExpression>
+      </input>
+      <output id="output1" label="Result" typeRef="number"/>
+      <rule id="rule1">
+        <inputEntry id="inputEntry1">
+          <text>"123.45"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry1">
+          <text>InputString + 1.55</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision2" name="BoolToNumber">
+    <decisionTable id="decisionTable2" hitPolicy="UNIQUE">
+      <input id="input2" label="InputBool">
+        <inputExpression id="inputExpression2" typeRef="boolean">
+          <text>InputBool</text>
+        </inputExpression>
+      </input>
+      <output id="output2" label="Result" typeRef="number"/>
+      <rule id="rule2">
+        <inputEntry id="inputEntry2">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="outputEntry2">
+          <text>InputBool + 2</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

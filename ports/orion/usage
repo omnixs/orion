@@ -1,0 +1,17 @@
+orion provides CMake targets:
+
+  find_package(orion CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE orion::orion_lib)
+
+The library requires nlohmann-json and rapidxml, which are automatically
+linked as transitive dependencies.
+
+Optional: Enable spdlog support by installing with the [spdlog] feature:
+  vcpkg install orion[spdlog]
+
+Example usage in your project:
+  #include <orion/api/engine.hpp>
+  #include <orion/api/logger.hpp>
+  
+  auto engine = orion::api::BusinessRulesEngine::create();
+  auto result = engine->evaluate_decision(dmn_xml, decision_id, context);

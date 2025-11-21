@@ -1,0 +1,186 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 26, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows-base",
+      "displayName": "Windows Base Configuration",
+      "description": "Base configuration for Windows with vcpkg",
+      "hidden": true,
+      "generator": "Visual Studio 17 2022",
+      "architecture": { "value": "x64", "strategy": "external" },
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static"
+      },
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "windows-static",
+      "displayName": "Windows (Static)",
+      "description": "Visual Studio 2022 with static linking",
+      "inherits": "windows-base",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "windows-dynamic",
+      "displayName": "Windows (Dynamic)",
+      "description": "Visual Studio 2022 with dynamic linking",
+      "inherits": "windows-base",
+      "binaryDir": "${sourceDir}/build-dynamic",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+      }
+    },
+    {
+      "name": "windows-no-tests",
+      "displayName": "Windows (No Tests)",
+      "description": "Build without tests for faster compilation",
+      "inherits": "windows-base",
+      "binaryDir": "${sourceDir}/build-no-tests",
+      "cacheVariables": {
+        "ORION_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "linux-base",
+      "displayName": "Linux Base Configuration",
+      "description": "Base configuration for Linux with vcpkg",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      },
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug build (Linux/macOS)",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release build (Linux/macOS)",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ninja-clang",
+      "displayName": "Ninja + Clang",
+      "description": "Ninja generator with Clang compiler (for clang-tidy)",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build-ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "USE_CLANG": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-static-debug",
+      "displayName": "Build Windows Static (Debug)",
+      "configurePreset": "windows-static",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-static-release",
+      "displayName": "Build Windows Static (Release)",
+      "configurePreset": "windows-static",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-dynamic-debug",
+      "displayName": "Build Windows Dynamic (Debug)",
+      "configurePreset": "windows-dynamic",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-dynamic-release",
+      "displayName": "Build Windows Dynamic (Release)",
+      "configurePreset": "windows-dynamic",
+      "configuration": "Release"
+    },
+    {
+      "name": "debug-build",
+      "displayName": "Build Debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release-build",
+      "displayName": "Build Release",
+      "configurePreset": "release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "displayName": "Test Base (hidden)",
+      "description": "Base configuration for all tests",
+      "hidden": true,
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      }
+    },
+    {
+      "name": "test-all",
+      "displayName": "Run All Tests",
+      "description": "Run all available tests",
+      "inherits": "test-base"
+    },
+    {
+      "name": "test-quick",
+      "displayName": "Quick Test",
+      "description": "Run a quick subset of tests",
+      "inherits": "test-base",
+      "execution": {
+        "stopOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "name": "test_feel_parser_suite"
+        }
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "debug-workflow",
+      "displayName": "Debug: Configure → Build → Test",
+      "description": "Complete debug workflow",
+      "steps": [
+        { "type": "configure", "name": "debug" },
+        { "type": "build", "name": "debug-build" },
+        { "type": "test", "name": "test-all" }
+      ]
+    },
+    {
+      "name": "release-workflow",
+      "displayName": "Release: Configure → Build",
+      "description": "Complete release workflow (no tests)",
+      "steps": [
+        { "type": "configure", "name": "release" },
+        { "type": "build", "name": "release-build" }
+      ]
+    }
+  ]
+}

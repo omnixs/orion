@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="arithmetic-null-test" name="Arithmetic Null Test" namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="d1" name="AddNull">
+    <literalExpression id="le1">
+      <text>A + B</text>
+    </literalExpression>
+  </decision>
+  <decision id="d2" name="MultiplyNull">
+    <literalExpression id="le2">
+      <text>A * B</text>
+    </literalExpression>
+  </decision>
+  <decision id="d3" name="DivideNull">
+    <literalExpression id="le3">
+      <text>A / B</text>
+    </literalExpression>
+  </decision>
+  <decision id="d4" name="SubtractNull">
+    <literalExpression id="le4">
+      <text>A - B</text>
+    </literalExpression>
+  </decision>
+</definitions>

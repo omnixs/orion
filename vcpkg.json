@@ -1,0 +1,26 @@
+{
+  "name": "orion-bre",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "nlohmann-json",
+    "rapidxml",
+    "spdlog",
+    "boost-test",
+    "benchmark"
+  ],
+  "features": {
+    "spdlog": {
+      "description": "Enable spdlog logger implementation",
+      "dependencies": [
+        "spdlog"
+      ]
+    },
+    "tests": {
+      "description": "Build unit tests and benchmarks",
+      "dependencies": [
+        "boost-test",
+        "benchmark"
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+<testCases>
+  <testCase id="1" name="Allowed value: red">
+    <inputNode>
+      <color>red</color>
+    </inputNode>
+    <expectedNode>
+      <result>apple</result>
+    </expectedNode>
+  </testCase>
+  <testCase id="2" name="Allowed value: green">
+    <inputNode>
+      <color>green</color>
+    </inputNode>
+    <expectedNode>
+      <result>leaf</result>
+    </expectedNode>
+  </testCase>
+  <testCase id="3" name="Allowed value: blue">
+    <inputNode>
+      <color>blue</color>
+    </inputNode>
+    <expectedNode>
+      <result>sky</result>
+    </expectedNode>
+  </testCase>
+  <testCase id="4" name="Disallowed value: yellow">
+    <inputNode>
+      <color>yellow</color>
+    </inputNode>
+    <expectedError>Input value for 'color' not in allowed values: yellow</expectedError>
+  </testCase>
+</testCases>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testCases xmlns="http://www.omg.org/spec/DMN/20191111/TESTCASES/">
+  <testCase id="tc1" name="String to Number Conversion">
+    <inputNode decisionRef="InputString">
+      <value>"123.45"</value>
+    </inputNode>
+    <resultNode decisionRef="StringToNumber">
+      <value>125.0</value>
+    </resultNode>
+  </testCase>
+  <testCase id="tc2" name="Boolean to Number Conversion">
+    <inputNode decisionRef="InputBool">
+      <value>true</value>
+    </inputNode>
+    <resultNode decisionRef="BoolToNumber">
+      <value>3</value>
+    </resultNode>
+  </testCase>
+</testCases>

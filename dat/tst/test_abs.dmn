@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" 
+             xmlns:feel="https://www.omg.org/spec/DMN/20230324/FEEL/" 
+             id="test_abs" 
+             name="Test Abs Function" 
+             namespace="https://www.test.com/dmn/test_abs">
+    <decision id="decision001" name="decision001">
+        <variable name="decision001"/>
+        <literalExpression>
+            <text>abs(-42)</text>
+        </literalExpression>
+    </decision>
+</definitions>

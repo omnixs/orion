@@ -1,0 +1,7 @@
+{
+  "name": "orion-consumer-example",
+  "version": "1.0.0",
+  "dependencies": [
+    "orion"
+  ]
+}

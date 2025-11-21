@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="ternary-logic-test" name="Ternary Logic Test" namespace="http://camunda.org/schema/1.0/dmn">
+  <decision id="d1" name="TernaryAnd">
+    <decisionTable id="dt1">
+      <input id="i1" label="A">
+        <inputExpression id="ie1" typeRef="boolean"><text>A</text></inputExpression>
+      </input>
+      <input id="i2" label="B">
+        <inputExpression id="ie2" typeRef="boolean"><text>B</text></inputExpression>
+      </input>
+      <output id="o1" label="Result" typeRef="boolean"/>
+      <rule>
+        <inputEntry id="ie1r1"><text>true</text></inputEntry>
+        <inputEntry id="ie2r1"><text>true</text></inputEntry>
+        <outputEntry id="oe1r1"><text>true</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r2"><text>true</text></inputEntry>
+        <inputEntry id="ie2r2"><text>null</text></inputEntry>
+        <outputEntry id="oe1r2"><text>null</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r3"><text>null</text></inputEntry>
+        <inputEntry id="ie2r3"><text>true</text></inputEntry>
+        <outputEntry id="oe1r3"><text>null</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r4"><text>false</text></inputEntry>
+        <inputEntry id="ie2r4"><text>true</text></inputEntry>
+        <outputEntry id="oe1r4"><text>false</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r5"><text>true</text></inputEntry>
+        <inputEntry id="ie2r5"><text>false</text></inputEntry>
+        <outputEntry id="oe1r5"><text>false</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r6"><text>null</text></inputEntry>
+        <inputEntry id="ie2r6"><text>null</text></inputEntry>
+        <outputEntry id="oe1r6"><text>null</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="d2" name="TernaryOr">
+    <decisionTable id="dt2">
+      <input id="i1" label="A">
+        <inputExpression id="ie1" typeRef="boolean"><text>A</text></inputExpression>
+      </input>
+      <input id="i2" label="B">
+        <inputExpression id="ie2" typeRef="boolean"><text>B</text></inputExpression>
+      </input>
+      <output id="o1" label="Result" typeRef="boolean"/>
+      <rule>
+        <inputEntry id="ie1r1"><text>true</text></inputEntry>
+        <inputEntry id="ie2r1"><text>null</text></inputEntry>
+        <outputEntry id="oe1r1"><text>true</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r2"><text>null</text></inputEntry>
+        <inputEntry id="ie2r2"><text>true</text></inputEntry>
+        <outputEntry id="oe1r2"><text>true</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r3"><text>false</text></inputEntry>
+        <inputEntry id="ie2r3"><text>null</text></inputEntry>
+        <outputEntry id="oe1r3"><text>null</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r4"><text>null</text></inputEntry>
+        <inputEntry id="ie2r4"><text>false</text></inputEntry>
+        <outputEntry id="oe1r4"><text>null</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r5"><text>false</text></inputEntry>
+        <inputEntry id="ie2r5"><text>false</text></inputEntry>
+        <outputEntry id="oe1r5"><text>false</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry id="ie1r6"><text>true</text></inputEntry>
+        <inputEntry id="ie2r6"><text>true</text></inputEntry>
+        <outputEntry id="oe1r6"><text>true</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

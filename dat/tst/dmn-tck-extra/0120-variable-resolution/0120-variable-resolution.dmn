@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/"
+             xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20230324/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="_0120-variable-resolution"
+             name="0120-variable-resolution"
+             namespace="https://github.com/orion/dmn-tck-extra">
+  <decision id="d_Result" name="Result">
+    <variable name="Result" typeRef="number"/>
+    <informationRequirement>
+      <requiredInput href="#i_Input With Spaces"/>
+    </informationRequirement>
+    <literalExpression>
+      <text>2 * Input With Spaces</text>
+    </literalExpression>
+  </decision>
+  <inputData id="i_Input With Spaces" name="Input With Spaces">
+    <variable name="Input With Spaces" typeRef="number"/>
+  </inputData>
+</definitions>
