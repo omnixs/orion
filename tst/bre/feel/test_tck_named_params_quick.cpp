@@ -1,4 +1,10 @@
 /*
+ * ORION Optimized Rule Integration & Operations Native
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: 2025 ORION contributors
+ */
+
+/*
  * Quick verification that named parameters work for TCK tests
  */
 
