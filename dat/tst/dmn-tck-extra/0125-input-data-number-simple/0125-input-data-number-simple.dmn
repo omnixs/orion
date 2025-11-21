@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<definitions namespace="https://github.com/agilepro/dmn-tck" name="0125-input-data-number-simple" id="_0125-input-data-number-simple" xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" xmlns:dmndi="https://www.omg.org/spec/DMN/20230324/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:triso="http://www.trisotech.com/2015/triso/modeling" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <decision name="Result" id="d_Result">
+        <variable typeRef="number" name="Result"/>
+        <informationRequirement id="_req1">
+            <requiredInput href="#i_Number"/>
+        </informationRequirement>
+        <literalExpression>
+            <text>Number * 10</text>
+        </literalExpression>
+    </decision>
+    <inputData name="Number" id="i_Number">
+        <variable typeRef="number" name="Number"/>
+    </inputData>
+</definitions>

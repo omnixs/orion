@@ -1,0 +1,62 @@
+<testCases>
+  <testCase id="tc1" name="TernaryAnd-true-true">
+    <input name="A">true</input>
+    <input name="B">true</input>
+    <expected name="TernaryAnd">true</expected>
+  </testCase>
+  <testCase id="tc2" name="TernaryAnd-true-null">
+    <input name="A">true</input>
+    <input name="B">null</input>
+    <expected name="TernaryAnd">null</expected>
+  </testCase>
+  <testCase id="tc3" name="TernaryAnd-null-true">
+    <input name="A">null</input>
+    <input name="B">true</input>
+    <expected name="TernaryAnd">null</expected>
+  </testCase>
+  <testCase id="tc4" name="TernaryAnd-false-true">
+    <input name="A">false</input>
+    <input name="B">true</input>
+    <expected name="TernaryAnd">false</expected>
+  </testCase>
+  <testCase id="tc5" name="TernaryAnd-true-false">
+    <input name="A">true</input>
+    <input name="B">false</input>
+    <expected name="TernaryAnd">false</expected>
+  </testCase>
+  <testCase id="tc6" name="TernaryAnd-null-null">
+    <input name="A">null</input>
+    <input name="B">null</input>
+    <expected name="TernaryAnd">null</expected>
+  </testCase>
+  <testCase id="tc7" name="TernaryOr-true-null">
+    <input name="A">true</input>
+    <input name="B">null</input>
+    <expected name="TernaryOr">true</expected>
+  </testCase>
+  <testCase id="tc8" name="TernaryOr-null-true">
+    <input name="A">null</input>
+    <input name="B">true</input>
+    <expected name="TernaryOr">true</expected>
+  </testCase>
+  <testCase id="tc9" name="TernaryOr-false-null">
+    <input name="A">false</input>
+    <input name="B">null</input>
+    <expected name="TernaryOr">null</expected>
+  </testCase>
+  <testCase id="tc10" name="TernaryOr-null-false">
+    <input name="A">null</input>
+    <input name="B">false</input>
+    <expected name="TernaryOr">null</expected>
+  </testCase>
+  <testCase id="tc11" name="TernaryOr-false-false">
+    <input name="A">false</input>
+    <input name="B">false</input>
+    <expected name="TernaryOr">false</expected>
+  </testCase>
+  <testCase id="tc12" name="TernaryOr-true-true">
+    <input name="A">true</input>
+    <input name="B">true</input>
+    <expected name="TernaryOr">true</expected>
+  </testCase>
+</testCases>

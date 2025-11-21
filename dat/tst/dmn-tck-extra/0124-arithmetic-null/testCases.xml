@@ -1,0 +1,27 @@
+<testCases>
+  <testCase id="tc1" name="AddNull-1-null">
+    <input name="A">1</input>
+    <input name="B">null</input>
+    <expected name="AddNull">null</expected>
+  </testCase>
+  <testCase id="tc2" name="MultiplyNull-null-2">
+    <input name="A">null</input>
+    <input name="B">2</input>
+    <expected name="MultiplyNull">null</expected>
+  </testCase>
+  <testCase id="tc3" name="DivideNull-3-null">
+    <input name="A">3</input>
+    <input name="B">null</input>
+    <expected name="DivideNull">null</expected>
+  </testCase>
+  <testCase id="tc4" name="SubtractNull-null-4">
+    <input name="A">null</input>
+    <input name="B">4</input>
+    <expected name="SubtractNull">null</expected>
+  </testCase>
+  <testCase id="tc5" name="AddNull-null-null">
+    <input name="A">null</input>
+    <input name="B">null</input>
+    <expected name="AddNull">null</expected>
+  </testCase>
+</testCases>

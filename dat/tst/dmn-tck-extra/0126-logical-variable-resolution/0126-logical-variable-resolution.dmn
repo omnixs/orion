@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" 
+             xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" 
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20230324/DMNDI/" 
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" 
+             id="_0126-logical-variable-resolution"
+             name="0126-logical-variable-resolution"
+             namespace="https://github.com/dmn-tck/tck">
+    
+    <inputData name="VarA" id="i_VarA">
+        <variable typeRef="boolean" name="VarA"/>
+    </inputData>
+    
+    <inputData name="VarB" id="i_VarB">
+        <variable typeRef="boolean" name="VarB"/>
+    </inputData>
+
+    <decision name="LogicalAnd" id="d_LogicalAnd">
+        <variable typeRef="boolean" name="LogicalAnd"/>
+        <informationRequirement id="_req1">
+            <requiredInput href="#i_VarA"/>
+        </informationRequirement>
+        <informationRequirement id="_req2">
+            <requiredInput href="#i_VarB"/>
+        </informationRequirement>
+        <literalExpression>
+            <text>VarA and VarB</text>
+        </literalExpression>
+    </decision>
+
+    <decision name="LogicalOr" id="d_LogicalOr">
+        <variable typeRef="boolean" name="LogicalOr"/>
+        <informationRequirement id="_req3">
+            <requiredInput href="#i_VarA"/>
+        </informationRequirement>
+        <informationRequirement id="_req4">
+            <requiredInput href="#i_VarB"/>
+        </informationRequirement>
+        <literalExpression>
+            <text>VarA or VarB</text>
+        </literalExpression>
+    </decision>
+
+    <decision name="LogicalNot" id="d_LogicalNot">
+        <variable typeRef="boolean" name="LogicalNot"/>
+        <informationRequirement id="_req5">
+            <requiredInput href="#i_VarA"/>
+        </informationRequirement>
+        <literalExpression>
+            <text>not(VarA)</text>
+        </literalExpression>
+    </decision>
+
+</definitions>

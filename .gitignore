@@ -1,0 +1,54 @@
+# Build directories
+build/
+
+# Visual Studio Code settings
+.vscode/
+
+# Documentation (excluding from repo, but keeping examples and key standards)
+docs/*
+!docs/examples/
+!docs/copilot_instructions.md
+docs/prompts/
+docs/replies/
+
+# DMN TCK data files (log only, not the test repository)
+dat/log/
+
+# Backup files
+*.zip
+*.backup
+temp/
+
+# Compiled binaries
+*.o
+*.a
+*.so
+*.exe
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+_deps/
+
+# vcpkg
+vcpkg_installed/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+# Performance profiling results
+performance_results/
+vtune_results/
+test_arena_*.cpp

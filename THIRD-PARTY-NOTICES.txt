@@ -1,0 +1,7 @@
+This project may bundle or depend on third-party components. List them here,
+including their licenses and attributions. Example:
+
+- Example Library — MIT License
+  License: https://opensource.org/license/mit/
+
+(Add each third-party component you redistribute, with its license text or a link.)

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testCases xmlns="http://www.omg.org/spec/DMN/20160719/testcase" 
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+           xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <modelName>0126-logical-variable-resolution.dmn</modelName>
+    <labels>
+        <label>DMN TCK Extra</label>
+        <label>Variable Resolution</label>
+        <label>Logical Expressions</label>
+        <label>FEEL</label>
+    </labels>
+    
+    <testCase id="001">
+        <description>Test logical AND with variables resolved from context (true and true)</description>
+        <inputNode name="VarA">
+            <value xsi:type="xsd:boolean">true</value>
+        </inputNode>
+        <inputNode name="VarB">
+            <value xsi:type="xsd:boolean">true</value>
+        </inputNode>
+        <resultNode name="LogicalAnd" type="decision">
+            <expected>
+                <value xsi:type="xsd:boolean">true</value>
+            </expected>
+        </resultNode>
+        <resultNode name="LogicalOr" type="decision">
+            <expected>
+                <value xsi:type="xsd:boolean">true</value>
+            </expected>
+        </resultNode>
+        <resultNode name="LogicalNot" type="decision">
+            <expected>
+                <value xsi:type="xsd:boolean">false</value>
+            </expected>
+        </resultNode>
+    </testCase>
+    
+    <testCase id="002">
+        <description>Test logical operations with variables resolved from context (false and true)</description>
+        <inputNode name="VarA">
+            <value xsi:type="xsd:boolean">false</value>
+        </inputNode>
+        <inputNode name="VarB">
+            <value xsi:type="xsd:boolean">true</value>
+        </inputNode>
+        <resultNode name="LogicalAnd" type="decision">
+            <expected>
+                <value xsi:type="xsd:boolean">false</value>
+            </expected>
+        </resultNode>
+        <resultNode name="LogicalOr" type="decision">
+            <expected>
+                <value xsi:type="xsd:boolean">true</value>
+            </expected>
+        </resultNode>
+        <resultNode name="LogicalNot" type="decision">
+            <expected>
+                <value xsi:type="xsd:boolean">true</value>
+            </expected>
+        </resultNode>
+    </testCase>
+</testCases>

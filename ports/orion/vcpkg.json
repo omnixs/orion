@@ -1,0 +1,28 @@
+{
+  "name": "orion",
+  "version": "1.0.0",
+  "description": "Orion Business Rules Engine - DMN decision engine with FEEL expression language support",
+  "homepage": "https://github.com/your-org/orion",
+  "license": "MIT",
+  "supports": "!(uwp | arm)",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    "nlohmann-json",
+    "rapidxml"
+  ],
+  "features": {
+    "spdlog": {
+      "description": "Enable spdlog logger implementation (optional)",
+      "dependencies": [
+        "spdlog"
+      ]
+    }
+  }
+}

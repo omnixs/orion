@@ -1,0 +1,26 @@
+name: "[OPTIONAL] Drools Runner"
+
+on:
+  [ push, pull_request ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    - name: Cache Maven packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+    - name: Run OPTIONAL Drools Runner
+      # It is never possible to make a green PR check running tests, because new tests for new
+      # features that may not be yet in the engine can get merged regularly. So ignoring failures, but
+      # still running tests to have a list of potential failures.
+      run: cd runners && mvn verify --batch-mode --update-snapshots -Pdrools -Dmaven.test.failure.ignore=true
