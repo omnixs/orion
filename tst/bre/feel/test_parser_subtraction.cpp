@@ -1,3 +1,9 @@
+/*
+ * ORION Optimized Rule Integration & Operations Native
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: 2025 ORION contributors
+ */
+
 /**
  * @file test_subtraction_parsing.cpp
  * @brief Unit tests for subtraction operator parsing

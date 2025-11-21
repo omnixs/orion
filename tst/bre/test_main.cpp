@@ -1,3 +1,9 @@
+/*
+ * ORION Optimized Rule Integration & Operations Native
+ * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: 2025 ORION contributors
+ */
+
 #define BOOST_TEST_MODULE orion_bre
 #include <boost/test/unit_test.hpp>
 #include <orion/api/logger.hpp>
