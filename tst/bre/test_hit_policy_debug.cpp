@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(test_rule_order_hit_policy) {
             BOOST_FAIL("Failed to load DMN model: " + error);
         }
         
-        std::string result = engine.evaluate(input_json, {});
+        std::string result = engine.evaluate(input_json);
         BOOST_TEST_MESSAGE("Result: " << result);
         
         // Parse result to check if it's valid JSON
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE(test_output_order_hit_policy) {
             BOOST_FAIL("Failed to load DMN model: " + error);
         }
         
-        std::string result = engine.evaluate(input_json, {});
+        std::string result = engine.evaluate(input_json);
         BOOST_TEST_MESSAGE("Result: " << result);
         
         // Parse result to check if it's valid JSON

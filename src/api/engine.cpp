@@ -119,7 +119,7 @@ namespace orion
             }
         }
 
-        string BusinessRulesEngine::evaluate(string_view data_json, const EvalOptions& options [[maybe_unused]]) const
+        string BusinessRulesEngine::evaluate(string_view data_json) const
         {
             json data = json::parse(data_json);
             json results = json::object();

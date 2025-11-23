@@ -110,7 +110,7 @@ static void BM_FeelMath_AST(benchmark::State& state) {
     for (auto _ : state) {
         for (const auto& test_case : test_cases) {
             std::string input_json = test_case.input.dump();
-            auto result = engine.evaluate(input_json, {});
+            auto result = engine.evaluate(input_json);
             benchmark::DoNotOptimize(result);
         }
     }
@@ -173,7 +173,7 @@ static void BM_TernaryLogic_AST(benchmark::State& state) {
     for (auto _ : state) {
         for (const auto& test_case : test_cases) {
             std::string input_json = test_case.input.dump();
-            auto result = engine.evaluate(input_json, {});
+            auto result = engine.evaluate(input_json);
             benchmark::DoNotOptimize(result);
         }
     }
@@ -222,7 +222,7 @@ static void BM_MultiOutput_CollectSum_AST(benchmark::State& state) {
     for (auto _ : state) {
         for (const auto& test_case : test_cases) {
             std::string input_json = test_case.input.dump();
-            auto result = engine.evaluate(input_json, {});
+            auto result = engine.evaluate(input_json);
             benchmark::DoNotOptimize(result);
         }
     }
@@ -271,7 +271,7 @@ static void BM_StringConcat_AST(benchmark::State& state) {
     for (auto _ : state) {
         for (const auto& test_case : test_cases) {
             std::string input_json = test_case.input.dump();
-            auto result = engine.evaluate(input_json, {});
+            auto result = engine.evaluate(input_json);
             benchmark::DoNotOptimize(result);
         }
     }
@@ -327,7 +327,7 @@ static void BM_Phase3_MultiEvaluation_Benefit(benchmark::State& state) {
     for (auto _ : state) {
         for (const auto& test_case : test_cases) {
             std::string input_json = test_case.input.dump();
-            auto result = engine.evaluate(input_json, {});
+            auto result = engine.evaluate(input_json);
             benchmark::DoNotOptimize(result);
             total_evaluations++;
         }

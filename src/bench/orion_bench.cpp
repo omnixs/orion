@@ -314,7 +314,7 @@ static BusinessRulesEngine createEngineForOrderDiscount() {
 static void BM_CalcDiscount_A1_Infant_NoPriority(benchmark::State& state) {
     auto engine = createEngineForA1();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA1_Input1, {});
+        std::string result = engine.evaluate(kCalcDiscountA1_Input1);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -322,7 +322,7 @@ static void BM_CalcDiscount_A1_Infant_NoPriority(benchmark::State& state) {
 static void BM_CalcDiscount_A1_Infant_Priority(benchmark::State& state) {
     auto engine = createEngineForA1();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA1_Input2, {});
+        std::string result = engine.evaluate(kCalcDiscountA1_Input2);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -330,7 +330,7 @@ static void BM_CalcDiscount_A1_Infant_Priority(benchmark::State& state) {
 static void BM_CalcDiscount_A1_Child_NoPriority(benchmark::State& state) {
     auto engine = createEngineForA1();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA1_Input3, {});
+        std::string result = engine.evaluate(kCalcDiscountA1_Input3);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -338,7 +338,7 @@ static void BM_CalcDiscount_A1_Child_NoPriority(benchmark::State& state) {
 static void BM_CalcDiscount_A1_Child_Priority(benchmark::State& state) {
     auto engine = createEngineForA1();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA1_Input4, {});
+        std::string result = engine.evaluate(kCalcDiscountA1_Input4);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -346,7 +346,7 @@ static void BM_CalcDiscount_A1_Child_Priority(benchmark::State& state) {
 static void BM_CalcDiscount_A1_Adult_NoPriority(benchmark::State& state) {
     auto engine = createEngineForA1();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA1_Input5, {});
+        std::string result = engine.evaluate(kCalcDiscountA1_Input5);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -354,7 +354,7 @@ static void BM_CalcDiscount_A1_Adult_NoPriority(benchmark::State& state) {
 static void BM_CalcDiscount_A1_Adult_Priority(benchmark::State& state) {
     auto engine = createEngineForA1();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA1_Input6, {});
+        std::string result = engine.evaluate(kCalcDiscountA1_Input6);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -363,7 +363,7 @@ static void BM_CalcDiscount_A1_Adult_Priority(benchmark::State& state) {
 static void BM_CalcDiscount_A2_CollectSum(benchmark::State& state) {
     auto engine = createEngineForA2();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kCalcDiscountA2_Input, {});
+        std::string result = engine.evaluate(kCalcDiscountA2_Input);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -372,7 +372,7 @@ static void BM_CalcDiscount_A2_CollectSum(benchmark::State& state) {
 static void BM_OrderDiscount_Small(benchmark::State& state) {
     auto engine = createEngineForOrderDiscount();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kOrderDiscount_Input1, {});
+        std::string result = engine.evaluate(kOrderDiscount_Input1);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -380,7 +380,7 @@ static void BM_OrderDiscount_Small(benchmark::State& state) {
 static void BM_OrderDiscount_Medium(benchmark::State& state) {
     auto engine = createEngineForOrderDiscount();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kOrderDiscount_Input2, {});
+        std::string result = engine.evaluate(kOrderDiscount_Input2);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -388,7 +388,7 @@ static void BM_OrderDiscount_Medium(benchmark::State& state) {
 static void BM_OrderDiscount_Large(benchmark::State& state) {
     auto engine = createEngineForOrderDiscount();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kOrderDiscount_Input3, {});
+        std::string result = engine.evaluate(kOrderDiscount_Input3);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -396,7 +396,7 @@ static void BM_OrderDiscount_Large(benchmark::State& state) {
 static void BM_OrderDiscount_Larger(benchmark::State& state) {
     auto engine = createEngineForOrderDiscount();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kOrderDiscount_Input4, {});
+        std::string result = engine.evaluate(kOrderDiscount_Input4);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -404,7 +404,7 @@ static void BM_OrderDiscount_Larger(benchmark::State& state) {
 static void BM_OrderDiscount_Largest(benchmark::State& state) {
     auto engine = createEngineForOrderDiscount();
     for (auto _ : state) {
-        std::string result = engine.evaluate(kOrderDiscount_Input5, {});
+        std::string result = engine.evaluate(kOrderDiscount_Input5);
         benchmark::DoNotOptimize(result);
     }
 }
