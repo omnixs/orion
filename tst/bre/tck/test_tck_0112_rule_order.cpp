@@ -77,14 +77,13 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
 </definitions>)";
 
     BusinessRulesEngine engine;
-    std::string error;
     
     BOOST_TEST_MESSAGE("Loading DMN model...");
-    bool loaded = engine.load_dmn_model(dmn_xml, error);
-    BOOST_CHECK_MESSAGE(loaded, "Failed to load DMN model: " + error);
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    BOOST_CHECK_MESSAGE(load_result.has_value(), "Failed to load DMN model: " + load_result.error());
     
-    if (!loaded) {
-        BOOST_TEST_MESSAGE("DMN model load failed: " + error);
+    if (!load_result) {
+        BOOST_TEST_MESSAGE("DMN model load failed: " + load_result.error());
         return;
     }
     

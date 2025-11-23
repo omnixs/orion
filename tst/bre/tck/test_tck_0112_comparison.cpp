@@ -82,9 +82,9 @@ BOOST_AUTO_TEST_CASE(test_0112_exact_tck_comparison) {
     
     // Use proper BusinessRulesEngine API instead of legacy function
     orion::api::BusinessRulesEngine engine;
-    std::string error;
-    if (!engine.load_dmn_model(dmn_xml, error)) {
-        BOOST_FAIL("Failed to load DMN model: " + error);
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
     }
     std::string result = engine.evaluate(input_json);
     BOOST_TEST_MESSAGE("Engine result string: " + result);

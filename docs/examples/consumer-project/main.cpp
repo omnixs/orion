@@ -54,10 +54,10 @@ int main() {
   </decision>
 </definitions>)";
     
-    // Load the DMN model
-    std::string error_message;
-    if (!engine.load_dmn_model(dmn_xml, error_message)) {
-        std::cerr << "Failed to load DMN model: " << error_message << std::endl;
+    // Load DMN model
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        std::cerr << "Failed to load DMN model: " << load_result.error() << std::endl;
         return 1;
     }
     std::cout << "DMN model loaded successfully!" << std::endl;
