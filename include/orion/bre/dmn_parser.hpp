@@ -30,12 +30,12 @@ namespace rapidxml
 
 namespace orion::bre
 {
-    DecisionTable parse_dmn_decision_table(const std::string& xml);
+    DecisionTable parse_dmn_decision_table(std::string_view xml);
     // Returns { decisionName, literalExpressionText } or throws if not found
-    std::pair<std::string, std::string> parse_dmn_literal_decision(const std::string& xml);
+    std::pair<std::string, std::string> parse_dmn_literal_decision(std::string_view xml);
     // Returns { bkmName, parameters, expressionText } or throws if not found  
     std::tuple<std::string, std::vector<std::string>, std::string> parse_dmn_business_knowledge_model(
-        const std::string& xml, const std::string& bkm_name = "");
+        std::string_view xml, std::string_view bkm_name = "");
 
     // DMN Model structure (needs to be defined)
     struct DmnModel
@@ -47,7 +47,7 @@ namespace orion::bre
     class DmnParser
     {
     public:
-        DmnModel parse(const std::string& xml);
+        DmnModel parse(std::string_view xml);
 
     private:
         DecisionTable parse_decision_table_from_node(rapidxml::xml_node<char>* table,

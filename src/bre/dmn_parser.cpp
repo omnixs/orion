@@ -80,7 +80,7 @@ namespace orion::bre
         }
     }
     
-    static HitPolicy parse_hit_policy(const std::string& hp, CollectAggregation& agg)
+    static HitPolicy parse_hit_policy(std::string_view hp, CollectAggregation& agg)
     {
     agg = CollectAggregation::NONE; // Default
 
@@ -120,10 +120,10 @@ namespace orion::bre
         return HitPolicy::FIRST; // Default fallback
     }
 
-    DecisionTable parse_dmn_decision_table(const std::string& xml)
+    DecisionTable parse_dmn_decision_table(std::string_view xml)
     {
         rapidxml::xml_document<> doc;
-        std::string buf = xml;
+        std::string buf(xml);
         doc.parse<0>(buf.data());
 
         auto* root = doc.first_node();
@@ -284,10 +284,10 @@ namespace orion::bre
         return dt;
     }
 
-    std::pair<std::string, std::string> parse_dmn_literal_decision(const std::string& xml)
+    std::pair<std::string, std::string> parse_dmn_literal_decision(std::string_view xml)
     {
         rapidxml::xml_document<> doc;
-        std::string buf = xml;
+        std::string buf(xml);
         doc.parse<0>(&buf[0]);
         auto* root = doc.first_node();
         if (root == nullptr) { throw std::runtime_error("DMN: empty document");
@@ -314,10 +314,10 @@ namespace orion::bre
 
     // Parse Business Knowledge Model from DMN XML
     std::tuple<std::string, std::vector<std::string>, std::string> parse_dmn_business_knowledge_model(
-        const std::string& xml, const std::string& bkm_name)
+        std::string_view xml, std::string_view bkm_name)
     {
         rapidxml::xml_document<> doc;
-        std::string buf = xml;
+        std::string buf(xml);
         doc.parse<0>(&buf[0]);
 
         auto* root = doc.first_node();
@@ -372,13 +372,13 @@ namespace orion::bre
             }
         }
 
-        throw std::runtime_error("DMN: businessKnowledgeModel '" + bkm_name + "' not found");
+        throw std::runtime_error(std::string("DMN: businessKnowledgeModel '") + std::string(bkm_name) + "' not found");
     }
 
-    DmnModel DmnParser::parse(const std::string& xml)
+    DmnModel DmnParser::parse(std::string_view xml)
     {
         rapidxml::xml_document<> doc;
-        std::string buf = xml;
+        std::string buf(xml);
         doc.parse<0>(&buf[0]);
 
         auto* root = doc.first_node();
@@ -573,8 +573,8 @@ namespace orion::bre
     }
 
     // Enhanced parse_business_knowledge_model with contract enforcement
-    unique_ptr<BusinessKnowledgeModel> parse_business_knowledge_model(const string& dmn_xml,
-                                                                   const string& bkm_name,
+    unique_ptr<BusinessKnowledgeModel> parse_business_knowledge_model(std::string_view dmn_xml,
+                                                                   std::string_view bkm_name,
                                                                    string& error_message)
     {
         if (dmn_xml.empty()) [[unlikely]]

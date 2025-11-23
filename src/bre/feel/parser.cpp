@@ -76,12 +76,12 @@ namespace orion::bre::feel {
         return peek().type == type;
     }
     
-    bool Parser::check_text(const std::string& text) const
+    bool Parser::check_text(std::string_view text) const
     {
         return peek().text == text;
     }
     
-    const Token& Parser::expect(TokenType type, const std::string& message)
+    const Token& Parser::expect(TokenType type, std::string_view message)
     {
         if (!check(type))
         {
@@ -399,11 +399,11 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
     return parse_variable_with_properties(token.text);
 }
 
-std::unique_ptr<ASTNode> Parser::parse_function_call(const std::string& function_name)
+std::unique_ptr<ASTNode> Parser::parse_function_call(std::string_view function_name)
 {
     advance(); // consume '('
     
-    auto func_node = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, function_name);
+    auto func_node = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, std::string(function_name));
     
     // Parse arguments (if any)
     if (!check(TokenType::RPAREN))
@@ -415,7 +415,7 @@ std::unique_ptr<ASTNode> Parser::parse_function_call(const std::string& function
     return func_node;
 }
 
-void Parser::parse_function_parameters(ASTNode* func_node, const std::string& function_name)
+void Parser::parse_function_parameters(ASTNode* func_node, std::string_view function_name)
 {
     bool has_named_params = false;
     bool has_positional_params = false;
@@ -492,9 +492,9 @@ void Parser::parse_function_parameters(ASTNode* func_node, const std::string& fu
     }
 }
 
-std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(const std::string& var_name)
+std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(std::string_view var_name)
 {
-    auto node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, var_name);
+    auto node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, std::string(var_name));
     
     // Check for property access (.property)
     while (check(TokenType::DOT))

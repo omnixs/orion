@@ -19,5 +19,5 @@
 #include <string>
 
 namespace orion::bre::feel {
-    bool unary_test_matches(const std::string& test, const std::string& candidate);
+    bool unary_test_matches(std::string_view test, std::string_view candidate);
 }

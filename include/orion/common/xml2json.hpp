@@ -44,20 +44,20 @@ namespace orion::common
     /// @param value The text content of the XML value
     /// @param xsiType The xsi:type attribute value (e.g., "xsd:decimal", "xsd:string")
     /// @return JSON representation of the value
-    nlohmann::json parse_xml_value(const std::string& value, const std::string& xsiType);
+    nlohmann::json parse_xml_value(std::string_view value, std::string_view xsiType);
 
     /// Parse DMN TCK test XML into structured test cases
     /// @param xml The complete XML content of a DMN test file
     /// @return Vector of parsed test cases with input/output expectations
-    std::vector<ParsedCase> parse_test_xml(const std::string& xml);
+    std::vector<ParsedCase> parse_test_xml(std::string_view xml);
 
     /// Extract expected outputs from a specific test case XML node
     /// @param testCaseXml XML content of a single test case
     /// @return Vector of output expectations for this test case
-    std::vector<OutputExpectation> parse_output_expectations(const std::string& testCaseXml);
+    std::vector<OutputExpectation> parse_output_expectations(std::string_view testCaseXml);
 
     /// Convert component structure to JSON object
     /// @param componentXml XML content containing component definitions
     /// @return JSON object with component name-value pairs
-    nlohmann::json parse_component_structure(const std::string& componentXml);
+    nlohmann::json parse_component_structure(std::string_view componentXml);
 } // namespace orion::common

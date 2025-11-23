@@ -48,8 +48,8 @@ namespace orion
             std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
 
             // Helper methods
-            [[nodiscard]] nlohmann::json resolve_variable(const std::string& name, const nlohmann::json& context) const;
-            [[nodiscard]] std::string format_result(const std::string& decision_name, const nlohmann::json& result) const;
+            [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
+            [[nodiscard]] std::string format_result(std::string_view decision_name, const nlohmann::json& result) const;
 
             // Internal component management (moved from public API)
             void add_decision_table(std::unique_ptr<DecisionTable> table);
@@ -66,7 +66,7 @@ namespace orion
         BusinessRulesEngine& BusinessRulesEngine::operator=(BusinessRulesEngine&&) noexcept = default;
 
         // BusinessRulesEngine implementation
-        bool BusinessRulesEngine::load_dmn_model(const string& dmn_xml, string& error_message)
+        bool BusinessRulesEngine::load_dmn_model(string_view dmn_xml, string& error_message)
         {
             if (dmn_xml.empty()) [[unlikely]]
             {
@@ -119,7 +119,7 @@ namespace orion
             }
         }
 
-        string BusinessRulesEngine::evaluate(const string& data_json, const EvalOptions& options [[maybe_unused]]) const
+        string BusinessRulesEngine::evaluate(string_view data_json, const EvalOptions& options [[maybe_unused]]) const
         {
             json data = json::parse(data_json);
             json results = json::object();
@@ -179,19 +179,19 @@ namespace orion
             return names;
         }
 
-        bool BusinessRulesEngine::remove_decision_table(const string& name)
+        bool BusinessRulesEngine::remove_decision_table(string_view name)
         {
-            return pimpl->decision_tables_.erase(name) > 0;
+            return pimpl->decision_tables_.erase(string(name)) > 0;
         }
 
-        bool BusinessRulesEngine::remove_business_knowledge_model(const string& name)
+        bool BusinessRulesEngine::remove_business_knowledge_model(string_view name)
         {
             return pimpl->bkm_manager_.remove_bkm(name);
         }
 
-        bool BusinessRulesEngine::remove_literal_decision(const string& name)
+        bool BusinessRulesEngine::remove_literal_decision(string_view name)
         {
-            return pimpl->literal_decisions_.erase(name) > 0;
+            return pimpl->literal_decisions_.erase(string(name)) > 0;
         }
 
         void BusinessRulesEngine::clear()
@@ -209,7 +209,7 @@ namespace orion
         }
 
         // Impl helper methods implementation
-        json BusinessRulesEngine::Impl::resolve_variable(const string& name, const json& context) const
+            json BusinessRulesEngine::Impl::resolve_variable(string_view name, const json& context) const
         {
             if (context.contains(name))
             {
@@ -218,7 +218,7 @@ namespace orion
             return json{};
         }
 
-        string BusinessRulesEngine::Impl::format_result(const string& decision_name, const json& result) const
+            string BusinessRulesEngine::Impl::format_result(string_view decision_name, const json& result) const
         {
             json wrapper = json::object();
             wrapper[decision_name.empty() ? "result" : decision_name] = result;
