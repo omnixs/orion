@@ -456,7 +456,7 @@ std::string try_extend_variable_name(std::string_view expr, std::string_view var
     const auto& ctx = *orion::bre::detail::current_eval_context;
     
     // If standard name exists, use it
-    if (ctx.contains(std::string(var_name)))
+    if (ctx.contains(var_name))
     {
         return std::string(var_name);
     }

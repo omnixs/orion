@@ -460,11 +460,11 @@ namespace orion::bre
             if (value.is_array())
             {
                 return std::ranges::any_of(value, [&](const auto& element) {
-                    return feel::unary_test_matches(std::string(token), to_string_sv(element));
+                    return feel::unary_test_matches(token, to_string_sv(element));
                 });
             }
 
-            return feel::unary_test_matches(std::string(token), to_string_sv(value));
+            return feel::unary_test_matches(token, to_string_sv(value));
         }
     } // namespace detail
 

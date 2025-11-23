@@ -72,11 +72,11 @@ namespace orion::bre::feel {
                 // AST evaluation failed - log at debug level to avoid spam during TCK testing
                 // When testing compliance suites, many unimplemented features are expected
                 debug("[AST-FAILED] AST evaluation failed: '{}' - Error: {}", expression, e.what());
-                throw std::runtime_error(std::string("FEEL expression evaluation failed: ") + std::string(expression) + " - " + std::string(e.what()));
+                throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression) + " - " + e.what());
             }
         }
 
         // If we reach here with AST parsing enabled, something went wrong
-        throw std::runtime_error(std::string("FEEL expression evaluation failed: ") + std::string(expression));
+        throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression));
     }
 }

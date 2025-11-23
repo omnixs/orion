@@ -91,7 +91,7 @@ namespace orion::bre
         auto bkm_iterator = bkms_.find(std::string(bkm_name));
         if (bkm_iterator == bkms_.end()) [[unlikely]]
         {
-            throw std::runtime_error(std::string("BKM not found: ") + std::string(bkm_name));
+            throw std::runtime_error(std::string("BKM not found: ").append(bkm_name));
         }
 
         // Create BKM map for recursive calls
@@ -218,7 +218,7 @@ namespace orion::bre
         const BusinessKnowledgeModel& bkm = bkm_it->second;
 
         // Parse arguments using existing utility function
-        std::vector<std::string> args = orion::common::split(std::string(args_str), ',');
+        std::vector<std::string> args = orion::common::split(args_str, ',');
 
         // Trim whitespace from each argument
         for (auto& arg : args)

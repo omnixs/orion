@@ -372,7 +372,7 @@ namespace orion::bre
             }
         }
 
-        throw std::runtime_error(std::string("DMN: businessKnowledgeModel '") + std::string(bkm_name) + "' not found");
+        throw std::runtime_error(std::string("DMN: businessKnowledgeModel '").append(bkm_name) + "' not found");
     }
 
     DmnModel DmnParser::parse(std::string_view xml)
