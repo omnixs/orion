@@ -53,15 +53,15 @@ namespace orion::api
             BusinessRulesEngine& operator=(BusinessRulesEngine&&) noexcept;
 
             // Parse and load DMN model
-            [[nodiscard]] bool load_dmn_model(const std::string& dmn_xml, std::string& error_message);
+            [[nodiscard]] bool load_dmn_model(std::string_view dmn_xml, std::string& error_message);
 
             // Remove components
-            [[nodiscard]] bool remove_decision_table(const std::string& name);
-            [[nodiscard]] bool remove_business_knowledge_model(const std::string& name);
-            [[nodiscard]] bool remove_literal_decision(const std::string& name);
+            [[nodiscard]] bool remove_decision_table(std::string_view name);
+            [[nodiscard]] bool remove_business_knowledge_model(std::string_view name);
+            [[nodiscard]] bool remove_literal_decision(std::string_view name);
 
         // Evaluate with loaded models
-        [[nodiscard]] std::string evaluate(const std::string& data_json, const EvalOptions& options = {}) const;
+        [[nodiscard]] std::string evaluate(std::string_view data_json, const EvalOptions& options = {}) const;
 
         // Introspection
         [[nodiscard]] std::vector<std::string> get_decision_table_names() const;

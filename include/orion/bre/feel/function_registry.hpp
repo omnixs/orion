@@ -75,7 +75,7 @@ public:
      * @param name The function name (case-sensitive)
      * @return The function signature if found, otherwise nullopt
      */
-    [[nodiscard]] std::optional<FunctionSignature> get_signature(const std::string& name) const;
+    [[nodiscard]] std::optional<FunctionSignature> get_signature(std::string_view name) const;
     
     // Prevent copying and moving (singleton pattern)
     FunctionRegistry(const FunctionRegistry&) = delete;

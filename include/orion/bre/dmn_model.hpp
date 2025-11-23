@@ -366,7 +366,7 @@ namespace orion::bre
          * @param label Key or dotted path to resolve
          * @return JSON value at path, or empty JSON if not found
          */
-        inline nlohmann::json get_value_from_label(const nlohmann::json& ctx, const std::string& label)
+        inline nlohmann::json get_value_from_label(const nlohmann::json& ctx, std::string_view label)
         {
             if (!ctx.is_object()) {
                 return {};
@@ -387,7 +387,7 @@ namespace orion::bre
                 while (start < label.size())
                 {
                     size_t dot = label.find('.', start);
-                    std::string part = label.substr(start, dot == std::string::npos ? std::string::npos : dot - start);
+                    std::string part(label.substr(start, dot == std::string::npos ? std::string::npos : dot - start));
 
                     if (node->is_object())
                     {
@@ -428,7 +428,7 @@ namespace orion::bre
          * @param value JSON value to test against
          * @return true if token matches value, false otherwise
          */
-        inline bool entry_matches(const std::string& token, const nlohmann::json& value)
+        inline bool entry_matches(std::string_view token, const nlohmann::json& value)
         {
             if (token == "-" || token.empty()) {
                 return true;
@@ -460,16 +460,16 @@ namespace orion::bre
             if (value.is_array())
             {
                 return std::ranges::any_of(value, [&](const auto& element) {
-                    return feel::unary_test_matches(token, to_string_sv(element));
+                    return feel::unary_test_matches(std::string(token), to_string_sv(element));
                 });
             }
 
-            return feel::unary_test_matches(token, to_string_sv(value));
+            return feel::unary_test_matches(std::string(token), to_string_sv(value));
         }
     } // namespace detail
 
     // Factory functions for creating parsed components
-    std::unique_ptr<DecisionTable> parse_decision_table(const std::string& dmn_xml, std::string& error_message);
-    std::unique_ptr<LiteralDecision> parse_literal_decision(const std::string& dmn_xml, std::string& error_message);
+    std::unique_ptr<DecisionTable> parse_decision_table(std::string_view dmn_xml, std::string& error_message);
+    std::unique_ptr<LiteralDecision> parse_literal_decision(std::string_view dmn_xml, std::string& error_message);
 
 } // namespace orion::bre

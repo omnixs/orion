@@ -32,7 +32,7 @@ namespace orion::bre::feel {
         return str;
     }
 
-    static bool parse_bool(const std::string& str, bool& value)
+    static bool parse_bool(std::string_view str, bool& value)
     {
         if (str == "true" || str == "True" || str == "TRUE")
         {
@@ -47,7 +47,7 @@ namespace orion::bre::feel {
         return false;
     }
 
-    static bool parse_number(const std::string& str, double& out)
+    static bool parse_number(std::string_view str, double& out)
     {
         auto str_view = std::string_view(str);
         double value{};
@@ -59,7 +59,7 @@ namespace orion::bre::feel {
         }
         try
         {
-            out = std::stod(str);
+            out = std::stod(std::string(str));
             return true;
         }
         catch (...) { return false; }
@@ -76,7 +76,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Three-way comparison for dates
-    static std::optional<int> try_compare_dates(const std::string& lhs, const std::string& rhs)
+    static std::optional<int> try_compare_dates(std::string_view lhs, std::string_view rhs)
     {
         auto date_lhs = parse_date(lhs);
         if (!date_lhs) { return std::nullopt;
@@ -94,7 +94,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Three-way comparison for times
-    static std::optional<int> try_compare_times(const std::string& lhs, const std::string& rhs)
+    static std::optional<int> try_compare_times(std::string_view lhs, std::string_view rhs)
     {
         auto time_lhs = parse_time(lhs);
         if (!time_lhs) { return std::nullopt;
@@ -112,7 +112,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Three-way comparison for datetimes
-    static std::optional<int> try_compare_datetimes(const std::string& lhs, const std::string& rhs)
+    static std::optional<int> try_compare_datetimes(std::string_view lhs, std::string_view rhs)
     {
         auto datetime_lhs = parse_datetime(lhs);
         if (!datetime_lhs) { return std::nullopt;
@@ -130,7 +130,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Three-way comparison for durations
-    static std::optional<int> try_compare_durations(const std::string& lhs, const std::string& rhs)
+    static std::optional<int> try_compare_durations(std::string_view lhs, std::string_view rhs)
     {
         auto duration_lhs = parse_duration(lhs);
         if (!duration_lhs) { return std::nullopt;
@@ -152,7 +152,7 @@ namespace orion::bre::feel {
     }
 
     // Main dispatcher: Try each type comparison in order
-    static int cmp_values(const std::string& lhs, const std::string& rhs)
+    static int cmp_values(std::string_view lhs, std::string_view rhs)
     {
         // Try numeric comparison
         double num_lhs = 0.0;
@@ -194,7 +194,7 @@ namespace orion::bre::feel {
         return 0;
     }
 
-    static bool match_single_literal(const std::string& test, const std::string& cand)
+    static bool match_single_literal(std::string_view test, std::string_view cand)
     {
         std::string test_val = unquote(orion::common::trim(test));
         std::string cand_val = orion::common::trim(cand);
@@ -258,7 +258,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Handle not() function - returns true if NONE of the inner tests match
-    static bool match_not_function(const std::string& test, const std::string& candidate)
+    static bool match_not_function(std::string_view test, std::string_view candidate)
     {
         if (!test.ends_with(")"))
         {
@@ -276,7 +276,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Handle comma-separated list - returns true if ANY test matches
-    static bool match_list(const std::string& test, const std::string& candidate)
+    static bool match_list(std::string_view test, std::string_view candidate)
     {
         for (auto& part : orion::common::split(test, ','))
         {
@@ -289,11 +289,12 @@ namespace orion::bre::feel {
     }
 
     // Helper: Handle comparison operators (<, <=, >, >=, ==)
-    static bool match_comparison(const std::string& test, const std::string& candidate)
+    static bool match_comparison(std::string_view test, std::string_view candidate)
     {
         static const std::regex cmp_re(R"(^\s*([<>]=?|==)\s*(.+)\s*$)");
         std::smatch match;
-        if (!std::regex_match(test, match, cmp_re))
+        std::string test_str(test);  // regex requires std::string
+        if (!std::regex_match(test_str, match, cmp_re))
         {
             return false;
         }
@@ -316,11 +317,12 @@ namespace orion::bre::feel {
     }
 
     // Helper: Handle range test [a..b], (a..b), [a..b), (a..b]
-    static bool match_range(const std::string& test, const std::string& candidate)
+    static bool match_range(std::string_view test, std::string_view candidate)
     {
         static const std::regex range_re(R"(^\s*([\[(])\s*(.+)\s*\.\.\s*(.+)\s*([\])])\s*$)");
         std::smatch match;
-        if (!std::regex_match(test, match, range_re))
+        std::string test_str(test);
+        if (!std::regex_match(test_str, match, range_re))
         {
             return false;
         }
@@ -339,7 +341,7 @@ namespace orion::bre::feel {
     }
 
     // Main dispatcher: Try each test type in order
-    bool unary_test_matches(const std::string& test_raw, const std::string& candidate)
+    bool unary_test_matches(std::string_view test_raw, std::string_view candidate)
     {
         std::string test = orion::common::trim(test_raw);
         

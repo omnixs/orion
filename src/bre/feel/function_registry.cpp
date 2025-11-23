@@ -197,9 +197,9 @@ void FunctionRegistry::register_function(const FunctionSignature& sig) {
 }
 
 std::optional<FunctionSignature> FunctionRegistry::get_signature(
-    const std::string& name) const 
+    std::string_view name) const 
 {
-    auto iter = functions_.find(name);
+    auto iter = functions_.find(std::string(name));
     if (iter != functions_.end()) {
         return iter->second;
     }
