@@ -113,15 +113,15 @@ namespace orion::bre::detail
         }
 
         // Handle direct property access
-        string arg_str(arg);
-        if (context.contains(arg_str))
+        if (context.contains(arg))
         {
-            return context[arg_str];
+            return context[string(arg)];
         }
 
         // Try to parse as number
         try
         {
+            string arg_str(arg);  // Only construct when needed for numeric parsing
             if (arg.find('.') != std::string_view::npos)
             {
                 return json(std::stod(arg_str));
