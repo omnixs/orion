@@ -38,12 +38,23 @@ Typical files:
 
 ### 4. Testing
 Follow [unit test instructions](../instructions/run_unit_tests.md) and [TCK test instructions](../instructions/run_tck_tests.md):
+
+**Windows (PowerShell):**
 ```powershell
 # Unit tests (see run_unit_tests.md for test filtering options)
-.\build\tst_orion.exe --run_test=<feature_tests>
+.\build\Debug\tst_orion.exe --run_test=<feature_tests>
 
 # TCK verification (see run_tck_tests.md for test patterns)
-.\build\orion_tck_runner.exe --test <tck_pattern>
+.\build\Debug\orion_tck_runner.exe --test <tck_pattern>
+```
+
+**Linux (Bash):**
+```bash
+# Unit tests (see run_unit_tests.md for test filtering options)
+./build-debug/tst_orion --run_test=<feature_tests>
+
+# TCK verification (see run_tck_tests.md for test patterns)
+./build-debug/orion_tck_runner --test <tck_pattern>
 ```
 
 ### 5. Documentation

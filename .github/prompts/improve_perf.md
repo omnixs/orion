@@ -15,18 +15,38 @@ Performance targets (specify in task instance):
 
 ### 1. Establish Baseline
 Follow [build instructions](../instructions/build.md) for Release build and [performance test instructions](../instructions/run_perf_tests.md) for benchmarking:
+
+**Windows (PowerShell):**
 ```powershell
 # Build Release with debug symbols (see build.md for CMake presets)
-cmake --preset release
+cmake --build build --config Release
 
 # Capture baseline (see run_perf_tests.md for options and interpretation)
-.\build\orion-bench.exe --benchmark_repetitions=20 --benchmark_out=baseline.json
+.\build\Release\orion-bench.exe --benchmark_repetitions=20 --benchmark_out=baseline.json
+```
+
+**Linux (Bash):**
+```bash
+# Build Release (see build.md for details)
+cmake --build build-release -j$(nproc)
+
+# Capture baseline (see run_perf_tests.md for options and interpretation)
+./build-release/orion-bench --benchmark_repetitions=20 --benchmark_out=baseline.json
 ```
 
 ### 2. Profile with VTune (or equivalent)
+
+**Windows (PowerShell):**
 ```powershell
 # Run VTune hotspots analysis
-vtune -collect hotspots -result-dir vtune_results/baseline -- .\build\orion-bench.exe
+vtune -collect hotspots -result-dir vtune_results/baseline -- .\build\Release\orion-bench.exe
+```
+
+**Linux (Bash):**
+```bash
+# Run VTune hotspots analysis (or perf on Linux)
+vtune -collect hotspots -result-dir vtune_results/baseline -- ./build-release/orion-bench
+# Alternative: perf record -g ./build-release/orion-bench
 ```
 
 ### 3. Identify Bottlenecks
@@ -41,12 +61,23 @@ vtune -collect hotspots -result-dir vtune_results/baseline -- .\build\orion-benc
 
 ### 5. Validate Results
 Follow [performance test instructions](../instructions/run_perf_tests.md) for statistical analysis:
+
+**Windows (PowerShell):**
 ```powershell
 # Re-run benchmarks (see run_perf_tests.md for statistical requirements)
-.\build\orion-bench.exe --benchmark_repetitions=20 --benchmark_out=optimized.json
+.\build\Release\orion-bench.exe --benchmark_repetitions=20 --benchmark_out=optimized.json
 
 # Compare (requires Python with benchmark tools)
-python tools\compare.py baseline.json optimized.json
+python tools\scripts\compare_benchmarks.py baseline.json optimized.json
+```
+
+**Linux (Bash):**
+```bash
+# Re-run benchmarks (see run_perf_tests.md for statistical requirements)
+./build-release/orion-bench --benchmark_repetitions=20 --benchmark_out=optimized.json
+
+# Compare (requires Python with benchmark tools)
+python tools/scripts/compare_benchmarks.py baseline.json optimized.json
 ```
 
 ## Success Criteria

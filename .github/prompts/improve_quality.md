@@ -15,9 +15,11 @@ Target files for quality improvement (specify in task instance):
 
 ### 1. Analysis
 Follow [build instructions](../instructions/build.md) to ensure compile_commands.json exists:
-```powershell
+
+**Both Platforms:**
+```bash
 # Run static analysis (requires compile_commands.json from CMake)
-clang-tidy <file> -p build/
+clang-tidy <file> -p build-debug/
 ```
 
 ### 2. Fix Application
@@ -27,15 +29,29 @@ clang-tidy <file> -p build/
 
 ### 3. Verification
 Follow [build instructions](../instructions/build.md) and [test instructions](../instructions/run_unit_tests.md):
+
+**Windows (PowerShell):**
 ```powershell
 # Build (see build.md for details)
 cmake --build build --config Debug
 
 # Unit tests (see run_unit_tests.md for options)
-.\build\tst_orion.exe --log_level=test_suite
+.\build\Debug\tst_orion.exe --log_level=test_suite
 
 # TCK compliance (see run_tck_tests.md for details)
-.\build\orion_tck_runner.exe --log_level=error
+.\build\Debug\orion_tck_runner.exe --log_level=error
+```
+
+**Linux (Bash):**
+```bash
+# Build (see build.md for details)
+cmake --build build-debug -j$(nproc)
+
+# Unit tests (see run_unit_tests.md for options)
+./build-debug/tst_orion --log_level=test_suite
+
+# TCK compliance (see run_tck_tests.md for details)
+./build-debug/orion_tck_runner --log_level=error
 ```
 
 ### 4. Iteration

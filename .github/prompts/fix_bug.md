@@ -27,15 +27,29 @@ Fix identified bug with minimal changes and comprehensive verification.
 
 ### 4. Verification
 Follow [unit test instructions](../instructions/run_unit_tests.md), [TCK test instructions](../instructions/run_tck_tests.md), and [performance test instructions](../instructions/run_perf_tests.md):
+
+**Windows (PowerShell):**
 ```powershell
 # Unit tests (see run_unit_tests.md for verbose output options)
-.\build\tst_orion.exe --log_level=all
+.\build\Debug\tst_orion.exe --log_level=all
 
 # TCK tests (see run_tck_tests.md for error-only output)
-.\build\orion_tck_runner.exe --log_level=error
+.\build\Debug\orion_tck_runner.exe --log_level=error
 
 # Regression check (see run_perf_tests.md for repetition guidelines)
-.\build\orion-bench.exe --benchmark_repetitions=3
+.\build\Release\orion-bench.exe --benchmark_repetitions=3
+```
+
+**Linux (Bash):**
+```bash
+# Unit tests (see run_unit_tests.md for verbose output options)
+./build-debug/tst_orion --log_level=all
+
+# TCK tests (see run_tck_tests.md for error-only output)
+./build-debug/orion_tck_runner --log_level=error
+
+# Regression check (see run_perf_tests.md for repetition guidelines)
+./build-release/orion-bench --benchmark_repetitions=3
 ```
 
 ## Success Criteria
