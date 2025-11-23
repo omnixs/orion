@@ -24,26 +24,6 @@
 #include <orion/api/spdlog_logger.hpp>
 #include "../common/log.hpp"
 
-static orion::api::HitPolicy parse_hp(std::string_view s)
-{
-    if (s == "FIRST") { return orion::api::HitPolicy::FIRST;
-}
-    if (s == "UNIQUE") { return orion::api::HitPolicy::UNIQUE;
-}
-    if (s.rfind("COLLECT", 0) == 0) { return orion::api::HitPolicy::COLLECT;
-}
-    return orion::api::HitPolicy::FIRST;
-}
-
-static orion::api::CollectAggregation parse_agg(std::string_view s)
-{
-    if (s == "COLLECT:SUM") { return orion::api::CollectAggregation::SUM;
-}
-    if (s == "COLLECT:COUNT") { return orion::api::CollectAggregation::COUNT;
-}
-    return orion::api::CollectAggregation::NONE;
-}
-
 int main(int argc, char** argv)
 {
     using namespace std;
@@ -55,20 +35,18 @@ int main(int argc, char** argv)
     orion::api::Logger::instance().set_logger(logger);
     
     string model, data;
-    string hp;
     for (int i = 1; i < argc; ++i)
     {
         string a = argv[i];
         if ((a == "-m" || a == "--model") && i + 1 < argc) { model = argv[++i];
         } else if ((a == "-d" || a == "--data") && i + 1 < argc) { data = argv[++i];
-        } else if (a == "--hit-policy" && i + 1 < argc) { hp = argv[++i];
         } else { 
             spdlog_instance->error("Unknown argument: {}", a);
         }
     }
     if (model.empty() || data.empty())
     {
-        spdlog_instance->info("Usage: orion-bre -m <model.dmn.xml> -d <data.json> [--hit-policy FIRST|UNIQUE|COLLECT|COLLECT:SUM|COLLECT:COUNT]");
+        spdlog_instance->info("Usage: orion-bre -m <model.dmn.xml> -d <data.json>");
         return 2;
     }
     try
@@ -86,14 +64,6 @@ int main(int argc, char** argv)
         dd << fd.rdbuf();
         string data_json = dd.str();
 
-        orion::api::EvalOptions opt{};
-        if (!hp.empty())
-        {
-            opt.overrideHitPolicy = true;
-            opt.hitPolicyOverride = parse_hp(hp);
-            opt.collectAgg = parse_agg(hp);
-        }
-
         // Use proper BusinessRulesEngine API
         orion::api::BusinessRulesEngine engine;
         std::string error;
@@ -102,7 +72,7 @@ int main(int argc, char** argv)
             return 1;
         }
         
-        auto out = engine.evaluate(data_json, opt);
+        auto out = engine.evaluate(data_json);
         spdlog_instance->info("Result: {}", out);
         return 0;
     }

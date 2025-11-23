@@ -37,7 +37,7 @@ BOOST_AUTO_TEST_CASE(test_abs_with_actual_tck_file) {
     if (!engine.load_dmn_model(dmn_xml, error)) {
         BOOST_FAIL("Failed to load DMN model: " + error);
     }
-    std::string result = engine.evaluate(input_json, {});
+    std::string result = engine.evaluate(input_json);
     BOOST_TEST_MESSAGE("Raw result: " << result);
     
     auto j = json::parse(result);

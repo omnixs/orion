@@ -25,16 +25,6 @@
 
 namespace orion::api
 {
-    // Evaluation options 
-    struct EvalOptions
-        {
-            bool strict_mode = false;
-            bool debug_output = false;
-            bool overrideHitPolicy = false;
-            HitPolicy hitPolicyOverride = HitPolicy::FIRST;
-            CollectAggregation collectAgg = CollectAggregation::NONE;
-        };
-
         // Main stateful BRE engine
         class BusinessRulesEngine
         {
@@ -61,7 +51,7 @@ namespace orion::api
             [[nodiscard]] bool remove_literal_decision(std::string_view name);
 
         // Evaluate with loaded models
-        [[nodiscard]] std::string evaluate(std::string_view data_json, const EvalOptions& options = {}) const;
+        [[nodiscard]] std::string evaluate(std::string_view data_json) const;
 
         // Introspection
         [[nodiscard]] std::vector<std::string> get_decision_table_names() const;

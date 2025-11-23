@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(test_0112_exact_tck_comparison) {
     if (!engine.load_dmn_model(dmn_xml, error)) {
         BOOST_FAIL("Failed to load DMN model: " + error);
     }
-    std::string result = engine.evaluate(input_json, {});
+    std::string result = engine.evaluate(input_json);
     BOOST_TEST_MESSAGE("Engine result string: " + result);
     
     // Parse the result
