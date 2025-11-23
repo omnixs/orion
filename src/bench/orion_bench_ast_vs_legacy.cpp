@@ -100,9 +100,9 @@ static void BM_FeelMath_AST(benchmark::State& state) {
     
     // Load model once (Phase 3: parse and cache AST)
     BusinessRulesEngine engine;
-    std::string error;
-    if (!engine.load_dmn_model(dmn_xml, error)) {
-        state.SkipWithError(("Failed to load model: " + error).c_str());
+    auto result = engine.load_dmn_model(dmn_xml);
+    if (!result) {
+        state.SkipWithError(("Failed to load model: " + result.error()).c_str());
         return;
     }
     

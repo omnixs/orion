@@ -73,9 +73,9 @@ int main() {
     
     // Load DMN model from XML string or file
     std::string dmn_xml = "<?xml version=\"1.0\"?>...";
-    std::string error;
-    if (!engine.load_dmn_model(dmn_xml, error)) {
-        std::cerr << "Error: " << error << std::endl;
+    auto result = engine.load_dmn_model(dmn_xml);
+    if (!result) {
+        std::cerr << "Error: " << result.error() << std::endl;
         return 1;
     }
     

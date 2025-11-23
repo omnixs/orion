@@ -4,6 +4,15 @@
 #
 # UBUNTU/LINUX BUILD:
 # -------------------
+# REQUIREMENTS:
+#   - C++23 compiler: GCC 13+ or Clang 16+ (for std::expected support)
+#   - Ubuntu 24.04 LTS (Noble) includes: GCC 13.3.0 and Clang 18.1.3
+#   - CMake 3.26+
+#
+# Note: When using Clang on Linux, CMake automatically configures it to use
+#       libstdc++ (GCC's standard library) for complete C++23 feature support.
+#       Clang's libc++ v18 does not yet have std::expected.
+#
 # 1. Install vcpkg (recommended for consistent versions):
 #    git clone https://github.com/Microsoft/vcpkg.git ~/vcpkg
 #    cd ~/vcpkg && ./bootstrap-vcpkg.sh
@@ -100,6 +109,15 @@ if(MSVC OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID MATC
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   # Linux/GCC/Clang specific settings
   add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+  
+  # Force Clang to use libstdc++ for full C++23 support (std::expected, etc.)
+  # Clang's libc++ doesn't have complete C++23 as of version 18
+  # GCC 13's libstdc++ has full std::expected support
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND UNIX AND NOT APPLE)
+    add_compile_options(-stdlib=libstdc++)
+    add_link_options(-stdlib=libstdc++)
+  endif()
+  
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-g -O0)
   elseif(CMAKE_BUILD_TYPE STREQUAL "Release")

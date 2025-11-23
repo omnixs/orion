@@ -285,27 +285,27 @@ static const char* kOrderDiscount_Input5 = R"({"amount": 6000})";
 // Helper function to create and load engine for each benchmark
 static BusinessRulesEngine createEngineForA1() {
     BusinessRulesEngine engine;
-    std::string error;
-    if (!engine.load_dmn_model(kCalcDiscountA1_DMN, error)) {
-        throw std::runtime_error("Failed to load CalcDiscount A1 model: " + error);
+    auto result = engine.load_dmn_model(kCalcDiscountA1_DMN);
+    if (!result) {
+        throw std::runtime_error("Failed to load CalcDiscount A1 model: " + result.error());
     }
     return engine;
 }
 
 static BusinessRulesEngine createEngineForA2() {
     BusinessRulesEngine engine;
-    std::string error;
-    if (!engine.load_dmn_model(kCalcDiscountA2_DMN, error)) {
-        throw std::runtime_error("Failed to load CalcDiscount A2 model: " + error);
+    auto result = engine.load_dmn_model(kCalcDiscountA2_DMN);
+    if (!result) {
+        throw std::runtime_error("Failed to load CalcDiscount A2 model: " + result.error());
     }
     return engine;
 }
 
 static BusinessRulesEngine createEngineForOrderDiscount() {
     BusinessRulesEngine engine;
-    std::string error;
-    if (!engine.load_dmn_model(kOrderDiscount_DMN, error)) {
-        throw std::runtime_error("Failed to load OrderDiscount model: " + error);
+    auto result = engine.load_dmn_model(kOrderDiscount_DMN);
+    if (!result) {
+        throw std::runtime_error("Failed to load OrderDiscount model: " + result.error());
     }
     return engine;
 }

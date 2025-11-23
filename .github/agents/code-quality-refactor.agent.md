@@ -89,8 +89,16 @@ You execute systematic code quality improvements with automated verification and
 1. **Run clang-tidy to generate issue list**
    - Follow [build instructions](../instructions/build.md) to ensure compile_commands.json exists
    - Read task file for specific clang-tidy check category
-   - Command: `clang-tidy <files> -p build/ --checks='<category>'`
+   - The `.clang-tidy` file in project root is automatically used
+   - Command: `clang-tidy <files> -p build/` (uses project .clang-tidy config)
+   - For specific category: `clang-tidy <files> -p build/ --checks='-*,<category>'`
+   - Use absolute paths for reliability: `clang-tidy /full/path/file.cpp -p /full/path/build/`
    - Parse output to extract all issues with file:line:diagnostic
+   
+   **Project .clang-tidy configuration:**
+   - Enables: bugprone, clang-analyzer, cppcoreguidelines, modernize, performance, readability, portability
+   - Enforces naming: CamelCase classes, snake_case functions/variables
+   - Filters headers: Only project files in include/orion, src, tst
 
 2. **Enumerate findings in structured format:**
    ```

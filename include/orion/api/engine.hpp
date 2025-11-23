@@ -21,34 +21,35 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "dmn_enums.hpp"
+#include <expected>
 
 namespace orion::api
 {
-        // Main stateful BRE engine
-        class BusinessRulesEngine
-        {
-        private:
-            class Impl;
-            std::unique_ptr<Impl> pimpl;
+    // Main stateful BRE engine
+    class BusinessRulesEngine
+    {
+    private:
+        class Impl;
+        std::unique_ptr<Impl> pimpl;
 
-        public:
-            BusinessRulesEngine();
-            ~BusinessRulesEngine();
+    public:
+        BusinessRulesEngine();
+        ~BusinessRulesEngine();
 
-            // Non-copyable but moveable
-            BusinessRulesEngine(const BusinessRulesEngine&) = delete;
-            BusinessRulesEngine& operator=(const BusinessRulesEngine&) = delete;
-            BusinessRulesEngine(BusinessRulesEngine&&) noexcept;
-            BusinessRulesEngine& operator=(BusinessRulesEngine&&) noexcept;
+        // Non-copyable but moveable
+        BusinessRulesEngine(const BusinessRulesEngine&) = delete;
+        BusinessRulesEngine& operator=(const BusinessRulesEngine&) = delete;
+        BusinessRulesEngine(BusinessRulesEngine&&) noexcept;
+        BusinessRulesEngine& operator=(BusinessRulesEngine&&) noexcept;
 
-            // Parse and load DMN model
-            [[nodiscard]] bool load_dmn_model(std::string_view dmn_xml, std::string& error_message);
+        // Parse and load DMN model
+        // Returns void on success, error message on failure
+        [[nodiscard]] std::expected<void, std::string> load_dmn_model(std::string_view dmn_xml);
 
-            // Remove components
-            [[nodiscard]] bool remove_decision_table(std::string_view name);
-            [[nodiscard]] bool remove_business_knowledge_model(std::string_view name);
-            [[nodiscard]] bool remove_literal_decision(std::string_view name);
+        // Remove components
+        [[nodiscard]] bool remove_decision_table(std::string_view name);
+        [[nodiscard]] bool remove_business_knowledge_model(std::string_view name);
+        [[nodiscard]] bool remove_literal_decision(std::string_view name);
 
         // Evaluate with loaded models
         [[nodiscard]] std::string evaluate(std::string_view data_json) const;
@@ -58,8 +59,8 @@ namespace orion::api
         [[nodiscard]] std::vector<std::string> get_business_knowledge_model_names() const;
         [[nodiscard]] std::vector<std::string> get_literal_decision_names() const;
 
-            // Clear all loaded models
-            void clear();
+        // Clear all loaded models
+        void clear();
 
         // Validation
         [[nodiscard]] std::vector<std::string> validate_models() const;

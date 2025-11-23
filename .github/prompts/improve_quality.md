@@ -19,8 +19,23 @@ Follow [build instructions](../instructions/build.md) to ensure compile_commands
 **Both Platforms:**
 ```bash
 # Run static analysis (requires compile_commands.json from CMake)
-clang-tidy <file> -p build-debug/
+# The .clang-tidy file in the project root is automatically used
+clang-tidy <file> -p build/
+
+# Or with absolute paths (more reliable in scripts)
+clang-tidy /path/to/file.cpp -p /path/to/build/
+
+# Check specific category only
+clang-tidy <file> -p build/ --checks='-*,readability-identifier-naming'
+
+# List all enabled checks
+clang-tidy --list-checks -p build/
 ```
+
+**Note:** The `.clang-tidy` configuration file in the project root defines:
+- Enabled check categories (bugprone, modernize, readability, performance, etc.)
+- Naming conventions (CamelCase classes, snake_case functions/variables)
+- Header filter regex for project files only
 
 ### 2. Fix Application
 - Follow CODING_STANDARDS.md priority

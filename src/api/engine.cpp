@@ -19,6 +19,7 @@
 #include <orion/api/engine.hpp>
 #include <orion/bre/dmn_model.hpp>
 #include <orion/bre/dmn_parser.hpp>
+#include <expected>
 #include <stdexcept>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
@@ -66,12 +67,11 @@ namespace orion
         BusinessRulesEngine& BusinessRulesEngine::operator=(BusinessRulesEngine&&) noexcept = default;
 
         // BusinessRulesEngine implementation
-        bool BusinessRulesEngine::load_dmn_model(string_view dmn_xml, string& error_message)
+        std::expected<void, string> BusinessRulesEngine::load_dmn_model(string_view dmn_xml)
         {
             if (dmn_xml.empty()) [[unlikely]]
             {
-                error_message = "DMN XML cannot be empty";
-                return false;
+                return std::unexpected(string("DMN XML cannot be empty"));
             }
 
             try
@@ -110,12 +110,11 @@ namespace orion
                 pimpl->bkm_manager_.load_bkm_from_dmn(dmn_xml, temp_error, "");
                 // BKM parsing is optional, continue if none found
 
-                return true;
+                return {};
             }
             catch (const exception& e)
             {
-                error_message = e.what();
-                return false;
+                return std::unexpected(string(e.what()));
             }
         }
 

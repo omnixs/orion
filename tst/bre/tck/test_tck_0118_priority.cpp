@@ -28,10 +28,9 @@ BOOST_AUTO_TEST_CASE(test_0118_case_001_debug) {
     
     // Create engine and load model
     BusinessRulesEngine engine;
-    std::string error;
     
-    bool loaded = engine.load_dmn_model(dmn_xml, error);
-    BOOST_REQUIRE_MESSAGE(loaded, "Failed to load DMN model: " + error);
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    BOOST_REQUIRE_MESSAGE(load_result.has_value(), "Failed to load DMN model: " + load_result.error());
     
     // Test case 001: Age=17, RiskCategory=High, isAffordable=true
     // Expected: Approved/Standard (Rule 3 wins over Rule 2 due to "Approved" > "Declined" priority)
@@ -101,12 +100,11 @@ BOOST_AUTO_TEST_CASE(test_0118_case_003_debug) {
     
     // Create engine and load model
     BusinessRulesEngine engine;
-    std::string error;
     
-    bool loaded = engine.load_dmn_model(dmn_xml, error);
-    BOOST_REQUIRE_MESSAGE(loaded, "Failed to load DMN model: " + error);
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    BOOST_REQUIRE_MESSAGE(load_result.has_value(), "Failed to load DMN model: " + load_result.error());
     
-    // Test case 003: Age=10, RiskCategory=Low, isAffordable=true
+    // Test case 001: Age=17, RiskCategory=Low, isAffordable=true
     // Expected: Declined/Standard
     // Should match Rule 2: Age<18 → Declined/Standard
     json input = {
