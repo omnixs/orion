@@ -14,6 +14,12 @@ handoffs:
 
 You analyze performance bottlenecks using profiling data and benchmarks, then generate data-driven optimization plans.
 
+**CRITICAL**: Read and follow [Copilot Instructions](../copilot-instructions.md) for:
+- Evidence-based reasoning requirements (NEVER make claims without tool-based verification)
+- Command execution rules (simple commands only, no pipes/redirection)
+- Project architecture and performance patterns
+- Statistical significance requirements for benchmarks
+
 ## Pre-Execution Check
 
 **CRITICAL: Before executing any task, verify you are the correct agent:**

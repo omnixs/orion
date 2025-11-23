@@ -11,6 +11,7 @@ ORION is a native C++ DMN™ Level 1 rule engine focused on decision tables with
 - [Unit Tests](./instructions/run_unit_tests.md) - Boost Test execution
 - [TCK Tests](./instructions/run_tck_tests.md) - DMN compliance validation
 - [Performance Tests](./instructions/run_perf_tests.md) - Benchmarking
+- [Adaptive CI Loop](./instructions/adaptive_ci_loop.md) - Intelligent testing for refactoring
 
 **Development:**
 - [DMN Feature Template](./prompts/add_dmn_feature.md) - Implement new FEEL features
@@ -20,6 +21,7 @@ ORION is a native C++ DMN™ Level 1 rule engine focused on decision tables with
 
 **Standards:**
 - [CODING_STANDARDS.md](../CODING_STANDARDS.md) - Naming, error handling, memory management
+- [Code Review Checklist](./instructions/code_review_checklist.md) - Quality gates for all changes
 - DMN 1.5 Spec: `docs/formal-24-01-01.txt` - Official OMG specification
 
 ## Architecture Overview
@@ -93,6 +95,13 @@ After completing tasks from `.github/tasks/`:
 
 **Quality Criteria:** Be specific (reference exact issues), actionable (suggest improvements), brief (3-5 bullets max)
 
+## Evidence-Based Reasoning
+
+**Before stating facts about the codebase, use tools to verify:**
+- Use `read_file`, `grep_search`, `file_search`, `list_dir` to gather evidence
+- Cite specific file paths, line numbers, or command output
+- Say "I don't have evidence for X" rather than speculating with "probably", "likely", "seems"
+
 ## Command Execution Rules
 
 **WHY:** VS Code AI requires simple commands for automation. Complex shell operations (pipes, redirection, chaining) need manual approval.
@@ -121,35 +130,87 @@ After completing tasks from `.github/tasks/`:
 ## Common Workflows
 
 ### Build & Test Cycle
+
+**Windows (PowerShell):**
 ```powershell
 # 1. Build
-cmake --build build
+cmake --build build --config Debug
 
 # 2. Unit tests (verify build succeeded first)
-.\build\tst_orion.exe --log_level=test_suite
+.\build\Debug\tst_orion.exe --log_level=test_suite
 
 # 3. TCK tests (verify unit tests passed first)
-.\build\orion_tck_runner.exe --log_level=error
+.\build\Debug\orion_tck_runner.exe --log_level=error
 
 # 4. Performance check (optional)
-.\build\orion-bench.exe --benchmark_repetitions=3
+.\build\Release\orion-bench.exe --benchmark_repetitions=3
+```
+
+**Linux (Bash):**
+```bash
+# 1. Build (Debug)
+cmake --build build-debug -j$(nproc)
+
+# 2. Unit tests (verify build succeeded first)
+./build-debug/tst_orion --log_level=test_suite
+
+# 3. TCK tests (verify unit tests passed first)
+./build-debug/orion_tck_runner --log_level=error
+
+# 4. Performance check (optional - use Release build)
+cmake --build build-release -j$(nproc)
+./build-release/orion-bench --benchmark_repetitions=3
 ```
 
 ### Debug Failing Test
-1. Run test with verbose: `.\build\tst_orion.exe --run_test=test_name --log_level=all`
-2. Read source files to understand code
-3. Add `BOOST_TEST_MESSAGE` or `spdlog::debug` for tracing
-4. Fix issue using file edit tools
-5. Re-run test to verify
+
+**Windows (PowerShell):**
+```powershell
+# Run test with verbose output
+.\build\Debug\tst_orion.exe --run_test=test_name --log_level=all
+```
+
+**Linux (Bash):**
+```bash
+# Run test with verbose output
+./build-debug/tst_orion --run_test=test_name --log_level=all
+```
+
+**Then:**
+1. Read source files to understand code
+2. Add `BOOST_TEST_MESSAGE` or `spdlog::debug` for tracing
+3. Fix issue using file edit tools
+4. Re-run test to verify
 
 ### Code Quality Iteration
 See [Code Quality Template](./prompts/improve_quality.md). Quick version:
-1. Analyze: `clang-tidy file.cpp -p build/`
-2. Fix issues in file
-3. Build & test
-4. Commit if all pass
+
+**Both Platforms:**
+```bash
+# 1. Analyze (requires compile_commands.json from build)
+clang-tidy src/bre/file.cpp -p build-debug/
+
+# 2. Fix issues in file using editing tools
+
+# 3. Build & test
+cmake --build build-debug -j$(nproc)          # Linux
+cmake --build build --config Debug             # Windows
+
+# 4. Commit if all pass
+```
 
 ---
+
+## Available Scripts
+
+**Location:** `tools/scripts/`
+
+**Referenced in documentation:**
+- `compare_benchmarks.py` - Statistical benchmark comparison (used in performance workflow)
+
+**Other scripts** (not currently referenced):
+- PowerShell: `setup-clang-tidy.ps1`, `run-clang-tidy.ps1`, `autofix.ps1`, `list-project-files.ps1`, `compare_benchmarks.ps1`
+- Bash: `orion_bench_smoke.sh`
 
 ## Dependencies
 

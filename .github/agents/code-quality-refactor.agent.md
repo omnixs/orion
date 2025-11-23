@@ -1,7 +1,7 @@
 ---
 description: "Systematic code quality refactoring with automated testing and rollback"
 name: code-quality-refactor
-tools: ['search', 'edit', 'usages']
+tools: ['search', 'edit', 'usages', 'runCommands', 'runCommands/runInTerminal']
 model: Claude Sonnet 4.5
 handoffs:
   - label: Review Changes
@@ -13,6 +13,12 @@ handoffs:
 # Code Quality Refactoring Agent
 
 You execute systematic code quality improvements with automated verification and error recovery.
+
+**CRITICAL**: Read and follow [Copilot Instructions](../copilot-instructions.md) for:
+- Evidence-based reasoning requirements (NEVER make claims without tool-based verification)
+- Command execution rules (simple commands only, no pipes/redirection)
+- Project architecture and standards
+- Build/test workflow references
 
 ## Pre-Execution Check
 
@@ -54,22 +60,29 @@ You execute systematic code quality improvements with automated verification and
 
 ### Phase 1: Baseline Capture
 
-1. **Build in Debug configuration**
+1. **Build in BOTH Debug and Release configurations**
    - Follow [build instructions](../instructions/build.md)
-   - Command: `cmake --build build --config Debug`
+   - Debug: `cmake --build build-debug -j$(nproc)` (runtime checks: asserts, UB detection)
+   - Release: `cmake --build build-release -j$(nproc)` (performance-accurate tests)
+   - **Strategy**: Debug for smoke tests (fast, catches UB), Release for full validation
    - Verify: Check for compilation errors
 
-2. **Execute TCK tests and store baseline**
+2. **Execute TCK baseline (Release only)**
    - Follow [TCK test instructions](../instructions/run_tck_tests.md)
-   - Command: `.\build\Debug\orion_tck_runner.exe --log_level=error`
+   - Command: `./build-release/orion_tck_runner --log_level=error`
    - Save output to: `dat/log/baseline_tck_YYYYMMDD_HHMMSS.txt`
    - Parse results: Extract "X/Y passed" from output
    - Report: "Baseline captured: X/Y TCK tests passing"
 
-3. **Execute unit tests baseline**
+3. **Execute unit tests baseline (Release)**
    - Follow [unit test instructions](../instructions/run_unit_tests.md)
-   - Command: `.\build\Debug\tst_orion.exe --log_level=test_suite`
+   - Command: `./build-release/tst_orion --log_level=test_suite`
    - Record: Any existing failures to exclude from regression detection
+
+4. **Initialize adaptive checkpoint tracker**
+   - Create: `dat/log/checkpoint_state.json`
+   - Fields: `{issues_since_last_check: 0, consecutive_successes: 0, checkpoint_interval: 10, last_failure_issue: null}`
+   - Purpose: Dynamic test frequency based on change risk and failure history
 
 ### Phase 2: Analysis & Enumeration
 
@@ -130,9 +143,10 @@ You execute systematic code quality improvements with automated verification and
       - Follow CODING_STANDARDS.md conventions
       - Preserve formatting and comments
    
-   c. **Build in Debug configuration**
+   c. **Build in Debug configuration (incremental)**
       - Follow [build instructions](../instructions/build.md)
-      - Command: `cmake --build build --config Debug`
+      - Command: `cmake --build build-debug -j$(nproc)`
+      - **Speed optimization**: Uses incremental compilation, only rebuilds changed files
       - Capture output
       - **If build FAILS:**
         * Parse error message
@@ -142,16 +156,28 @@ You execute systematic code quality improvements with automated verification and
         * Log detailed failure reason
         * **Break retry loop and continue to next issue**
    
-   d. **Run unit tests if build succeeded**
+   d. **Run Debug smoke test if build succeeded (fast runtime validation)**
       - Follow [unit test instructions](../instructions/run_unit_tests.md)
-      - Command: `.\build\Debug\tst_orion.exe --log_level=test_suite`
-      - **If tests FAIL:**
+      - Command: `./build-debug/tst_orion --run_test=*impacted* --log_level=error` (if impact analysis available)
+      - **Fallback**: Run small representative suite (~10-20 tests, <1 second)
+      - **Purpose**: Catch runtime UB, assertion failures, dangling references
+      - **If smoke test FAILS:**
         * Parse test output to identify failed tests
-        * Analyze failure cause (lifetime issue, semantic change, edge case)
+        * Analyze failure cause (lifetime issue, UB, assertion)
         * If attempt < 5: Retry with different fix
-        * If attempt == 5: Revert all changes, mark as "Skipped - test failure after 5 retries"
-        * Log failed test names and reasons
+        * If attempt == 5: Revert all changes, mark as "Skipped - smoke test failure after 5 retries"
         * **Break retry loop and continue to next issue**
+   
+   e. **Update adaptive checkpoint tracker**
+      - Increment `issues_since_last_check`
+      - Increment `consecutive_successes`
+      - Reset `consecutive_successes` to 0 if any failure occurred
+      - **Determine next checkpoint based on risk:**
+        * **Low-risk changes** (string_view, const-correctness): checkpoint_interval = 20-30
+        * **Medium-risk changes** (refactoring, modernization): checkpoint_interval = 10-15
+        * **High-risk changes** (FEEL evaluator, DMN parser logic): checkpoint_interval = 5-10
+        * **After recent failures**: checkpoint_interval = max(5, current_interval / 2)
+        * **After 20+ consecutive successes**: checkpoint_interval = min(30, current_interval * 1.5)
    
    e. **If build and tests pass: Run code review checks**
       - **Review the change using [Code Review Checklist](../instructions/code_review_checklist.md)**
@@ -176,25 +202,47 @@ You execute systematic code quality improvements with automated verification and
         * Log any SUGGESTION items for final review phase
         * **Break retry loop and continue to next issue**
 
-3. **Every 10 issues: TCK Regression Check**
+3. **Adaptive Checkpoint: Full Validation (dynamic frequency)**
    
-   **After completing issues 10, 20, 30, etc.:**
+   **Trigger when `issues_since_last_check >= checkpoint_interval`:**
    
-   a. **Build in Release configuration**
+   a. **Build in Release configuration (incremental)**
       - Follow [build instructions](../instructions/build.md)
-      - Command: `cmake --build build --config Release`
+      - Command: `cmake --build build-release -j$(nproc)`
+      - **Purpose**: Performance-accurate builds for full test suite
    
-   b. **Execute TCK tests**
-      - Follow [TCK test instructions](../instructions/run_tck_tests.md)
-      - Command: `.\build\Release\orion_tck_runner.exe --log_level=error`
+   b. **Execute full unit test suite (Release)**
+      - Follow [unit test instructions](../instructions/run_unit_tests.md)
+      - Command: `./build-release/tst_orion --log_level=error`
+      - **Purpose**: Full regression detection across all 279 tests
+      - Save output to: `dat/log/checkpoint_unit_YYYYMMDD_HHMMSS_issue_X.txt`
+   
+   c. **Conditional TCK execution (only if high-risk changes)**
+      - **Skip TCK if:**
+        * All changes are low-risk (string_view, const, [[nodiscard]])
+        * No FEEL evaluator, DMN parser, or BKM manager changes
+        * Consecutive successes > 15
+      - **Run TCK if:**
+        * Any FEEL evaluator/parser/DMN changes detected
+        * Recent failure in last 10 issues
+        * Checkpoint interval >= 30 (periodic long-horizon check)
+      - Command: `./build-release/orion_tck_runner --log_level=error`
       - Save output to: `dat/log/checkpoint_tck_YYYYMMDD_HHMMSS_issue_X.txt`
    
-   c. **Compare with baseline**
-      - Parse both baseline and checkpoint outputs
+   d. **Compare with baseline**
+      - Parse checkpoint unit test output
+      - Parse checkpoint TCK output (if executed)
       - Identify any test status changes (pass→fail)
       - **If regressions detected:**
-        * Report: "TCK Regression at issue X: Tests [list] now failing"
+        * Report: "Regression at issue X: Tests [list] now failing"
+        * Log to `dat/log/ci_failures.log` with timestamp and issue context
         * Enter regression resolution loop (max 5 attempts)
+        * **Update checkpoint tracker**: Reset checkpoint_interval to 5, reset consecutive_successes to 0
+   
+   e. **Reset checkpoint counter**
+      - Set `issues_since_last_check = 0`
+      - If no regressions: keep incrementing `consecutive_successes`
+      - Recalculate `checkpoint_interval` based on adaptive logic
    
    d. **Regression Resolution Loop (max 5 attempts):**
       
@@ -210,9 +258,10 @@ You execute systematic code quality improvements with automated verification and
          - Option B: Revert the suspected change
          - Apply fix using #tool:edit
       
-      iii. **Re-build Release and re-run TCK:**
-         - Build: `cmake --build build --config Release`
-         - Test: `.\build\Release\orion_tck_runner.exe --log_level=error`
+      iii. **Re-build Release and re-run tests:**
+         - Build: `cmake --build build-release -j$(nproc)`
+         - Unit tests: `./build-release/tst_orion --log_level=error`
+         - TCK (if applicable): `./build-release/orion_tck_runner --log_level=error`
       
       iv. **Check if regression resolved:**
          - If YES: ✓ Continue to next issue
@@ -227,9 +276,34 @@ You execute systematic code quality improvements with automated verification and
 4. **Progress update every 5 issues:**
    ```
    Progress: 15/47 completed (32%), 2 skipped (1 build, 1 test), 30 remaining
-   Last checkpoint: Issue 10 - No TCK regressions
-   Next checkpoint: Issue 20
+   Adaptive checkpoint: Next validation in 8 issues (interval: 12, risk: medium)
+   Consecutive successes: 15, Last failure: issue 7 (build error)
+   Last checkpoint: Issue 10 - No regressions (unit: pass, TCK: skipped - low risk)
+   Next checkpoint: Issue ~22 (adaptive interval)
    ```
+
+5. **Risk classification heuristics:**
+   
+   **Low-risk changes** (checkpoint_interval = 20-30):
+   - String parameter changes (const std::string& → string_view)
+   - Adding const, [[nodiscard]], noexcept
+   - Comment/documentation updates
+   - Naming convention fixes (snake_case, CamelCase)
+   - Include reordering
+   
+   **Medium-risk changes** (checkpoint_interval = 10-15):
+   - Modernization (auto, structured bindings, range-for)
+   - Error handling refactoring
+   - Class member reordering
+   - Function signature changes (non-logic)
+   
+   **High-risk changes** (checkpoint_interval = 5-10):
+   - FEEL evaluator logic changes
+   - DMN parser algorithm changes
+   - BKM manager invocation changes
+   - AST node evaluation changes
+   - Unary test matching logic
+   - Any file in `src/bre/feel/{evaluator,expr,unary,parser}.cpp`
 
 ### Phase 4: Final Verification
 
@@ -242,16 +316,22 @@ You execute systematic code quality improvements with automated verification and
      * Analyze why they weren't fixed (likely excluded or failed all retries)
      * Report count: "X/N issues resolved, Y remaining (Z skipped)"
 
-2. **Build in Release configuration**
+2. **Build in Release configuration (incremental)**
    - Follow [build instructions](../instructions/build.md)
-   - Command: `cmake --build build --config Release`
+   - Command: `cmake --build build-release -j$(nproc)`
+   - **Optimization**: Ninja + ccache enabled for faster rebuilds
 
-3. **Execute full TCK test suite**
+3. **Execute full unit test suite (Release)**
+   - Follow [unit test instructions](../instructions/run_unit_tests.md)
+   - Command: `./build-release/tst_orion --log_level=error`
+   - Save output to: `dat/log/final_unit_YYYYMMDD_HHMMSS.txt`
+
+4. **Execute full TCK test suite (Release)**
    - Follow [TCK test instructions](../instructions/run_tck_tests.md)
-   - Command: `.\build\Release\orion_tck_runner.exe --log_level=error`
+   - Command: `./build-release/orion_tck_runner --log_level=error`
    - Save output to: `dat/log/final_tck_YYYYMMDD_HHMMSS.txt`
 
-4. **Compare with baseline results**
+5. **Compare with baseline results**
    - Parse both baseline and final outputs
    - Identify any test status changes (pass→fail)
    - **If regressions detected:**
@@ -283,24 +363,39 @@ You execute systematic code quality improvements with automated verification and
    - Review issues fixed on retry: 2
    - Failed review after 5 attempts: 1
    
-   TCK Checkpoints:
-   - Issue 10: ✓ No regressions
-   - Issue 20: ⚠ 1 regression (resolved on attempt 2)
-   - Issue 30: ✓ No regressions
-   - Issue 40: ✓ No regressions
+   Adaptive Checkpoint Statistics:
+   - Total checkpoints executed: 4
+   - Checkpoint intervals used: [10, 12, 15, 20] (adaptive)
+   - TCK runs: 2 (skipped 2 due to low risk)
+   - Average checkpoint interval: 14.25 issues
+   - Time saved vs fixed-10: ~30 minutes (2 TCK runs avoided)
    
-   Final TCK Results:
-   Baseline: 484/3535 passing (13.7%)
-   Final:    484/3535 passing (13.7%)
+   Checkpoint History:
+   - Issue 10: ✓ No regressions (interval: 10, unit: pass, TCK: pass)
+   - Issue 22: ✓ No regressions (interval: 12, unit: pass, TCK: skipped - low risk)
+   - Issue 37: ✓ No regressions (interval: 15, unit: pass, TCK: skipped - low risk)
+   - Issue 47: ✓ Final validation (interval: 10, unit: pass, TCK: pass)
+   
+   Final Results:
+   Baseline: 484/3535 TCK passing (13.7%), 279/279 unit passing (100%)
+   Final:    484/3535 TCK passing (13.7%), 279/279 unit passing (100%)
    Regressions: None
    
-   Unit Tests: All passing (264 tests)
+   Performance Optimizations Used:
+   - Ninja build system: ✓ (3x faster than Make)
+   - ccache enabled: ✓ (90% cache hit rate)
+   - Parallel builds (-j8): ✓
+   - Incremental compilation: ✓
+   - Dual build strategy: ✓ (Debug smoke + Release full)
    
    Clang-tidy verification:
    Remaining issues in category: 0 (all resolved)
    ```
 
-6. **Update task file with results**
+6. **Archive checkpoint artifacts**
+   - Save `dat/log/checkpoint_state.json` to `dat/log/final_checkpoint_state.json`
+   - Append session summary to `dat/log/ci_failures.log` (even if no failures for trend analysis)
+   - Clean up intermediate checkpoint files older than 7 days
    - Add progress tracking section
    - Add results section with baseline/final comparison
    - List all skipped issues with reasons and retry counts
