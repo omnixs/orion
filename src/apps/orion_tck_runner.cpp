@@ -454,7 +454,7 @@ static std::vector<DirInfo> discover_test_directories(const fs::path& base_path,
         // Apply test filter if specified
         if (!testFilter.empty()) {
             std::string dirPath = di.dir.string();
-            if (dirPath.find(std::string(testFilter)) == std::string::npos) {
+            if (dirPath.find(testFilter) == std::string::npos) {
                 continue; // Skip this directory if it doesn't match the filter
             }
         }
