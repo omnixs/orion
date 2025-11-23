@@ -66,9 +66,9 @@ int main(int argc, char** argv)
 
         // Use proper BusinessRulesEngine API
         orion::api::BusinessRulesEngine engine;
-        std::string error;
-        if (!engine.load_dmn_model(dmn_xml, error)) {
-            spdlog_instance->error("Failed to load DMN model: {}", error);
+        auto result = engine.load_dmn_model(dmn_xml);
+        if (!result) {
+            spdlog_instance->error("Failed to load DMN model: {}", result.error());
             return 1;
         }
         

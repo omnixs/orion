@@ -27,7 +27,12 @@ BOOST_AUTO_TEST_CASE(test_abs_positional_basic) {
 
     std::string input_json = "{}";
     
-    orion::api::BusinessRulesEngine engine; std::string error; if (!engine.load_dmn_model(dmn_xml, error)) { BOOST_FAIL("Failed to load DMN model: " + error); } std::string result = engine.evaluate(input_json);
+    orion::api::BusinessRulesEngine engine;
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
+    std::string result = engine.evaluate(input_json);
     auto result_json = json::parse(result);
     
     BOOST_TEST_MESSAGE("Result JSON: " << result);
@@ -50,7 +55,12 @@ BOOST_AUTO_TEST_CASE(test_abs_positional_negative) {
 
     std::string input_json = "{}";
     
-    orion::api::BusinessRulesEngine engine; std::string error; if (!engine.load_dmn_model(dmn_xml, error)) { BOOST_FAIL("Failed to load DMN model: " + error); } std::string result = engine.evaluate(input_json);
+    orion::api::BusinessRulesEngine engine;
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
+    std::string result = engine.evaluate(input_json);
     auto result_json = json::parse(result);
     
     BOOST_TEST_MESSAGE("Result JSON: " << result);
@@ -74,7 +84,12 @@ BOOST_AUTO_TEST_CASE(test_abs_named_param_correct) {
 
     std::string input_json = "{}";
     
-    orion::api::BusinessRulesEngine engine; std::string error; if (!engine.load_dmn_model(dmn_xml, error)) { BOOST_FAIL("Failed to load DMN model: " + error); } std::string result = engine.evaluate(input_json);
+    orion::api::BusinessRulesEngine engine;
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
+    std::string result = engine.evaluate(input_json);
     auto result_json = json::parse(result);
     
     BOOST_TEST_MESSAGE("Result JSON: " << result);
@@ -106,7 +121,12 @@ BOOST_AUTO_TEST_CASE(test_abs_named_param_wrong_name) {
 
     std::string input_json = "{}";
     
-    orion::api::BusinessRulesEngine engine; std::string error; if (!engine.load_dmn_model(dmn_xml, error)) { BOOST_FAIL("Failed to load DMN model: " + error); } std::string result = engine.evaluate(input_json);
+    orion::api::BusinessRulesEngine engine;
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
+    std::string result = engine.evaluate(input_json);
     auto result_json = json::parse(result);
     
     BOOST_TEST_MESSAGE("Result JSON: " << result);
@@ -131,7 +151,12 @@ BOOST_AUTO_TEST_CASE(test_abs_no_params) {
 
     std::string input_json = "{}";
     
-    orion::api::BusinessRulesEngine engine; std::string error; if (!engine.load_dmn_model(dmn_xml, error)) { BOOST_FAIL("Failed to load DMN model: " + error); } std::string result = engine.evaluate(input_json);
+    orion::api::BusinessRulesEngine engine;
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
+    std::string result = engine.evaluate(input_json);
     auto result_json = json::parse(result);
     
     BOOST_TEST_MESSAGE("Result JSON: " << result);
@@ -155,7 +180,12 @@ BOOST_AUTO_TEST_CASE(test_abs_too_many_params) {
 
     std::string input_json = "{}";
     
-    orion::api::BusinessRulesEngine engine; std::string error; if (!engine.load_dmn_model(dmn_xml, error)) { BOOST_FAIL("Failed to load DMN model: " + error); } std::string result = engine.evaluate(input_json);
+    orion::api::BusinessRulesEngine engine;
+    auto load_result = engine.load_dmn_model(dmn_xml);
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
+    std::string result = engine.evaluate(input_json);
     auto result_json = json::parse(result);
     
     BOOST_TEST_MESSAGE("Result JSON: " << result);

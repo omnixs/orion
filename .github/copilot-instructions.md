@@ -39,8 +39,11 @@ ORION is a native C++ DMN™ Level 1 rule engine focused on decision tables with
 ```cpp
 // ✅ CORRECT: Load once, evaluate many (9-45 μs/eval)
 orion::bre::BusinessRulesEngine engine;
-std::string error;
-engine.load_dmn_model(dmn_xml, error);  // One-time: 100-200μs
+auto result = engine.load_dmn_model(dmn_xml);  // One-time: 100-200μs
+if (!result) {
+    std::cerr << "Error: " << result.error() << std::endl;
+    return 1;
+}
 
 for (auto& request : requests) {
     std::string result = engine.evaluate(request_json);  // 9-45μs each

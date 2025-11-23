@@ -33,10 +33,8 @@ using std::vector;
 
 namespace orion::bre
 {
-    // Import logger and API types
+    // Import logger
     using orion::api::warn;
-    using api::HitPolicy;
-    using api::CollectAggregation;
 
     /**
      * @brief Helper function to parse FEEL expression into AST during model load

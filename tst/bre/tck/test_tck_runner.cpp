@@ -87,9 +87,9 @@ static bool execute_single_test_case(
     try {
         // Use proper BusinessRulesEngine API instead of legacy function
         orion::api::BusinessRulesEngine engine;
-        std::string error;
-        if (!engine.load_dmn_model(dmn_xml, error)) {
-            throw std::runtime_error("Failed to load DMN model: " + error);
+        auto load_result = engine.load_dmn_model(dmn_xml);
+        if (!load_result) {
+            throw std::runtime_error("Failed to load DMN model: " + load_result.error());
         }
         
         result = engine.evaluate(input_json);
@@ -383,9 +383,9 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
         
         // Use proper BusinessRulesEngine API
         orion::api::BusinessRulesEngine engine;
-        std::string error;
-        if (!engine.load_dmn_model(dmn_xml, error)) {
-            BOOST_FAIL("Failed to load DMN model: " + error);
+        auto load_result = engine.load_dmn_model(dmn_xml);
+        if (!load_result) {
+            BOOST_FAIL("Failed to load DMN model: " + load_result.error());
         }
         std::string result = engine.evaluate(input.dump());
         
@@ -414,9 +414,9 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
         
         // Use proper BusinessRulesEngine API
         orion::api::BusinessRulesEngine engine;
-        std::string error;
-        if (!engine.load_dmn_model(dmn_xml, error)) {
-            BOOST_FAIL("Failed to load DMN model: " + error);
+        auto load_result = engine.load_dmn_model(dmn_xml);
+        if (!load_result) {
+            BOOST_FAIL("Failed to load DMN model: " + load_result.error());
         }
         std::string result = engine.evaluate(input.dump());
         

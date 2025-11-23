@@ -2,11 +2,31 @@
 
 ## Prerequisites
 
+### Required
+
 - CMake 3.20+
-- Visual Studio 2022 (Windows) or GCC 11+ (Linux)
+- **C++23 Compiler**:
+  - **Windows**: Visual Studio 2022 (MSVC 19.30+) with C++23 support
+  - **Linux**: **GCC 13+** (Ubuntu 24.04 LTS includes GCC 13.3.0)
+    - ⚠️ **Important**: Clang 18 on Linux cannot access libstdc++'s C++23 features (`std::expected`). Use GCC instead.
 - vcpkg (dependency manager)
-- **Recommended**: Ninja build system (`sudo apt install ninja-build` or `choco install ninja`)
-- **Recommended**: ccache for faster rebuilds (`sudo apt install ccache` or `choco install ccache`)
+
+### Recommended
+
+- Ninja build system (`sudo apt install ninja-build` or `choco install ninja`)
+- ccache for faster rebuilds (`sudo apt install ccache` or `choco install ccache`)
+
+### C++23 Feature Requirements
+
+The project requires **full C++23 support**, specifically:
+- `std::expected<T, E>` - Error handling without exceptions
+- `std::string_view` - Zero-copy string operations
+- Concepts and ranges
+
+**Tested Configurations:**
+- Ubuntu 24.04 LTS with GCC 13.3.0 ✅
+- Windows with MSVC 2022 (TBD)
+- Clang 18 with libstdc++ on Linux ❌ (does not work - use GCC)
 
 ## Performance Optimizations
 
@@ -61,12 +81,15 @@ cmake --build build --config Release
 ## Linux (Bash)
 
 ### Dual Build Setup (Debug + Release)
+
+**⚠️ Important: Use GCC (not Clang) for full C++23 support**
+
 ```bash
 # Remove old builds
 rm -rf build-debug build-release
 
-# Configure Debug build (runtime checks, assertions)
-cmake -S . -B build-debug \
+# Configure Debug build with GCC (required for std::expected)
+CC=gcc CXX=g++ cmake -S . -B build-debug \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_TOOLCHAIN_FILE=/home/$USER/vcpkg/scripts/buildsystems/vcpkg.cmake \
@@ -74,8 +97,8 @@ cmake -S . -B build-debug \
   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
   -DCMAKE_C_COMPILER_LAUNCHER=ccache
 
-# Configure Release build (optimized, fast tests)
-cmake -S . -B build-release \
+# Configure Release build with GCC
+CC=gcc CXX=g++ cmake -S . -B build-release \
   -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=/home/$USER/vcpkg/scripts/buildsystems/vcpkg.cmake \
