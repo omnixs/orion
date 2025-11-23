@@ -24,7 +24,7 @@ namespace orion::common
 {
     using json = nlohmann::json;
 
-    nlohmann::json parse_xml_value(const std::string& value, const std::string& xsiType)
+    nlohmann::json parse_xml_value(std::string_view value, std::string_view xsiType)
         {
             if (value.empty()) { return json{};
 }
@@ -35,7 +35,7 @@ namespace orion::common
             {
                 try
                 {
-                    return json(std::stod(value));
+                    return json(std::stod(std::string(value)));
                 }
                 catch (...)
                 {
@@ -46,7 +46,7 @@ namespace orion::common
             {
                 try
                 {
-                    return json(std::stoll(value));
+                    return json(std::stoll(std::string(value)));
                 }
                 catch (...)
                 {
@@ -77,11 +77,11 @@ namespace orion::common
                 // Try integer first
                 if (value.find('.') == std::string::npos)
                 {
-                    return json(std::stoll(value));
+                    return json(std::stoll(std::string(value)));
                 }
                 else
                 {
-                    return json(std::stod(value));
+                    return json(std::stod(std::string(value)));
                 }
             }
             catch (...)
@@ -340,12 +340,12 @@ namespace orion::common
         }
     }
 
-    std::vector<ParsedCase> parse_test_xml(const std::string& xml)
+    std::vector<ParsedCase> parse_test_xml(std::string_view xml)
         {
             std::vector<ParsedCase> out;
             using namespace rapidxml;
             xml_document<> doc;
-            std::string buf = xml;
+            std::string buf(xml);
             buf.push_back('\0');
             try
             {
@@ -421,11 +421,11 @@ namespace orion::common
             return out;
         }
 
-    std::vector<OutputExpectation> parse_output_expectations(const std::string& testCaseXml)
+    std::vector<OutputExpectation> parse_output_expectations(std::string_view testCaseXml)
         {
             // This is a utility function that can extract just the output expectations
             // from a single test case XML fragment - useful for focused testing
-            auto cases = parse_test_xml("<testCase>" + testCaseXml + "</testCase>");
+            auto cases = parse_test_xml("<testCase>" + std::string(testCaseXml) + "</testCase>");
             if (!cases.empty())
             {
                 return cases[0].outputs;
@@ -433,12 +433,12 @@ namespace orion::common
             return {};
         }
 
-    nlohmann::json parse_component_structure(const std::string& componentXml)
+    nlohmann::json parse_component_structure(std::string_view componentXml)
         {
             // Parse a component structure XML fragment into JSON
             using namespace rapidxml;
             xml_document<> doc;
-            std::string buf = componentXml;
+            std::string buf(componentXml);
             buf.push_back('\0');
 
             nlohmann::json componentObj = nlohmann::json::object();

@@ -43,7 +43,7 @@ namespace orion::bre::detail
      * @param args_str The argument string (e.g., "a, b, c(x, y), d")
      * @return Vector of individual arguments
      */
-    std::vector<std::string> split_arguments(const std::string& args_str);
+    std::vector<std::string> split_arguments(std::string_view args_str);
 
     /**
      * @brief Resolve argument value from context or parse as literal
@@ -51,7 +51,7 @@ namespace orion::bre::detail
      * @param context JSON context for variable resolution
      * @return Resolved JSON value
      */
-    nlohmann::json resolve_argument(const std::string& arg, const nlohmann::json& context);
+    nlohmann::json resolve_argument(std::string_view arg, const nlohmann::json& context);
 
     /**
      * @brief Resolve property path to numeric value
@@ -59,7 +59,7 @@ namespace orion::bre::detail
      * @param context JSON context
      * @return Numeric value or NaN if not found
      */
-    double resolve_property_path(const std::string& path, const nlohmann::json& context);
+    double resolve_property_path(std::string_view path, const nlohmann::json& context);
 
     /**
      * @brief Evaluate complex arithmetic expression with property substitution
@@ -67,14 +67,14 @@ namespace orion::bre::detail
      * @param context JSON context for property resolution
      * @return Result as JSON or null on error
      */
-    nlohmann::json evaluate_complex_arithmetic_expression(const std::string& expression, const nlohmann::json& context);
+    nlohmann::json evaluate_complex_arithmetic_expression(std::string_view expression, const nlohmann::json& context);
 
     /**
      * @brief Evaluate mathematical expression (numbers only, no properties)
      * @param expr Pure mathematical expression like "(P*r/MONTHS_PER_YEAR)/(1-(1+r/MONTHS_PER_YEAR)**-n)" where P, r, n are numeric values
      * @return Result as JSON or null on error
      */
-    nlohmann::json eval_math_expression(const std::string& expr);
+    nlohmann::json eval_math_expression(std::string_view expr);
 
     /**
      * @brief Parse arithmetic expression (recursive descent parser)
@@ -82,7 +82,7 @@ namespace orion::bre::detail
      * @param pos Current parsing position (modified during parsing)
      * @return Parsed numeric value
      */
-    double parse_expression(const std::string& expr, size_t& pos);
+    double parse_expression(std::string_view expr, size_t& pos);
 
     /**
      * @brief Parse arithmetic term (* / **)
@@ -90,7 +90,7 @@ namespace orion::bre::detail
      * @param pos Current parsing position (modified during parsing)
      * @return Parsed numeric value
      */
-    double parse_term(const std::string& expr, size_t& pos);
+    double parse_term(std::string_view expr, size_t& pos);
 
     /**
      * @brief Parse arithmetic power (**) 
@@ -98,7 +98,7 @@ namespace orion::bre::detail
      * @param pos Current parsing position (modified during parsing)
      * @return Parsed numeric value
      */
-    double parse_power(const std::string& expr, size_t& pos);
+    double parse_power(std::string_view expr, size_t& pos);
 
     /**
      * @brief Parse arithmetic factor (numbers, parentheses, unary operators)
@@ -106,21 +106,21 @@ namespace orion::bre::detail
      * @param pos Current parsing position (modified during parsing)
      * @return Parsed numeric value
      */
-    double parse_factor(const std::string& expr, size_t& pos);
+    double parse_factor(std::string_view expr, size_t& pos);
 
     // Helper functions for parse_factor to reduce cognitive complexity
-    double parse_parenthesized_expression_impl(const std::string& expr, size_t& pos);
-    double parse_number_literal_impl(const std::string& expr, size_t& pos);
-    double parse_identifier_or_variable(const std::string& expr, size_t& pos);
-    std::string extract_variable_name(const std::string& expr, size_t start_pos, size_t& pos);
-    std::string try_extend_variable_name(const std::string& expr, const std::string& var_name, size_t start_pos, size_t& pos);
-    double resolve_feel_constant(const std::string& var_name);
-    double resolve_variable_from_context(const std::string& var_name, bool& found);
+    double parse_parenthesized_expression_impl(std::string_view expr, size_t& pos);
+    double parse_number_literal_impl(std::string_view expr, size_t& pos);
+    double parse_identifier_or_variable(std::string_view expr, size_t& pos);
+    std::string extract_variable_name(std::string_view expr, size_t start_pos, size_t& pos);
+    std::string try_extend_variable_name(std::string_view expr, std::string_view var_name, size_t start_pos, size_t& pos);
+    double resolve_feel_constant(std::string_view var_name);
+    double resolve_variable_from_context(std::string_view var_name, bool& found);
 
     /**
      * @brief Skip whitespace characters
      * @param expr Expression string
      * @param pos Current position (modified to skip whitespace)
      */
-    void skip_whitespace(const std::string& expr, size_t& pos);
+    void skip_whitespace(std::string_view expr, size_t& pos);
 } // namespace orion::bre::detail

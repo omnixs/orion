@@ -24,7 +24,7 @@
 #include <orion/api/spdlog_logger.hpp>
 #include "../common/log.hpp"
 
-static orion::api::HitPolicy parse_hp(const std::string& s)
+static orion::api::HitPolicy parse_hp(std::string_view s)
 {
     if (s == "FIRST") { return orion::api::HitPolicy::FIRST;
 }
@@ -35,7 +35,7 @@ static orion::api::HitPolicy parse_hp(const std::string& s)
     return orion::api::HitPolicy::FIRST;
 }
 
-static orion::api::CollectAggregation parse_agg(const std::string& s)
+static orion::api::CollectAggregation parse_agg(std::string_view s)
 {
     if (s == "COLLECT:SUM") { return orion::api::CollectAggregation::SUM;
 }

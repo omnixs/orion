@@ -41,7 +41,7 @@ namespace orion::bre
     using orion::api::error;
     using orion::api::debug;
 
-    bool BKMManager::load_bkm_from_dmn(const string& dmn_xml, string& error_message, const string& bkm_name)
+    bool BKMManager::load_bkm_from_dmn(std::string_view dmn_xml, string& error_message, std::string_view bkm_name)
     {
         if (dmn_xml.empty()) [[unlikely]]
         {
@@ -79,7 +79,7 @@ namespace orion::bre
         bkms_[bkm->name] = std::move(bkm);
     }
 
-    json BKMManager::invoke_bkm(const string& bkm_name,
+    json BKMManager::invoke_bkm(std::string_view bkm_name,
                                const vector<json>& args,
                                const json& context) const
     {
@@ -88,10 +88,10 @@ namespace orion::bre
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty");
         }
 
-        auto bkm_iterator = bkms_.find(bkm_name);
+        auto bkm_iterator = bkms_.find(std::string(bkm_name));
         if (bkm_iterator == bkms_.end()) [[unlikely]]
         {
-            throw std::runtime_error("BKM not found: " + bkm_name);
+            throw std::runtime_error(std::string("BKM not found: ").append(bkm_name));
         }
 
         // Create BKM map for recursive calls
@@ -100,18 +100,18 @@ namespace orion::bre
         return bkm_iterator->second->invoke(args, context, bkm_map);
     }
 
-    bool BKMManager::has_bkm(const string& bkm_name) const
+    bool BKMManager::has_bkm(std::string_view bkm_name) const
     {
-        return bkms_.find(bkm_name) != bkms_.end();
+        return bkms_.find(std::string(bkm_name)) != bkms_.end();
     }
 
-    const BusinessKnowledgeModel* BKMManager::get_bkm(const string& bkm_name) const
+    const BusinessKnowledgeModel* BKMManager::get_bkm(std::string_view bkm_name) const
     {
         if (bkm_name.empty()) [[unlikely]]
         {
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty");
         }
-        auto bkm_iterator = bkms_.find(bkm_name);
+        auto bkm_iterator = bkms_.find(std::string(bkm_name));
         return (bkm_iterator != bkms_.end()) ? bkm_iterator->second.get() : nullptr;
     }
 
@@ -126,13 +126,13 @@ namespace orion::bre
         return names;
     }
 
-    bool BKMManager::remove_bkm(const string& bkm_name)
+    bool BKMManager::remove_bkm(std::string_view bkm_name)
     {
         if (bkm_name.empty()) [[unlikely]]
         {
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty for removal");
         }
-        return bkms_.erase(bkm_name) > 0;
+        return bkms_.erase(std::string(bkm_name)) > 0;
     }
 
     void BKMManager::clear()
@@ -203,16 +203,16 @@ namespace orion::bre
     }
 
     // Helper function to process BKM function call
-    static nlohmann::json process_bkm_call(const std::string& func_name,
-                                            const std::string& args_str,
+    static nlohmann::json process_bkm_call(std::string_view func_name,
+                                            std::string_view args_str,
                                             const nlohmann::json& context,
                                             const std::map<std::string, BusinessKnowledgeModel>& available_bkms)
     {
         // Check if this BKM exists
-        auto bkm_it = available_bkms.find(func_name);
+        auto bkm_it = available_bkms.find(std::string(func_name));
         if (bkm_it == available_bkms.end())
         {
-            return feel::Evaluator::evaluate(func_name + "(" + args_str + ")", context);
+            return feel::Evaluator::evaluate(std::string(func_name) + "(" + std::string(args_str) + ")", context);
         }
 
         const BusinessKnowledgeModel& bkm = bkm_it->second;
@@ -239,7 +239,7 @@ namespace orion::bre
     }
 
     // BKM-specific expression evaluator  
-    json evaluate_bkm_expression(const string& expression,
+    json evaluate_bkm_expression(std::string_view expression,
                                const json& context,
                                const map<string, BusinessKnowledgeModel>& available_bkms)
     {
@@ -247,8 +247,9 @@ namespace orion::bre
         // First, check if this contains a BKM function call
         std::regex bkm_call_regex(R"(\b([A-Za-z][A-Za-z0-9_]*)\s*\(\s*([^)]*)\s*\))");
         std::smatch match;
+        string expr_str(expression);  // regex_search requires std::string
 
-    if (std::regex_search(expression, match, bkm_call_regex))
+    if (std::regex_search(expr_str, match, bkm_call_regex))
     {
         std::string func_name = match[1].str();
         std::string args_str = match[2].str();
@@ -266,11 +267,11 @@ namespace orion::bre
 
             // Check if there's additional arithmetic (e.g., +fee)
             std::string full_match = match[0].str();
-            size_t match_end = expression.find(full_match) + full_match.length();
+            size_t match_end = expr_str.find(full_match) + full_match.length();
 
-        if (match_end < expression.length())
+        if (match_end < expr_str.length())
         {
-            std::string remainder = expression.substr(match_end);
+            std::string remainder = expr_str.substr(match_end);
             debug("Processing arithmetic remainder: '{}'", remainder);
             json final_result = handle_arithmetic_remainder(bkm_result, remainder, context);
             debug("Final result after arithmetic: {}", final_result.dump());

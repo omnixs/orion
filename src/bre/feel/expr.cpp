@@ -79,7 +79,7 @@ namespace {  // Anonymous namespace to prevent collision with main parser
     {
     }
 
-    Value(const std::string& str): v(str)
+    Value(std::string_view str): v(std::string(str))
     {
     }
 
@@ -819,7 +819,7 @@ enum class TokKind : std::uint8_t
         return std::numeric_limits<int>::max();
     }
 
-    static Value cmp_op(const std::string& op, const Value& a, const Value& b)
+    static Value cmp_op(std::string_view op, const Value& a, const Value& b)
     {
         int c = cmp_values(a, b);
         if (c == std::numeric_limits<int>::max()) { return make_null();
@@ -840,16 +840,16 @@ enum class TokKind : std::uint8_t
     }
 
     static Value eval_expr(const Expr* e, const json& ctx);
-    static Value eval_single_arg_math(const std::string& func_name, const std::vector<Value>& args);
-    static Value eval_two_arg_math(const std::string& func_name, const std::vector<Value>& args);
+    static Value eval_single_arg_math(std::string_view func_name, const std::vector<Value>& args);
+    static Value eval_two_arg_math(std::string_view func_name, const std::vector<Value>& args);
     static Value eval_all_function(const std::vector<Value>& values);
     static Value eval_any_function(const std::vector<Value>& values);
-    static Value eval_boolean_string_functions(const std::string& func_name, const std::vector<Value>& args);
+    static Value eval_boolean_string_functions(std::string_view func_name, const std::vector<Value>& args);
 
     // Helper: Trim leading and trailing whitespace from string
-    static std::string trim_whitespace(const std::string& str)
+    static std::string trim_whitespace(std::string_view str)
     {
-        std::string trimmed = str;
+        std::string trimmed(str);
         while (!trimmed.empty() && trimmed.front() == ' ') {
             trimmed.erase(trimmed.begin());
         }
@@ -875,7 +875,7 @@ enum class TokKind : std::uint8_t
     }
 
     // Helper: Navigate to property in JSON object, handling dots
-    static const json* navigate_json_path(const json& root, const std::string& path)
+    static const json* navigate_json_path(const json& root, std::string_view path)
     {
         const json* node = &root;
         size_t start = 0;
@@ -883,8 +883,8 @@ enum class TokKind : std::uint8_t
         while (start < path.size())
         {
             size_t dot = path.find('.', start);
-            std::string part = path.substr(start, 
-                dot == std::string::npos ? std::string::npos : dot - start);
+            std::string part(path.substr(start, 
+                dot == std::string_view::npos ? std::string_view::npos : dot - start));
             
             if (!node->is_object()) {
                 return nullptr;
@@ -909,7 +909,7 @@ enum class TokKind : std::uint8_t
     }
 
     // Resolve variable name in context (handles property access with dots)
-    static Value resolve_name(const std::string& name, const json& ctx)
+    static Value resolve_name(std::string_view name, const json& ctx)
     {
         std::string trimmed = trim_whitespace(name);
         const json* result = navigate_json_path(ctx, trimmed);
@@ -1055,7 +1055,7 @@ static Value eval_range(const ERange* r, const json& ctx)
     }
 
     // Helper: Evaluate boolean/string functions (matches, all, any)
-    static Value eval_boolean_string_functions(const std::string& func_name, const std::vector<Value>& args)
+    static Value eval_boolean_string_functions(std::string_view func_name, const std::vector<Value>& args)
     {
         if (func_name == "matches")
         {
@@ -1090,7 +1090,7 @@ static Value eval_range(const ERange* r, const json& ctx)
     
     return make_null();  // Unknown function
 }   // Helper: Evaluate two-argument math functions (rounding/scaling/modulo functions)
-    static Value eval_two_arg_math(const std::string& func_name, const std::vector<Value>& args)
+    static Value eval_two_arg_math(std::string_view func_name, const std::vector<Value>& args)
     {
         // Common validation: two numeric arguments
         if (args.size() != 2) { return make_null(); }
@@ -1136,7 +1136,7 @@ static Value eval_range(const ERange* r, const json& ctx)
     }
 
     // Helper: Evaluate single-argument math functions
-    static Value eval_single_arg_math(const std::string& func_name, const std::vector<Value>& args)
+    static Value eval_single_arg_math(std::string_view func_name, const std::vector<Value>& args)
     {
         // Validate arguments
         if (args.size() != 1) {

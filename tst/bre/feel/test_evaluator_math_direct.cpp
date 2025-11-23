@@ -9,7 +9,7 @@
 #include <nlohmann/json.hpp>
 
 namespace orion::bre::detail {
-    nlohmann::json eval_math_expression(const std::string& expr);
+    nlohmann::json eval_math_expression(std::string_view expr);
     extern thread_local const nlohmann::json* current_eval_context;
 }
 

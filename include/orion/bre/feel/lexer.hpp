@@ -141,7 +141,7 @@ namespace orion::bre::feel {
          * @return Vector of tokens (always ends with END_OF_INPUT)
          * @throws std::runtime_error if lexical errors are encountered
          */
-        std::vector<Token> tokenize(const std::string& expression);
+        std::vector<Token> tokenize(std::string_view expression);
 
     private:
         std::string input_;     ///< Current input expression
@@ -152,7 +152,7 @@ namespace orion::bre::feel {
          * @param text The text to check
          * @return true if the text is a reserved keyword
          */
-        [[nodiscard]] bool is_keyword(const std::string& text) const;
+        [[nodiscard]] bool is_keyword(std::string_view text) const;
         
         /**
          * @brief Get the next character without advancing position
@@ -223,7 +223,7 @@ namespace orion::bre::feel {
          * @param current_text The identifier text accumulated so far
          * @return true if we should stop at the space
          */
-        [[nodiscard]] bool should_stop_at_space(const std::string& current_text) const;
+        [[nodiscard]] bool should_stop_at_space(std::string_view current_text) const;
         
         /**
          * @brief Trim trailing whitespace from string

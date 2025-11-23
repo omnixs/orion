@@ -436,7 +436,7 @@ static Config parse_command_line(int argc, char** argv)
     return config;
 }
 
-static std::vector<DirInfo> discover_test_directories(const fs::path& base_path, const std::string& testFilter)
+static std::vector<DirInfo> discover_test_directories(const fs::path& base_path, std::string_view testFilter)
 {
     std::vector<DirInfo> dirs;
     
@@ -575,12 +575,12 @@ static std::string extract_output_value(
 }
 
 // Helper: Compare expected vs actual values with numeric tolerance
-static bool compare_values(const std::string& expected, const std::string& actual)
+static bool compare_values(std::string_view expected, std::string_view actual)
 {
     try
     {
-        double expected_num = std::stod(expected);
-        std::string numeric_str = actual;
+        double expected_num = std::stod(std::string(expected));
+        std::string numeric_str(actual);
         
         if (actual.front() == '"' && actual.back() == '"' && actual.length() > 2)
         {

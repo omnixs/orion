@@ -65,7 +65,7 @@ namespace orion::bre
          * @param bkm_name Optional specific BKM name to parse (empty = parse all)
          * @return true if parsing succeeded
          */
-        bool load_bkm_from_dmn(const std::string& dmn_xml, std::string& error_message, const std::string& bkm_name = "");
+        bool load_bkm_from_dmn(std::string_view dmn_xml, std::string& error_message, std::string_view bkm_name = "");
 
         /**
          * @brief Add a BKM instance
@@ -80,7 +80,7 @@ namespace orion::bre
          * @param context Evaluation context (variable bindings)
          * @return Result of BKM evaluation
          */
-        [[nodiscard]] nlohmann::json invoke_bkm(const std::string& bkm_name,
+        [[nodiscard]] nlohmann::json invoke_bkm(std::string_view bkm_name,
                                  const std::vector<nlohmann::json>& args,
                                  const nlohmann::json& context) const;
 
@@ -89,14 +89,14 @@ namespace orion::bre
          * @param bkm_name Name to check
          * @return true if BKM exists
          */
-        [[nodiscard]] bool has_bkm(const std::string& bkm_name) const;
+        [[nodiscard]] bool has_bkm(std::string_view bkm_name) const;
 
         /**
          * @brief Get BKM by name (read-only access)
          * @param bkm_name Name of the BKM
          * @return Pointer to BKM or nullptr if not found
          */
-        [[nodiscard]] const BusinessKnowledgeModel* get_bkm(const std::string& bkm_name) const;
+        [[nodiscard]] const BusinessKnowledgeModel* get_bkm(std::string_view bkm_name) const;
 
         /**
          * @brief Get all BKM names
@@ -109,7 +109,7 @@ namespace orion::bre
          * @param bkm_name Name of BKM to remove
          * @return true if BKM was removed
          */
-        [[nodiscard]] bool remove_bkm(const std::string& bkm_name);
+        [[nodiscard]] bool remove_bkm(std::string_view bkm_name);
 
         /**
          * @brief Clear all BKMs
@@ -134,8 +134,8 @@ namespace orion::bre
      * @return Unique pointer to parsed BKM or nullptr on failure
      */
     std::unique_ptr<BusinessKnowledgeModel> parse_business_knowledge_model(
-        const std::string& dmn_xml,
-        const std::string& bkm_name,
+        std::string_view dmn_xml,
+        std::string_view bkm_name,
         std::string& error_message);
 
     /**
@@ -145,7 +145,7 @@ namespace orion::bre
      * @param available_bkms Map of available BKMs
      * @return Result of evaluation or error
      */
-    nlohmann::json evaluate_bkm_expression(const std::string& expression,
+    nlohmann::json evaluate_bkm_expression(std::string_view expression,
                                          const nlohmann::json& context,
                                          const std::map<std::string, BusinessKnowledgeModel>& available_bkms);
 } // namespace orion::bre

@@ -53,11 +53,11 @@ namespace orion::bre::feel {
     };
 
     // Declared here; implemented in feel_types.cpp
-    [[nodiscard]] std::optional<Duration> parse_duration(const std::string& str);
+    [[nodiscard]] std::optional<Duration> parse_duration(std::string_view str);
 
     using Value = std::variant<std::monostate, bool, number, std::string, Date, Time, DateTime, Duration>;
 
-    [[nodiscard]] std::optional<Date> parse_date(const std::string& str);
-    [[nodiscard]] std::optional<Time> parse_time(const std::string& str);
-    [[nodiscard]] std::optional<DateTime> parse_datetime(const std::string& str);
+    [[nodiscard]] std::optional<Date> parse_date(std::string_view str);
+    [[nodiscard]] std::optional<Time> parse_time(std::string_view str);
+    [[nodiscard]] std::optional<DateTime> parse_datetime(std::string_view str);
 }

@@ -30,9 +30,23 @@ namespace orion::bre::detail
     using std::vector;
     using orion::api::warn;
 
+    // Forward declarations for recursive parsing functions
+    double parse_expression(std::string_view expr, size_t& pos);
+    double parse_term(std::string_view expr, size_t& pos);
+    double parse_power(std::string_view expr, size_t& pos);
+    double parse_factor(std::string_view expr, size_t& pos);
+    double parse_parenthesized_expression_impl(std::string_view expr, size_t& pos);
+    double parse_number_literal_impl(std::string_view expr, size_t& pos);
+    double parse_identifier_or_variable(std::string_view expr, size_t& pos);
+    std::string extract_variable_name(std::string_view expr, size_t start_pos, size_t& pos);
+    std::string try_extend_variable_name(std::string_view expr, std::string_view var_name, size_t start_pos, size_t& pos);
+    double resolve_feel_constant(std::string_view var_name);
+    double resolve_variable_from_context(std::string_view var_name, bool& found);
+    void skip_whitespace(std::string_view expr, size_t& pos);
+
     // Removed unused constant MONTHS_PER_YEAR
 
-    std::vector<std::string> split_arguments(const std::string& args_str)
+    std::vector<std::string> split_arguments(std::string_view args_str)
     {
         vector<string> args;
         string current;
@@ -79,14 +93,14 @@ namespace orion::bre::detail
         return args;
     }
 
-    nlohmann::json resolve_argument(const std::string& arg, const nlohmann::json& context)
+    nlohmann::json resolve_argument(std::string_view arg, const nlohmann::json& context)
     {
         // Handle dotted property access like "Loan.amount"
-        if (arg.find('.') != string::npos)
+        if (arg.find('.') != std::string_view::npos)
         {
             size_t dot_pos = arg.find('.');
-            string obj_name = arg.substr(0, dot_pos);
-            string prop_name = arg.substr(dot_pos + 1);
+            string obj_name(arg.substr(0, dot_pos));
+            string prop_name(arg.substr(dot_pos + 1));
 
             if (context.contains(obj_name) && context[obj_name].is_object())
             {
@@ -101,17 +115,18 @@ namespace orion::bre::detail
         // Handle direct property access
         if (context.contains(arg))
         {
-            return context[arg];
+            return context[string(arg)];
         }
 
         // Try to parse as number
         try
         {
-            if (arg.find('.') != string::npos)
+            string arg_str(arg);  // Only construct when needed for numeric parsing
+            if (arg.find('.') != std::string_view::npos)
             {
-                return json(std::stod(arg));
+                return json(std::stod(arg_str));
             }
-            return json(std::stoll(arg));
+            return json(std::stoll(arg_str));
         }
         catch (...)
         {
@@ -121,15 +136,15 @@ namespace orion::bre::detail
         return json{};
     }
 
-    double resolve_property_path(const std::string& path, const nlohmann::json& context)
+    double resolve_property_path(std::string_view path, const nlohmann::json& context)
     {
         size_t dot_pos = path.find('.');
-        if (dot_pos == string::npos) {
+        if (dot_pos == std::string_view::npos) {
             return std::numeric_limits<double>::quiet_NaN();
         }
 
-        string obj_name = path.substr(0, dot_pos);
-        string prop_name = path.substr(dot_pos + 1);
+        string obj_name(path.substr(0, dot_pos));
+        string prop_name(path.substr(dot_pos + 1));
 
         // Try both cases - the original and lowercase
         const json* obj = nullptr;
@@ -156,12 +171,12 @@ namespace orion::bre::detail
         return std::numeric_limits<double>::quiet_NaN();
     }
 
-    nlohmann::json evaluate_complex_arithmetic_expression(const std::string& expression, const nlohmann::json& context)
+    nlohmann::json evaluate_complex_arithmetic_expression(std::string_view expression, const nlohmann::json& context)
     {
         // Handle expressions like "(loan.principal*loan.rate/MONTHS_PER_YEAR)/(1-(1+loan.rate/MONTHS_PER_YEAR)**-loan.termMonths)"
         try
         {
-            const string& expr = expression;
+            string expr(expression);  // regex requires std::string
 
             // Replace property references with their values
             std::regex prop_regex(R"([a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z][a-zA-Z0-9_]*)");
@@ -208,7 +223,7 @@ namespace orion::bre::detail
         }
     }
 
-    nlohmann::json eval_math_expression(const std::string& expr)
+    nlohmann::json eval_math_expression(std::string_view expr)
     {
         warn("[LEGACY-MATH-PARSER] *** PARSING ARITHMETIC DURING EVALUATION *** Expression: '{}'", expr);
         
@@ -240,7 +255,7 @@ namespace orion::bre::detail
         return json{};
     }
 
-    double parse_expression(const std::string& expr, size_t& pos)
+    double parse_expression(std::string_view expr, size_t& pos)
     {
         double result = parse_term(expr, pos);
 
@@ -270,7 +285,7 @@ namespace orion::bre::detail
         return result;
     }
 
-    double parse_term(const std::string& expr, size_t& pos)
+    double parse_term(std::string_view expr, size_t& pos)
     {
         double result = parse_power(expr, pos);
 
@@ -308,7 +323,7 @@ namespace orion::bre::detail
             }
         }
         return result;
-    }   double parse_power(const std::string& expr, size_t& pos)
+    }   double parse_power(std::string_view expr, size_t& pos)
     {
         double result = parse_factor(expr, pos);
 
@@ -337,7 +352,7 @@ namespace orion::bre::detail
         return result;
     }
 
-    double parse_factor(const std::string& expr, size_t& pos)
+    double parse_factor(std::string_view expr, size_t& pos)
 {
     skip_whitespace(expr, pos);
     if (pos >= expr.length()) {
@@ -376,7 +391,7 @@ namespace orion::bre::detail
     return negative ? -result : result;
 }
 
-double parse_parenthesized_expression_impl(const std::string& expr, size_t& pos)
+double parse_parenthesized_expression_impl(std::string_view expr, size_t& pos)
 {
     pos++; // consume '('
     double result = parse_expression(expr, pos);
@@ -387,7 +402,7 @@ double parse_parenthesized_expression_impl(const std::string& expr, size_t& pos)
     return result;
 }
 
-double parse_number_literal_impl(const std::string& expr, size_t& pos)
+double parse_number_literal_impl(std::string_view expr, size_t& pos)
 {
     size_t end_pos = pos;
     bool has_decimal = false;
@@ -398,12 +413,12 @@ double parse_number_literal_impl(const std::string& expr, size_t& pos)
         }
         end_pos++;
     }
-    double result = std::stod(expr.substr(pos, end_pos - pos));
+    double result = std::stod(string(expr.substr(pos, end_pos - pos)));
     pos = end_pos;
     return result;
 }
 
-double parse_identifier_or_variable(const std::string& expr, size_t& pos)
+double parse_identifier_or_variable(std::string_view expr, size_t& pos)
 {
     size_t start_pos = pos;
     std::string var_name = extract_variable_name(expr, start_pos, pos);
@@ -427,23 +442,23 @@ double parse_identifier_or_variable(const std::string& expr, size_t& pos)
     return found ? var_value : 0.0; // Unresolved: treat as 0.0
 }
 
-std::string extract_variable_name(const std::string& expr, size_t start_pos, size_t& pos)
+std::string extract_variable_name(std::string_view expr, size_t start_pos, size_t& pos)
 {
     // Parse standard identifier (no spaces)
     while (pos < expr.length() && (std::isalnum(static_cast<unsigned char>(expr[pos])) || expr[pos] == '_' || expr[pos] == '-')) {
         pos++;
     }
-    return expr.substr(start_pos, pos - start_pos);
+    return string(expr.substr(start_pos, pos - start_pos));
 }
 
-std::string try_extend_variable_name(const std::string& expr, const std::string& var_name, size_t start_pos, size_t& pos)
+std::string try_extend_variable_name(std::string_view expr, std::string_view var_name, size_t start_pos, size_t& pos)
 {
     const auto& ctx = *orion::bre::detail::current_eval_context;
     
     // If standard name exists, use it
     if (ctx.contains(var_name))
     {
-        return var_name;
+        return std::string(var_name);
     }
     
     // Try to extend with spaces for variable names like "Monthly Salary"
@@ -463,7 +478,7 @@ std::string try_extend_variable_name(const std::string& expr, const std::string&
                 extended_pos++;
             }
             
-            std::string potential_name = expr.substr(start_pos, extended_pos - start_pos);
+            std::string potential_name(expr.substr(start_pos, extended_pos - start_pos));
             if (ctx.contains(potential_name))
             {
                 pos = extended_pos;
@@ -476,10 +491,10 @@ std::string try_extend_variable_name(const std::string& expr, const std::string&
         }
     }
     
-    return var_name; // Return original if extension didn't help
+    return std::string(var_name); // Return original if extension didn't help
 }
 
-double resolve_feel_constant(const std::string& var_name)
+double resolve_feel_constant(std::string_view var_name)
 {
     if (var_name == "null")
     {
@@ -496,7 +511,7 @@ double resolve_feel_constant(const std::string& var_name)
     return std::numeric_limits<double>::quiet_NaN(); // Not a constant
 }
 
-double resolve_variable_from_context(const std::string& var_name, bool& found)
+double resolve_variable_from_context(std::string_view var_name, bool& found)
 {
     found = false;
     if (!orion::bre::detail::current_eval_context)
@@ -547,7 +562,7 @@ double resolve_variable_from_context(const std::string& var_name, bool& found)
     return 0.0;
 }
 
-    void skip_whitespace(const std::string& expr, size_t& pos)
+    void skip_whitespace(std::string_view expr, size_t& pos)
     {
         while (pos < expr.length() && std::isspace(static_cast<unsigned char>(expr[pos]))) {
             pos++;

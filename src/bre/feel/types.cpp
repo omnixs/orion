@@ -21,11 +21,12 @@
 #include <climits>  // For INT_MAX
 
 namespace orion::bre::feel {
-    std::optional<Date> parse_date(const std::string& str)
+    std::optional<Date> parse_date(std::string_view str)
     {
         static const std::regex regex_pattern(R"((\d{4})-(\d{2})-(\d{2}))");
         std::smatch match;
-        if (!std::regex_match(str, match, regex_pattern))
+        std::string str_copy(str);  // regex requires std::string
+        if (!std::regex_match(str_copy, match, regex_pattern))
         {
             return std::nullopt;
         }
@@ -36,27 +37,29 @@ namespace orion::bre::feel {
         return date;
     }
 
-    std::optional<Time> parse_time(const std::string& str)
+    std::optional<Time> parse_time(std::string_view str)
     {
         static const std::regex regex_time_full(R"((\d{2}):(\d{2}):(\d{2}))");
         static const std::regex regex_time_short(R"((\d{2}):(\d{2}))");
         std::smatch match;
-        if (std::regex_match(str, match, regex_time_full))
+        std::string str_copy(str);  // regex requires std::string
+        if (std::regex_match(str_copy, match, regex_time_full))
         {
             return Time{std::stoi(match[1]), std::stoi(match[2]), std::stoi(match[3])};
         }
-        if (std::regex_match(str, match, regex_time_short))
+        if (std::regex_match(str_copy, match, regex_time_short))
         {
             return Time{std::stoi(match[1]), std::stoi(match[2]), 0};
         }
         return std::nullopt;
     }
 
-    std::optional<DateTime> parse_datetime(const std::string& str)
+    std::optional<DateTime> parse_datetime(std::string_view str)
     {
         static const std::regex regex_pattern(R"((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}))");
         std::smatch match;
-        if (!std::regex_match(str, match, regex_pattern))
+        std::string str_copy(str);  // regex requires std::string
+        if (!std::regex_match(str_copy, match, regex_pattern))
         {
             return std::nullopt;
         }
@@ -65,7 +68,7 @@ namespace orion::bre::feel {
         return DateTime{date, time_val};
     }
 
-    std::optional<Duration> parse_duration(const std::string& str)
+    std::optional<Duration> parse_duration(std::string_view str)
     {
         if (str.empty() || str[0] != 'P')
         {

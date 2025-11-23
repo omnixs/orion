@@ -139,7 +139,7 @@ namespace orion::bre::feel {
          * @param text Expected token text
          * @return true if match
          */
-        [[nodiscard]] bool check_text(const std::string& text) const;
+        [[nodiscard]] bool check_text(std::string_view text) const;
         
         /**
          * @brief Consume expected token or throw error
@@ -147,7 +147,7 @@ namespace orion::bre::feel {
          * @param message Error message if mismatch
          * @return Consumed token
          */
-        const Token& expect(TokenType type, const std::string& message);
+        const Token& expect(TokenType type, std::string_view message);
         
         /**
          * @brief Check if at end of input
@@ -210,9 +210,9 @@ namespace orion::bre::feel {
     std::unique_ptr<ASTNode> parse_string_literal();
     std::unique_ptr<ASTNode> parse_keyword_or_not_function();
     std::unique_ptr<ASTNode> parse_identifier_or_function();
-    std::unique_ptr<ASTNode> parse_function_call(const std::string& function_name);
-    void parse_function_parameters(ASTNode* func_node, const std::string& function_name);
-    std::unique_ptr<ASTNode> parse_variable_with_properties(const std::string& var_name);
+    std::unique_ptr<ASTNode> parse_function_call(std::string_view function_name);
+    void parse_function_parameters(ASTNode* func_node, std::string_view function_name);
+    std::unique_ptr<ASTNode> parse_variable_with_properties(std::string_view var_name);
     std::unique_ptr<ASTNode> parse_parenthesized_expression();
     std::unique_ptr<ASTNode> parse_list_literal();
     std::unique_ptr<ASTNode> parse_unary_minus();

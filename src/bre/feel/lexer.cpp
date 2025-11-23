@@ -82,7 +82,7 @@ namespace orion::bre::feel {
         advance();
     }
 
-    std::vector<Token> Lexer::tokenize(const std::string& expression)
+    std::vector<Token> Lexer::tokenize(std::string_view expression)
     {
         input_ = expression;
         position_ = 0;
@@ -138,7 +138,7 @@ namespace orion::bre::feel {
         return tokens;
     }
 
-    bool Lexer::is_keyword(const std::string& text) const
+    bool Lexer::is_keyword(std::string_view text) const
     {
         return text == "true" || text == "false" || text == "null" ||
                text == "and" || text == "or" || text == "not" ||
@@ -287,7 +287,7 @@ namespace orion::bre::feel {
     }
 
     // Helper: Check if we should stop at current space
-    bool Lexer::should_stop_at_space(const std::string& current_text) const
+    bool Lexer::should_stop_at_space(std::string_view current_text) const
     {
         // Stop if current text is already a keyword
         if (is_keyword(current_text))

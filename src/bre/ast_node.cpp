@@ -38,7 +38,7 @@ namespace orion::bre
          * - Lowercase with underscores
          * - No spaces
          */
-        json resolveVariable(const std::string& name, const json& context)
+        json resolveVariable(std::string_view name, const json& context)
         {
             // Try exact match first
             if (context.contains(name))
@@ -47,7 +47,7 @@ namespace orion::bre
             }
             
             // Try with underscores instead of spaces
-            std::string underscored = name;
+            std::string underscored(name);
             std::replace(underscored.begin(), underscored.end(), ' ', '_');
             if (context.contains(underscored))
             {
@@ -55,7 +55,7 @@ namespace orion::bre
             }
             
             // Try lowercase
-            std::string lower = name;
+            std::string lower(name);
             std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
             if (context.contains(lower))
             {
@@ -71,7 +71,7 @@ namespace orion::bre
             }
             
             // Try without spaces
-            std::string nospace = name;
+            std::string nospace(name);
             nospace.erase(std::remove(nospace.begin(), nospace.end(), ' '), nospace.end());
             if (context.contains(nospace))
             {
@@ -87,7 +87,7 @@ namespace orion::bre
         /**
          * @brief Convert JSON value to number for arithmetic operations
          */
-        double toNumber(const json& value, const std::string& operation)
+        double toNumber(const json& value, std::string_view operation)
         {
             if (value.is_number())
             {
