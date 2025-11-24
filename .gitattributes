@@ -29,6 +29,9 @@ CMakePresets.json text eol=lf
 *.toml text eol=lf
 *.ini text eol=lf
 
+# DMN TCK submodule - don't normalize (external test data)
+dat/dmn-tck/** -text
+
 # Shell scripts
 *.sh text eol=lf
 *.bash text eol=lf
