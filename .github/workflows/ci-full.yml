@@ -32,10 +32,19 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v11
-      with:
-        vcpkgGitCommitId: 'c8696863d371ab7f46e213d8f5ca923c4ff84406'
+    - name: Install vcpkg (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+        C:\vcpkg\bootstrap-vcpkg.bat
+        echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+    
+    - name: Install vcpkg (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
+        $HOME/vcpkg/bootstrap-vcpkg.sh
+        echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
     
     - name: Install GCC 13 (Linux)
       if: runner.os == 'Linux'
@@ -49,7 +58,7 @@ jobs:
         CC=gcc-13 CXX=g++-13 cmake -S . -B build \
           -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=x64-linux \
           -DORION_BUILD_TESTS=ON \
           -DORION_BUILD_APPS=ON
@@ -59,7 +68,7 @@ jobs:
       run: |
         cmake -S . -B build `
           -G "Visual Studio 17 2022" -A x64 `
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg\scripts\buildsystems\vcpkg.cmake" `
           -DVCPKG_TARGET_TRIPLET=x64-windows-static `
           -DORION_BUILD_TESTS=ON `
           -DORION_BUILD_APPS=ON
