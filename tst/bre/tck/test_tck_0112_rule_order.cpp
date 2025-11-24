@@ -80,11 +80,8 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     
     BOOST_TEST_MESSAGE("Loading DMN model...");
     auto load_result = engine.load_dmn_model(dmn_xml);
-    BOOST_CHECK_MESSAGE(load_result.has_value(), "Failed to load DMN model: " + load_result.error());
-    
     if (!load_result) {
-        BOOST_TEST_MESSAGE("DMN model load failed: " + load_result.error());
-        return;
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
     }
     
     // Test case 1: Age = 19 (should match both >=18 and >=12 rules)

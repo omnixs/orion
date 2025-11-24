@@ -30,7 +30,9 @@ BOOST_AUTO_TEST_CASE(test_0112_collection_direct_comparison) {
     BusinessRulesEngine engine;
     
     auto load_result = engine.load_dmn_model(dmn_xml);
-    BOOST_REQUIRE_MESSAGE(load_result.has_value(), "Failed to load DMN model: " + load_result.error());
+    if (!load_result) {
+        BOOST_FAIL("Failed to load DMN model: " + load_result.error());
+    }
     
     // Test case 1: Age = 19 (should trigger multiple rules)
     json input = {{"Age", 19}};
