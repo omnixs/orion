@@ -1,0 +1,46 @@
+name: Quality - Format Check
+
+# This workflow is DISABLED by default (manual trigger only)
+# Requires .clang-format configuration file in repository root
+# Enable on PR by uncommenting the pull_request trigger below
+
+on:
+  workflow_dispatch:
+  # Uncomment to run on PRs:
+  # pull_request:
+  #   branches: [ "main" ]
+
+jobs:
+  format-check:
+    name: Code Formatting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install clang-format
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-format
+    
+    - name: Check if .clang-format exists
+      id: check-config
+      run: |
+        if [ -f .clang-format ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Run clang-format check
+      if: steps.check-config.outputs.exists == 'true'
+      run: |
+        find src include tst -name "*.cpp" -o -name "*.hpp" | \
+          xargs clang-format --dry-run --Werror
+    
+    - name: Skip - No .clang-format found
+      if: steps.check-config.outputs.exists == 'false'
+      run: |
+        echo "::warning::No .clang-format configuration found. Add one to enable format checking."
+        echo "To generate: clang-format -style=llvm -dump-config > .clang-format"

@@ -1,0 +1,107 @@
+name: CI - Full Validation
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  schedule:
+    # Run nightly at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  full-validation:
+    name: ${{ matrix.os }} - Release - Full Tests
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        include:
+          - os: ubuntu-24.04
+            triplet: x64-linux
+            cc: gcc-13
+            cxx: g++-13
+          - os: windows-latest
+            triplet: x64-windows-static
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'c8696863d371ab7f46e213d8f5ca923c4ff84406'
+    
+    - name: Install GCC 13 (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-13 g++-13 ninja-build
+    
+    - name: Configure CMake (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        CC=gcc-13 CXX=g++-13 cmake -S . -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=x64-linux \
+          -DORION_BUILD_TESTS=ON \
+          -DORION_BUILD_APPS=ON
+    
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cmake -S . -B build `
+          -G "Visual Studio 17 2022" -A x64 `
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+          -DORION_BUILD_TESTS=ON `
+          -DORION_BUILD_APPS=ON
+    
+    - name: Build (Linux)
+      if: runner.os == 'Linux'
+      run: cmake --build build -j$(nproc)
+    
+    - name: Build (Windows)
+      if: runner.os == 'Windows'
+      run: cmake --build build --config Release --parallel
+    
+    - name: Run Unit Tests (Linux)
+      if: runner.os == 'Linux'
+      run: ./build/tst_orion --log_level=test_suite
+      working-directory: ${{ github.workspace }}
+    
+    - name: Run Unit Tests (Windows)
+      if: runner.os == 'Windows'
+      run: .\build\Release\tst_orion.exe --log_level=test_suite
+      working-directory: ${{ github.workspace }}
+    
+    - name: Run TCK Tests (Linux)
+      if: runner.os == 'Linux'
+      run: ./build/orion_tck_runner --log_level=error
+      working-directory: ${{ github.workspace }}
+      timeout-minutes: 15
+    
+    - name: Run TCK Tests (Windows)
+      if: runner.os == 'Windows'
+      run: .\build\Release\orion_tck_runner.exe --log_level=error
+      working-directory: ${{ github.workspace }}
+      timeout-minutes: 15
+    
+    - name: Upload build artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: orion-${{ matrix.os }}-release
+        path: |
+          build/orion_app*
+          build/orion_tck_runner*
+          build/Release/orion_app.exe
+          build/Release/orion_tck_runner.exe
+        retention-days: 7

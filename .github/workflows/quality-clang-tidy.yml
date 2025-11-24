@@ -1,0 +1,52 @@
+name: Quality - Clang-Tidy
+
+# This workflow is DISABLED by default (manual trigger only)
+# Enable on PR by adding: pull_request: branches: [ "main" ]
+# Note: Clang-tidy only works on Linux (MSVC compile_commands.json not compatible)
+
+on:
+  workflow_dispatch:
+  # Uncomment to run on PRs:
+  # pull_request:
+  #   branches: [ "main" ]
+
+jobs:
+  clang-tidy:
+    name: Static Analysis (Linux)
+    runs-on: ubuntu-24.04
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'c8696863d371ab7f46e213d8f5ca923c4ff84406'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-13 g++-13 ninja-build clang-tidy
+    
+    - name: Configure CMake
+      run: |
+        CC=gcc-13 CXX=g++-13 cmake -S . -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=x64-linux \
+          -DORION_BUILD_TESTS=OFF
+    
+    - name: Run clang-tidy on source files
+      run: |
+        find src -name "*.cpp" -type f | xargs clang-tidy -p build/ --warnings-as-errors='*'
+      continue-on-error: true
+    
+    - name: Run clang-tidy summary
+      run: |
+        echo "::notice::Clang-tidy analysis complete. Review warnings above."
+        echo "To fix issues locally: clang-tidy -p build/ --fix-errors <file>"
