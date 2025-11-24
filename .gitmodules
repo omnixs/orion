@@ -1,3 +1,4 @@
 [submodule "dat/dmn-tck"]
 	path = dat/dmn-tck
 	url = https://github.com/dmn-tck/tck.git
+	ignore = dirty
