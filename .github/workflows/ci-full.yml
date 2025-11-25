@@ -38,6 +38,18 @@ jobs:
       with:
         submodules: recursive
     
+    - name: Cache vcpkg
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:\vcpkg\installed
+          C:\vcpkg\packages
+          C:\vcpkg\buildtrees
+          ~/.cache/vcpkg
+        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-
+    
     - name: Install vcpkg (Windows)
       if: runner.os == 'Windows'
       run: |
@@ -51,6 +63,7 @@ jobs:
         git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
         $HOME/vcpkg/bootstrap-vcpkg.sh
         echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+        echo "VCPKG_DEFAULT_BINARY_CACHE=$HOME/.cache/vcpkg" >> $GITHUB_ENV
     
     - name: Install GCC 13 (Linux)
       if: runner.os == 'Linux'
