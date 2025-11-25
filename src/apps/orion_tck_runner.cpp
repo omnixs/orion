@@ -442,9 +442,11 @@ static std::map<std::string, BaselineResult> load_baseline(const fs::path& basel
     }
     
     std::string line;
+    int row_number = 0;
     
     while (std::getline(file, line)) {
         if (line.empty()) continue;
+        ++row_number;
         
         // Parse CSV: "test_dir","test_case_id","result_node_id","result","detail"
         std::vector<std::string> fields;
@@ -469,8 +471,9 @@ static std::map<std::string, BaselineResult> load_baseline(const fs::path& basel
             std::string result_node_id = fields[2];
             std::string result = fields[3];
             
-            // Create unique test ID: test_case_id + result_node_id
-            std::string testId = test_case_id + "-" + result_node_id;
+            // Create unique test ID: test_dir + test_case_id + result_node_id + row
+            // Row number is needed because multiple outputs can have the same test_case_id and result_node_id
+            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id + "-" + std::to_string(row_number);
             
             // Determine level from test_dir (e.g., "compliance-level-2/...")
             int level = 0;
@@ -1054,9 +1057,11 @@ static RegressionInfo detect_regressions(
     }
     
     std::string line;
+    int row_number = 0;
     
     while (std::getline(file, line)) {
         if (line.empty()) continue;
+        ++row_number;
         
         // Parse CSV: "test_dir","test_case_id","result_node_id","result","detail"
         std::vector<std::string> fields;
@@ -1081,8 +1086,9 @@ static RegressionInfo detect_regressions(
             std::string result_node_id = fields[2];
             std::string result = fields[3];
             
-            // Create unique test ID: test_case_id + result_node_id
-            std::string testId = test_case_id + "-" + result_node_id;
+            // Create unique test ID: test_dir + test_case_id + result_node_id + row
+            // Row number is needed because multiple outputs can have the same test_case_id and result_node_id
+            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id + "-" + std::to_string(row_number);
             
             // Determine level from test_dir (e.g., "compliance-level-2/...")
             int level = 0;
@@ -1157,7 +1163,29 @@ int main(int argc, char** argv)
         auto log = orion::common::init_hourly_logger("orion_tck_runner");
         log->info("TCK Runner started");
         
+        // Log command-line arguments for debugging
+        std::ostringstream cmd_args;
+        for (int i = 0; i < argc; ++i) {
+            if (i > 0) cmd_args << " ";
+            cmd_args << argv[i];
+        }
+        spdlog::info("Command line: {}", cmd_args.str());
+        log->info("Command line: {}", cmd_args.str());
+        
         Config config = parse_command_line(argc, argv);
+        
+        // Log configuration
+        spdlog::info("Configuration:");
+        spdlog::info("  TCK Root: {}", config.root.string());
+        spdlog::info("  Version: {}", config.version);
+        spdlog::info("  Test Filter: {}", config.testFilter.empty() ? "<none>" : config.testFilter);
+        spdlog::info("  Verbose: {}", config.verbose ? "true" : "false");
+        spdlog::info("  Stop on Failure: {}", config.stopOnFailure ? "true" : "false");
+        spdlog::info("  Baseline Path: {}", config.baselinePath.empty() ? "<none>" : config.baselinePath.string());
+        spdlog::info("  Regression Check: {}", config.regressionCheck ? "enabled" : "disabled");
+        spdlog::info("  Level 2 Strict: {}", config.level2Strict ? "enabled" : "disabled");
+        spdlog::info("  Output CSV: {}", config.outputCsv.empty() ? "<default>" : config.outputCsv.string());
+        spdlog::info("  Output Properties: {}", config.outputProperties.empty() ? "<default>" : config.outputProperties.string());
         
         // Enable debug logging if verbose mode is requested
         if (config.verbose) {
@@ -1167,9 +1195,12 @@ int main(int argc, char** argv)
         // Load baseline if regression check is enabled
         std::map<std::string, BaselineResult> baseline;
         if (config.regressionCheck && !config.baselinePath.empty()) {
+            spdlog::info("Loading baseline from: {}", config.baselinePath.string());
             baseline = load_baseline(config.baselinePath);
             if (baseline.empty()) {
                 spdlog::warn("Regression check enabled but baseline is empty or could not be loaded");
+            } else {
+                spdlog::info("Baseline loaded: {} test results", baseline.size());
             }
         }
         
