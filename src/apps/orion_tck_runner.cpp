@@ -442,11 +442,9 @@ static std::map<std::string, BaselineResult> load_baseline(const fs::path& basel
     }
     
     std::string line;
-    int row_number = 0;
     
     while (std::getline(file, line)) {
         if (line.empty()) continue;
-        ++row_number;
         
         // Parse CSV: "test_dir","test_case_id","result_node_id","result","detail"
         std::vector<std::string> fields;
@@ -471,9 +469,9 @@ static std::map<std::string, BaselineResult> load_baseline(const fs::path& basel
             std::string result_node_id = fields[2];
             std::string result = fields[3];
             
-            // Create unique test ID: test_dir + test_case_id + result_node_id + row
-            // Row number is needed because multiple outputs can have the same test_case_id and result_node_id
-            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id + "-" + std::to_string(row_number);
+            // Create unique test ID from natural key: test_dir + test_case_id + result_node_id
+            // This matches the TCK standard format used by all vendors
+            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id;
             
             // Determine level from test_dir (e.g., "compliance-level-2/...")
             int level = 0;
@@ -838,7 +836,10 @@ static bool execute_single_test_case(
                 outExp.expected, (got.empty() ? "<none>" : got));
         }
         
-        std::string result_node_id = test_case.id.empty() ? "001" : test_case.id;
+        // Use output ID as result_node_id for proper TCK format compliance
+        // Falls back to test_case.id (e.g., "001") if output ID is not specified
+        std::string result_node_id = outExp.id.empty() ? 
+            (test_case.id.empty() ? "001" : test_case.id) : outExp.id;
         write_csv_result(csv, test_dir, test_case_id, result_node_id, success, detail);
         
         if (success)
@@ -1057,11 +1058,9 @@ static RegressionInfo detect_regressions(
     }
     
     std::string line;
-    int row_number = 0;
     
     while (std::getline(file, line)) {
         if (line.empty()) continue;
-        ++row_number;
         
         // Parse CSV: "test_dir","test_case_id","result_node_id","result","detail"
         std::vector<std::string> fields;
@@ -1086,9 +1085,9 @@ static RegressionInfo detect_regressions(
             std::string result_node_id = fields[2];
             std::string result = fields[3];
             
-            // Create unique test ID: test_dir + test_case_id + result_node_id + row
-            // Row number is needed because multiple outputs can have the same test_case_id and result_node_id
-            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id + "-" + std::to_string(row_number);
+            // Create unique test ID from natural key: test_dir + test_case_id + result_node_id
+            // This matches the TCK standard format used by all vendors
+            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id;
             
             // Determine level from test_dir (e.g., "compliance-level-2/...")
             int level = 0;
