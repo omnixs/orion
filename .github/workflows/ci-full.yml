@@ -153,8 +153,9 @@ jobs:
     - name: Run TCK Tests with Regression Detection (Linux)
       if: runner.os == 'Linux' && steps.baseline-linux.outputs.baseline_exists == 'true'
       id: tck-regression-linux
-      shell: bash  # Use bash WITHOUT -e flag
+      shell: bash
       run: |
+        set +e  # disable exit-on-error so we can capture the runner exit code
         ./build/orion_tck_runner \
           --baseline ${{ steps.baseline-linux.outputs.baseline_path }} \
           --regression-check \
