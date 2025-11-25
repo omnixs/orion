@@ -26,20 +26,20 @@ Each version directory contains:
 
 ### Properties Format
 
-Example baseline (actual values vary by implementation progress):
+Example baseline (actual values from version 1.0.0):
 
 ```properties
 total_tests=3535
 passed_tests=484
 failed_tests=3051
 pass_rate=13.7
-level2_total=3527
-level2_passed=476
-level2_pass_rate=13.5
+level2_total=126
+level2_passed=126
+level2_pass_rate=100.0
+level3_total=3401
+level3_passed=350
+level3_pass_rate=10.3
 ```
-
-Note: Level 2 statistics in current baseline reflect mixed Level 2/3 results.
-See Issue: Properties file incorrectly assumes all tests are Level 2.
 
 ## How Baselines Are Generated
 

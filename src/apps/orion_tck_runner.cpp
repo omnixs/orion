@@ -1118,6 +1118,7 @@ static RegressionInfo detect_regressions(
 // Write properties file with summary statistics
 static void write_properties_file(
     const fs::path& propertiesPath,
+    const fs::path& csvPath,
     const TestStats& main_stats,
     const TestStats& extra_stats)
 {
@@ -1138,13 +1139,68 @@ static void write_properties_file(
     props << "failed_tests=" << failed_tests << "\n";
     props << "pass_rate=" << std::fixed << std::setprecision(1) << pass_rate << "\n";
     
-    // Level 2 stats (LIMITATION: Currently includes both Level 2 and Level 3 tests)
-    // TODO: Separate Level 2 and Level 3 statistics for accurate compliance reporting
-    props << "level2_total=" << main_stats.total_cases << "\n";
-    props << "level2_passed=" << main_stats.passed_cases << "\n";
-    double level2_rate = main_stats.total_cases > 0 ? 
-                        (main_stats.passed_cases * 100.0) / main_stats.total_cases : 0.0;
+    // Calculate Level 2 and Level 3 stats by reading the CSV file
+    std::size_t level2_total = 0, level2_passed = 0;
+    std::size_t level3_total = 0, level3_passed = 0;
+    
+    std::ifstream csv_in(csvPath);
+    if (csv_in) {
+        std::string line;
+        std::getline(csv_in, line); // Skip header
+        
+        while (std::getline(csv_in, line)) {
+            if (line.empty()) continue;
+            
+            // Simple CSV parser (handles quoted fields)
+            std::vector<std::string> fields;
+            std::string field;
+            bool in_quotes = false;
+            
+            for (char ch : line) {
+                if (ch == '"') {
+                    in_quotes = !in_quotes;
+                } else if (ch == ',' && !in_quotes) {
+                    fields.push_back(field);
+                    field.clear();
+                } else {
+                    field += ch;
+                }
+            }
+            if (!field.empty()) {
+                fields.push_back(field);
+            }
+            
+            if (fields.size() >= 4) {
+                std::string test_dir = fields[0];
+                std::string result = fields[3];
+                
+                // Determine level from test_dir
+                bool is_level2 = (test_dir.find("compliance-level-2") != std::string::npos);
+                bool is_level3 = (test_dir.find("compliance-level-3") != std::string::npos);
+                bool passed = (result == "SUCCESS");
+                
+                if (is_level2) {
+                    level2_total++;
+                    if (passed) level2_passed++;
+                } else if (is_level3) {
+                    level3_total++;
+                    if (passed) level3_passed++;
+                }
+            }
+        }
+    }
+    
+    // Level 2 stats
+    double level2_rate = level2_total > 0 ? (level2_passed * 100.0) / level2_total : 0.0;
+    props << "level2_total=" << level2_total << "\n";
+    props << "level2_passed=" << level2_passed << "\n";
     props << "level2_pass_rate=" << std::fixed << std::setprecision(1) << level2_rate << "\n";
+    
+    // Level 3 stats
+    double level3_rate = level3_total > 0 ? (level3_passed * 100.0) / level3_total : 0.0;
+    props << "level3_total=" << level3_total << "\n";
+    props << "level3_passed=" << level3_passed << "\n";
+    props << "level3_pass_rate=" << std::fixed << std::setprecision(1) << level3_rate << "\n";
     
     props.flush();
     spdlog::info("Properties file written to: {}", propertiesPath.string());
@@ -1240,7 +1296,7 @@ int main(int argc, char** argv)
         // Write results files
         if (!config.outputProperties.empty()) {
             // User-specified properties file
-            write_properties_file(config.outputProperties, main_stats, extra_stats);
+            write_properties_file(config.outputProperties, csvPath, main_stats, extra_stats);
         } else {
             // Default properties file
             write_results_files(config, main_stats, extra_stats);
