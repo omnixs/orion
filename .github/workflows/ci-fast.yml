@@ -55,6 +55,7 @@ jobs:
     - name: Install vcpkg (Windows)
       if: runner.os == 'Windows'
       run: |
+        New-Item -ItemType Directory -Force -Path "C:\Users\runneradmin\AppData\Local\vcpkg\archives"
         git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
         C:\vcpkg\bootstrap-vcpkg.bat
         echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
