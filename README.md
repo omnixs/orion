@@ -74,12 +74,19 @@ cmake -S . -B build \
 # Build
 cmake --build build -j
 
-# Run tests
+# Run tests (fast selective mode - runs passing TCK tests only)
+./build/tst_orion --log_level=test_suite
+
+# Or run comprehensive mode (all TCK tests - slower)
+export ORION_TCK_RUN_ALL=1
 ./build/tst_orion --log_level=test_suite
 ```
 
 **Note**: The DMN TCK (Test Compatibility Kit) is included as a git submodule in `dat/dmn-tck/`. 
 If you skip the submodule initialization, the build will succeed but some tests will fail due to missing test data files.
+
+**Performance Tip**: Unit tests run in selective mode by default (0.9s vs 25s), executing only passing Level 3 TCK tests. 
+Level 2 tests always run in full (DMN compliance requirement). Set `ORION_TCK_RUN_ALL=1` for comprehensive validation.
 
 ### Minimal Usage Example
 

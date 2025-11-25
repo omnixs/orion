@@ -185,6 +185,11 @@ After completing tasks from `.github/tasks/`:
 cmake --build build --config Debug
 
 # 2. Unit tests (verify build succeeded first)
+# Note: Runs in selective mode by default (0.9s vs 25s)
+.\build\Debug\tst_orion.exe --log_level=test_suite
+
+# 2a. Unit tests - comprehensive mode (all Level 3 TCK tests)
+$env:ORION_TCK_RUN_ALL="1"
 .\build\Debug\tst_orion.exe --log_level=test_suite
 
 # 3. TCK tests (verify unit tests passed first)
@@ -200,6 +205,11 @@ cmake --build build --config Debug
 cmake --build build-debug -j$(nproc)
 
 # 2. Unit tests (verify build succeeded first)
+# Note: Runs in selective mode by default (0.9s vs 25s)
+./build-debug/tst_orion --log_level=test_suite
+
+# 2a. Unit tests - comprehensive mode (all Level 3 TCK tests)
+export ORION_TCK_RUN_ALL=1
 ./build-debug/tst_orion --log_level=test_suite
 
 # 3. TCK tests (verify unit tests passed first)
