@@ -8,7 +8,8 @@ build-*/
 # Documentation (excluding from repo, but keeping examples and key standards)
 docs/*
 !docs/examples/
-!docs/copilot_instructions.md
+!docs/formal-24-01-01.txt
+!docs/formal-24-01-01.pdf
 docs/prompts/
 docs/replies/
 
