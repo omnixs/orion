@@ -139,6 +139,7 @@ jobs:
     
     - name: Run TCK Tests with Regression Detection (Linux)
       if: runner.os == 'Linux' && steps.baseline-linux.outputs.baseline_exists == 'true'
+      id: tck-regression-linux
       run: |
         ./build/orion_tck_runner \
           --baseline ${{ steps.baseline-linux.outputs.baseline_path }} \
@@ -147,6 +148,17 @@ jobs:
           --output-csv dat/tck_results_current.csv \
           --output-properties dat/tck_results.properties \
           --log_level=error
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 2 ]; then
+          echo "::error::Regression detected!"
+          exit 1
+        elif [ $EXIT_CODE -eq 3 ]; then
+          echo "::error::Level 2 compliance failure!"
+          exit 1
+        elif [ $EXIT_CODE -eq 1 ]; then
+          echo "Expected test failures (normal)"
+          exit 0
+        fi
       working-directory: ${{ github.workspace }}
       timeout-minutes: 15
     
@@ -163,6 +175,7 @@ jobs:
     
     - name: Run TCK Tests with Regression Detection (Windows)
       if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists == 'true'
+      id: tck-regression-windows
       run: |
         .\build\orion_tck_runner.exe `
           --baseline ${{ steps.baseline-windows.outputs.baseline_path }} `
@@ -171,6 +184,16 @@ jobs:
           --output-csv dat\tck_results_current.csv `
           --output-properties dat\tck_results.properties `
           --log_level=error
+        if ($LASTEXITCODE -eq 2) {
+          Write-Error "Regression detected!"
+          exit 1
+        } elseif ($LASTEXITCODE -eq 3) {
+          Write-Error "Level 2 compliance failure!"
+          exit 1
+        } elseif ($LASTEXITCODE -eq 1) {
+          Write-Host "Expected test failures (normal)"
+          exit 0
+        }
       working-directory: ${{ github.workspace }}
       timeout-minutes: 15
     
