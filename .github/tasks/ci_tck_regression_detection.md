@@ -1,7 +1,7 @@
 ---
 template: custom
 agent: none
-status: not-started
+status: in-progress
 category: ci-cd
 priority: high
 estimated-effort: "10-14 hours"
