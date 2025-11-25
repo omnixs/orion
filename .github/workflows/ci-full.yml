@@ -91,16 +91,80 @@ jobs:
       run: .\build\Release\tst_orion.exe --log_level=test_suite
       working-directory: ${{ github.workspace }}
     
-    - name: Run TCK Tests (Linux)
+    - name: Detect version and baseline (Linux)
       if: runner.os == 'Linux'
-      run: ./build/orion_tck_runner --log_level=error
+      id: baseline-linux
+      run: |
+        VERSION=$(grep "project(orion VERSION" CMakeLists.txt | sed -E 's/.*VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        if [ -f "dat/tck-baselines/$VERSION/tck_results.csv" ]; then
+          echo "baseline_exists=true" >> $GITHUB_OUTPUT
+          echo "baseline_path=dat/tck-baselines/$VERSION/tck_results.csv" >> $GITHUB_OUTPUT
+          echo "Found baseline for version $VERSION"
+        else
+          echo "baseline_exists=false" >> $GITHUB_OUTPUT
+          echo "No baseline found for version $VERSION"
+        fi
+    
+    - name: Detect version and baseline (Windows)
+      if: runner.os == 'Windows'
+      id: baseline-windows
+      run: |
+        $VERSION = (Select-String -Path CMakeLists.txt -Pattern "project\(orion VERSION ([0-9]+\.[0-9]+\.[0-9]+)" | ForEach-Object { $_.Matches.Groups[1].Value })
+        echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+        if (Test-Path "dat\tck-baselines\$VERSION\tck_results.csv") {
+          echo "baseline_exists=true" >> $env:GITHUB_OUTPUT
+          echo "baseline_path=dat\tck-baselines\$VERSION\tck_results.csv" >> $env:GITHUB_OUTPUT
+          Write-Host "Found baseline for version $VERSION"
+        } else {
+          echo "baseline_exists=false" >> $env:GITHUB_OUTPUT
+          Write-Host "No baseline found for version $VERSION"
+        }
+    
+    - name: Run TCK Tests with Regression Detection (Linux)
+      if: runner.os == 'Linux' && steps.baseline-linux.outputs.baseline_exists == 'true'
+      run: |
+        ./build/orion_tck_runner \
+          --baseline ${{ steps.baseline-linux.outputs.baseline_path }} \
+          --regression-check \
+          --level2-strict \
+          --output-csv dat/tck_results_current.csv \
+          --output-properties dat/tck_results.properties \
+          --log_level=error
+      working-directory: ${{ github.workspace }}
+      timeout-minutes: 15
+    
+    - name: Run TCK Tests without Regression Detection (Linux)
+      if: runner.os == 'Linux' && steps.baseline-linux.outputs.baseline_exists != 'true'
+      run: |
+        ./build/orion_tck_runner \
+          --output-csv dat/tck_results_current.csv \
+          --output-properties dat/tck_results.properties \
+          --log_level=error
       working-directory: ${{ github.workspace }}
       timeout-minutes: 15
       continue-on-error: true
     
-    - name: Run TCK Tests (Windows)
-      if: runner.os == 'Windows'
-      run: .\build\Release\orion_tck_runner.exe --log_level=error
+    - name: Run TCK Tests with Regression Detection (Windows)
+      if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists == 'true'
+      run: |
+        .\build\Release\orion_tck_runner.exe `
+          --baseline ${{ steps.baseline-windows.outputs.baseline_path }} `
+          --regression-check `
+          --level2-strict `
+          --output-csv dat\tck_results_current.csv `
+          --output-properties dat\tck_results.properties `
+          --log_level=error
+      working-directory: ${{ github.workspace }}
+      timeout-minutes: 15
+    
+    - name: Run TCK Tests without Regression Detection (Windows)
+      if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists != 'true'
+      run: |
+        .\build\Release\orion_tck_runner.exe `
+          --output-csv dat\tck_results_current.csv `
+          --output-properties dat\tck_results.properties `
+          --log_level=error
       working-directory: ${{ github.workspace }}
       timeout-minutes: 15
       continue-on-error: true
@@ -116,3 +180,13 @@ jobs:
           build/Release/orion_app.exe
           build/Release/orion_tck_runner.exe
         retention-days: 7
+    
+    - name: Upload TCK test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: tck-results-${{ matrix.os }}
+        path: |
+          dat/tck_results_current.csv
+          dat/tck_results.properties
+        retention-days: 30
