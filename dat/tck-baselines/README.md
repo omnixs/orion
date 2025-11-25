@@ -18,23 +18,28 @@ Each version directory contains:
 ### CSV Format
 
 ```csv
-TestID,Level,Result,Duration
-0001-input-data-string,2,PASS,45
-0002-input-data-number,2,PASS,32
-0003-input-data-boolean,2,FAIL,28
+"test_dir","test_case_id","result_node_id","result","detail"
+"compliance-level-2/0001-input-data-string","_001","decision001","SUCCESS",""
+"compliance-level-2/0002-input-data-number","_001","decision001","SUCCESS",""
+"compliance-level-3/0003-iteration","_001","decision001","FAILURE","Expected value mismatch"
 ```
 
 ### Properties Format
+
+Example baseline (actual values vary by implementation progress):
 
 ```properties
 total_tests=3535
 passed_tests=484
 failed_tests=3051
 pass_rate=13.7
-level2_total=126
-level2_passed=126
-level2_pass_rate=100.0
+level2_total=3527
+level2_passed=476
+level2_pass_rate=13.5
 ```
+
+Note: Level 2 statistics in current baseline reflect mixed Level 2/3 results.
+See Issue: Properties file incorrectly assumes all tests are Level 2.
 
 ## How Baselines Are Generated
 

@@ -837,7 +837,7 @@ static bool execute_single_test_case(
         }
         
         // Use output ID as result_node_id for proper TCK format compliance
-        // Falls back to test_case.id (e.g., "001") if output ID is not specified
+        // Priority: outExp.id > test_case.id > "001" (default fallback)
         std::string result_node_id = outExp.id.empty() ? 
             (test_case.id.empty() ? "001" : test_case.id) : outExp.id;
         write_csv_result(csv, test_dir, test_case_id, result_node_id, success, detail);
@@ -1138,7 +1138,8 @@ static void write_properties_file(
     props << "failed_tests=" << failed_tests << "\n";
     props << "pass_rate=" << std::fixed << std::setprecision(1) << pass_rate << "\n";
     
-    // Level 2 stats (from main_stats only, assuming standard TCK is Level 2)
+    // Level 2 stats (LIMITATION: Currently includes both Level 2 and Level 3 tests)
+    // TODO: Separate Level 2 and Level 3 statistics for accurate compliance reporting
     props << "level2_total=" << main_stats.total_cases << "\n";
     props << "level2_passed=" << main_stats.passed_cases << "\n";
     double level2_rate = main_stats.total_cases > 0 ? 

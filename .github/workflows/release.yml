@@ -224,7 +224,7 @@ jobs:
           cp tck_results.csv tck_results.properties "$PKG_DIR/tck-baseline/" || echo "Warning: TCK baseline not found"
           
           # Copy license files
-          cp LICENSE NOTICE THIRD-PARTY-NOTICES.txt "$PKG_DIR/licenses/"
+          cp LICENSE NOTICE THIRD-PARTY-NOTICES.txt "$PKG_DIR/licenses/" || echo "Warning: Some license files not found"
           
           # Copy README
           cp README.md "$PKG_DIR/"
