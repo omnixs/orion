@@ -48,6 +48,7 @@ jobs:
         git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
         C:\vcpkg\bootstrap-vcpkg.bat
         echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+        echo "VCPKG_BINARY_SOURCES=clear;x-gha,readwrite" >> $env:GITHUB_ENV
     
     - name: Install vcpkg (Linux)
       if: runner.os == 'Linux'
@@ -55,6 +56,7 @@ jobs:
         git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
         $HOME/vcpkg/bootstrap-vcpkg.sh
         echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+        echo "VCPKG_BINARY_SOURCES=clear;x-gha,readwrite" >> $GITHUB_ENV
     
     - name: Install GCC 13 (Linux)
       if: runner.os == 'Linux'
