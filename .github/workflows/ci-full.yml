@@ -4,6 +4,12 @@ on:
   push:
     branches: [ "main" ]
     tags: [ "v*" ]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/tasks/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - 'NOTICE'
   schedule:
     # Run nightly at 3 AM UTC
     - cron: '0 3 * * *'
@@ -85,11 +91,15 @@ jobs:
       if: runner.os == 'Linux'
       run: ./build/tst_orion --log_level=test_suite
       working-directory: ${{ github.workspace }}
+      env:
+        ORION_TCK_RUN_ALL: 1
     
     - name: Run Unit Tests (Windows)
       if: runner.os == 'Windows'
       run: .\build\Release\tst_orion.exe --log_level=test_suite
       working-directory: ${{ github.workspace }}
+      env:
+        ORION_TCK_RUN_ALL: 1
     
     - name: Detect version and baseline (Linux)
       if: runner.os == 'Linux'

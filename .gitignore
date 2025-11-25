@@ -15,6 +15,7 @@ docs/replies/
 dat/log/
 
 # TCK test output files (temporary verification outputs)
+dat/tst/temp/
 dat/tck_*.csv
 dat/tck_*.properties
 

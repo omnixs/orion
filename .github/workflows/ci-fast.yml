@@ -3,8 +3,20 @@ name: CI - Fast Checks
 on:
   push:
     branches: [ "**" ]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/tasks/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - 'NOTICE'
   pull_request:
     branches: [ "main" ]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/tasks/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - 'NOTICE'
   workflow_dispatch:
 
 jobs:
@@ -81,8 +93,12 @@ jobs:
       if: runner.os == 'Linux'
       run: ./build/tst_orion --log_level=test_suite
       working-directory: ${{ github.workspace }}
+      env:
+        ORION_TCK_RUN_ALL: 0
     
     - name: Run Unit Tests (Windows)
       if: runner.os == 'Windows'
       run: .\build\Debug\tst_orion.exe --log_level=test_suite
       working-directory: ${{ github.workspace }}
+      env:
+        ORION_TCK_RUN_ALL: 0

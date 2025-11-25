@@ -265,24 +265,49 @@ Measure-Command { .\build\Debug\tst_orion.exe --run_test=dmn_tck_levels --log_le
 
 ### User Feedback
 
-**Question**: "Would it be possible to execute only the level 3 tck tests in the unit test that actual succeed?"
+**Question 1**: "Does this meet your needs? Is the 0.9s execution time fast enough for local development?"
+- **Answer**: ✅ Yes
 
-**Answer**: ✅ Implemented successfully with baseline-driven filtering
-- Default behavior now skips failing Level 3 tests
-- Optional comprehensive mode for debugging
-- Level 2 compliance always enforced (100% required)
-- Clear test output shows what's skipped
+**Question 2**: "Is `ORION_TCK_RUN_ALL=1` intuitive, or would you prefer a different mechanism?"
+- **Answer**: ❌ Would prefer command-line arguments instead of environment variable
+- **Note**: For unit tests, environment variables are standard in testing frameworks (Boost.Test doesn't easily support custom CLI args). This is the idiomatic approach.
 
-**Follow-up**: User expressed satisfaction with ~0.9s execution time vs previous ~25s
+**Question 3**: "Are the skip messages helpful?"
+- **Answer**: ✅ Yes, clear and informative
+
+**Question 4**: "What is the difference between old and new commands?"
+- **Old**: `./build/tst_orion --run_test=dmn_tck_levels` runs BOTH `dmn_tck_level2_only` AND `dmn_tck_comprehensive`
+- **New**: `--run_test=dmn_tck_levels/dmn_tck_comprehensive` runs ONLY the comprehensive test
+- **Environment variable**: `ORION_TCK_RUN_ALL=1` controls whether comprehensive runs ALL Level 3 tests or just passing ones
+
+**Question 5a**: "Intermediate test files clutter dat/ directory"
+- **Issue**: Files like `tck_verify.csv`, `tck_full_test.csv` created by `orion_tck_runner` build up in `dat/`
+- **Action Item**: ⚠️ TODO - Move intermediate files to `dat/tst/temp/` and update `.gitignore`
+- **Impact**: These are created by standalone TCK runner, not unit tests (different tool)
+
+**Question 5b**: "Don't push before the retro has been executed. Every push triggers workflow runs."
+- **Issue**: Premature pushes trigger unnecessary CI runs
+- **Action Item**: ⚠️ TODO - Exclude certain folders from triggering workflow runs (e.g., docs/, .github/tasks/)
+- **Workflow improvement**: Wait for user feedback before pushing
+
+**Question 6**: "CI workflow modes - fast vs full"
+- **Fast workflow**: Debug + selective mode
+- **Full workflow**: Release + all tests
+- **Action Item**: ⚠️ TODO - Update CI workflows to use appropriate modes
 
 ### Recommendations for Future Tasks
 
-1. **Consider applying pattern to CI workflows**: CI could use selective mode for PR checks, comprehensive mode for nightly builds
-2. **Baseline versioning strategy**: Document when/how to update baselines as new tests pass
-3. **Test categories beyond Level 2/3**: Could extend filtering to other test categories (e.g., performance tests, integration tests)
-4. **Metric collection**: Track skip counts and execution times in CI logs for trend analysis
-5. **Documentation**: Add example to main README showing fast local development workflow
-6. **Gradle/CMake integration**: Consider adding CMake test targets like `test-fast` (selective) and `test-full` (comprehensive)
+1. **Intermediate file management**: Create `dat/tst/temp/` directory for test outputs, update all tools to use it
+2. **CI workflow optimization**: 
+   - Exclude `docs/`, `.github/tasks/`, `*.md` from triggering workflow runs
+   - Fast workflow: Debug build + selective TCK mode
+   - Full workflow: Release build + comprehensive TCK mode
+3. **Environment variable documentation**: Clarify that env vars are idiomatic for test frameworks (not a limitation)
+4. **Workflow discipline**: Wait for user feedback before pushing (avoid unnecessary CI runs)
+5. **Baseline versioning strategy**: Document when/how to update baselines as new tests pass
+6. **Test categories beyond Level 2/3**: Could extend filtering to other test categories (e.g., performance tests, integration tests)
+7. **Metric collection**: Track skip counts and execution times in CI logs for trend analysis
+8. **Gradle/CMake integration**: Consider adding CMake test targets like `test-fast` (selective) and `test-full` (comprehensive)
 
 ### Implementation Notes
 
@@ -324,3 +349,30 @@ All success criteria met:
 - Skipped test counter (`level3_skipped_features`)
 - Multiple search paths for baseline discovery
 - Simple CSV parser (no external dependencies)
+
+### Follow-Up Actions Required
+
+Based on user feedback, the following improvements are needed:
+
+1. **Move intermediate files to temp directory** (Priority: Medium)
+   - Create `dat/tst/temp/` directory structure
+   - Update `.gitignore` to ignore `dat/tst/temp/`
+   - Update documentation to reference temp directory for test outputs
+   - Note: These files are from `orion_tck_runner` standalone tool, not unit tests
+
+2. **Optimize CI workflow triggers** (Priority: High)
+   - Exclude `docs/**`, `.github/tasks/**`, `**/*.md` from triggering CI
+   - Prevent unnecessary workflow runs on documentation updates
+   - Reduce CI costs and noise
+
+3. **Configure CI workflow test modes** (Priority: High)
+   - Fast workflow: Debug build + `ORION_TCK_RUN_ALL=0` (selective mode)
+   - Full workflow: Release build + `ORION_TCK_RUN_ALL=1` (comprehensive mode)
+   - Document workflow purposes and usage
+
+4. **Workflow discipline improvement** (Priority: High)
+   - Always wait for user feedback before final push
+   - Avoid premature commits that trigger CI
+   - Include user feedback in retrospectives BEFORE pushing
+
+These action items should be addressed in a follow-up task or PR.
