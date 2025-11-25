@@ -44,6 +44,70 @@ This adds `Signed-off-by: Your Name <your.email@example.com>` to your commit.
 - Ensure unit tests pass locally before opening a PR.
 - CI must be green for merge; add tests for new features or bug fixes.
 
+## Development Workflow
+
+### Baseline Updates During Development
+
+When implementing features that improve TCK test coverage, update the baseline for the **current version**:
+
+```bash
+# 1. Implement feature and verify tests pass
+./build-release/orion_tck_runner --log_level=error
+
+# 2. Generate updated baseline (current version directory)
+./build-release/orion_tck_runner \
+  --output-csv dat/tck-baselines/1.0.0/tck_results.csv \
+  --output-properties dat/tck-baselines/1.0.0/tck_results.properties \
+  --log_level=error
+
+# 3. Review improvements
+git diff dat/tck-baselines/1.0.0/tck_results.properties
+# Should show:
+# -level3_passed=350
+# +level3_passed=375  (+25 tests!)
+
+# 4. Commit updated baseline with feature
+git add src/ dat/tck-baselines/1.0.0/tck_results.*
+git commit -m "feat: Implement FEEL string functions - improves Level 3 coverage
+
+Added support for:
+- substring()
+- string length()
+- upper case()
+
+TCK Impact:
+- level3_passed: 350 → 375 (+25 tests)
+- level3_pass_rate: 10.4% → 11.1%
+- New passing tests: 1103-feel-substring-function (11/11)
+
+Updated baseline to reflect improvements."
+```
+
+**Guidelines:**
+- **Update existing baseline** for current version during development
+- **Create new baseline directory** only during release (automated)
+- Update baseline when tests **improve**, never to hide regressions
+- CI regression detection will catch attempts to ignore failures
+
+### CI Behavior
+
+CI automatically adapts based on baseline presence:
+
+**With baseline** (e.g., `dat/tck-baselines/1.0.0/` exists):
+```yaml
+# Strict mode - fails on regressions
+--baseline dat/tck-baselines/1.0.0/tck_results.csv
+--regression-check    # Exit code 2 if regressions detected
+--level2-strict       # Exit code 3 if Level 2 fails (must be 100%)
+```
+
+**Without baseline** (development of new version):
+```yaml
+# Permissive mode - allows failures
+--log_level=error
+# Continue on error until baseline established
+```
+
 ## Release Process
 
 ORION uses an automated release workflow to ensure consistent, reproducible releases.
