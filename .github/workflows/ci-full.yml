@@ -60,6 +60,7 @@ jobs:
     - name: Install vcpkg (Linux)
       if: runner.os == 'Linux'
       run: |
+        mkdir -p $HOME/.cache/vcpkg
         git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
         $HOME/vcpkg/bootstrap-vcpkg.sh
         echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
