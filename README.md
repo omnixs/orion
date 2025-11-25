@@ -1,5 +1,9 @@
 # ORION — Optimized Rule Integration & Operations Native
 
+[![Version](https://img.shields.io/github/v/release/omnixs/orion)](https://github.com/omnixs/orion/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/omnixs/orion/actions/workflows/ci-full.yml/badge.svg)](https://github.com/omnixs/orion/actions/workflows/ci-full.yml)
+
 A native C++ implementation of the DMN™ (Decision Model and Notation) specification,
 focusing on **decision tables** with an emphasis on performance, correctness, and simple integration.
 
@@ -8,6 +12,23 @@ focusing on **decision tables** with an emphasis on performance, correctness, an
 - **Status:** Early stage (APIs may evolve)
 - **DMN Compliance:** Level 1 and Level 2 compatible
 - **Goals:** fast rule evaluation, clean table model, clear extensibility points
+
+## Download
+
+Download the latest release from [GitHub Releases](https://github.com/omnixs/orion/releases/latest):
+
+- **Linux**: `orion-X.Y.Z-linux-x64.tar.gz`
+- **Windows**: `orion-X.Y.Z-windows-x64.zip`
+
+Each release includes:
+- Static libraries (`liborion_lib.a` / `orion_lib.lib`)
+- Headers (`include/orion/`)
+- CMake configuration files
+- Command-line tools (`orion_app`, `orion_tck_runner`)
+- TCK test baseline for the version
+- License files
+
+**Verify downloads** with the corresponding `.sha256` checksum files.
 
 ## Features
 
