@@ -59,13 +59,58 @@ for (auto& request : requests) {
 
 ## Development Workflow
 
+### Task-Based Development
+
+When creating or working on tasks from `.github/tasks/`:
+
+1. **Create Feature Branch** - Always create a new branch: `feature/<task-name>`
+   ```bash
+   git checkout -b feature/task-name
+   ```
+
+2. **Task File Format** - All task files MUST follow the YAML frontmatter template:
+   ```markdown
+   ---
+   template: <template-name>.md  # Which template (improve_quality, add_dmn_feature, etc.)
+   agent: <agent-name>            # Which agent should execute (code-quality-refactor, etc.)
+   status: not-started            # not-started | in-progress | completed
+   category: <category>           # code-quality | feature | bug-fix | ci-cd | performance
+   priority: <level>              # low | medium | high | critical
+   estimated-effort: "X-Y hours"  # Estimated time range
+   actual-effort: ""              # Filled after completion
+   ---
+   
+   # Task: <Title>
+   
+   ## Context
+   [Background and motivation]
+   
+   ## Scope
+   [What is included/excluded]
+   
+   ## Success Criteria
+   - [ ] Criterion 1
+   - [ ] Criterion 2
+   
+   ## Retrospective
+   (Filled after completion)
+   ```
+
+3. **Branch Naming** - Use descriptive names matching task focus:
+   - `feature/<feature-name>` - New features
+   - `fix/<bug-description>` - Bug fixes
+   - `quality/<improvement-type>` - Code quality improvements
+   - `perf/<optimization-area>` - Performance optimizations
+   - `ci/<workflow-name>` - CI/CD changes
+
 ### Adding Features
 See [DMN Feature Template](./prompts/add_dmn_feature.md) for full process. Quick steps:
-1. Update headers in `include/orion/bre/`
-2. Implement in `src/bre/`
-3. Add tests in `tst/bre/`
-4. Update `CMakeLists.txt` if needed
-5. Validate DMN 1.5 compliance
+1. Create feature branch: `git checkout -b feature/<feature-name>`
+2. Update headers in `include/orion/bre/`
+3. Implement in `src/bre/`
+4. Add tests in `tst/bre/`
+5. Update `CMakeLists.txt` if needed
+6. Validate DMN 1.5 compliance
 
 ### Working with Tests
 - **Unit Tests**: Boost Test in `tst/bre/`, focus on edge cases
@@ -140,6 +185,11 @@ After completing tasks from `.github/tasks/`:
 cmake --build build --config Debug
 
 # 2. Unit tests (verify build succeeded first)
+# Note: Runs in selective mode by default (0.9s vs 25s)
+.\build\Debug\tst_orion.exe --log_level=test_suite
+
+# 2a. Unit tests - comprehensive mode (all Level 3 TCK tests)
+$env:ORION_TCK_RUN_ALL="1"
 .\build\Debug\tst_orion.exe --log_level=test_suite
 
 # 3. TCK tests (verify unit tests passed first)
@@ -155,6 +205,11 @@ cmake --build build --config Debug
 cmake --build build-debug -j$(nproc)
 
 # 2. Unit tests (verify build succeeded first)
+# Note: Runs in selective mode by default (0.9s vs 25s)
+./build-debug/tst_orion --log_level=test_suite
+
+# 2a. Unit tests - comprehensive mode (all Level 3 TCK tests)
+export ORION_TCK_RUN_ALL=1
 ./build-debug/tst_orion --log_level=test_suite
 
 # 3. TCK tests (verify unit tests passed first)

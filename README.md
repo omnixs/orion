@@ -1,5 +1,9 @@
 # ORION — Optimized Rule Integration & Operations Native
 
+[![Version](https://img.shields.io/github/v/release/omnixs/orion)](https://github.com/omnixs/orion/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/omnixs/orion/actions/workflows/ci-full.yml/badge.svg)](https://github.com/omnixs/orion/actions/workflows/ci-full.yml)
+
 A native C++ implementation of the DMN™ (Decision Model and Notation) specification,
 focusing on **decision tables** with an emphasis on performance, correctness, and simple integration.
 
@@ -8,6 +12,23 @@ focusing on **decision tables** with an emphasis on performance, correctness, an
 - **Status:** Early stage (APIs may evolve)
 - **DMN Compliance:** Level 1 and Level 2 compatible
 - **Goals:** fast rule evaluation, clean table model, clear extensibility points
+
+## Download
+
+Download the latest release from [GitHub Releases](https://github.com/omnixs/orion/releases/latest):
+
+- **Linux**: `orion-X.Y.Z-linux-x64.tar.gz`
+- **Windows**: `orion-X.Y.Z-windows-x64.zip`
+
+Each release includes:
+- Static libraries (`liborion_lib.a` / `orion_lib.lib`)
+- Headers (`include/orion/`)
+- CMake configuration files
+- Command-line tools (`orion_app`, `orion_tck_runner`)
+- TCK test baseline for the version
+- License files
+
+**Verify downloads** with the corresponding `.sha256` checksum files.
 
 ## Features
 
@@ -53,12 +74,19 @@ cmake -S . -B build \
 # Build
 cmake --build build -j
 
-# Run tests
+# Run tests (fast selective mode - runs passing TCK tests only)
+./build/tst_orion --log_level=test_suite
+
+# Or run comprehensive mode (all TCK tests - slower)
+export ORION_TCK_RUN_ALL=1
 ./build/tst_orion --log_level=test_suite
 ```
 
 **Note**: The DMN TCK (Test Compatibility Kit) is included as a git submodule in `dat/dmn-tck/`. 
 If you skip the submodule initialization, the build will succeed but some tests will fail due to missing test data files.
+
+**Performance Tip**: Unit tests run in selective mode by default (0.9s vs 25s), executing only passing Level 3 TCK tests. 
+Level 2 tests always run in full (DMN compliance requirement). Set `ORION_TCK_RUN_ALL=1` for comprehensive validation.
 
 ### Minimal Usage Example
 

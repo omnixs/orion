@@ -216,6 +216,109 @@ static const std::set<std::string> SKIP_TESTS = {
     "0099-arithmetic-negation",  // Long running
     "0100-arithmetic",  // Long running
 };
+
+// Helper function to check if selective mode is enabled
+static bool should_run_all_tests() {
+    const char* run_all_env = std::getenv("ORION_TCK_RUN_ALL");
+    return (run_all_env != nullptr && std::string(run_all_env) == "1");
+}
+
+// Helper function to find baseline CSV for current version
+static fs::path find_baseline_for_version() {
+    // Try to find the version from CMakeLists.txt or use default
+    std::string version = "1.0.0"; // Default to current version
+    
+    // Look for baseline in dat/tck-baselines/{version}/tck_results.csv
+    fs::path baseline = fs::path("dat") / "tck-baselines" / version / "tck_results.csv";
+    
+    // Also try parent directories
+    if (!fs::exists(baseline)) {
+        fs::path cur = fs::current_path();
+        for (int i = 0; i < 6; ++i) {
+            fs::path probe = cur / "dat" / "tck-baselines" / version / "tck_results.csv";
+            if (fs::exists(probe)) {
+                return fs::canonical(probe);
+            }
+            if (cur.has_parent_path()) cur = cur.parent_path();
+            else break;
+        }
+    }
+    
+    return baseline;
+}
+
+// Helper function to parse baseline CSV and get passing test directories
+static std::set<std::string> get_passing_test_dirs(const fs::path& baseline_csv) {
+    std::set<std::string> passing_dirs;
+    
+    if (!fs::exists(baseline_csv)) {
+        return passing_dirs; // Empty set if baseline not found
+    }
+    
+    // Parse baseline CSV
+    // Format: "test_dir","test_case_id","result_node_id","result","detail"
+    // Example: "compliance-level-3/0032-conditionals","0032-conditionals-test-01","001","SUCCESS",""
+    
+    std::map<std::string, std::pair<int, int>> dir_stats; // dir -> {total, passed}
+    
+    std::ifstream file(baseline_csv);
+    if (!file) {
+        return passing_dirs;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        // Parse CSV line (simple CSV parser - assumes quoted fields)
+        std::vector<std::string> fields;
+        bool in_quotes = false;
+        std::string field;
+        
+        for (char c : line) {
+            if (c == '"') {
+                in_quotes = !in_quotes;
+            } else if (c == ',' && !in_quotes) {
+                fields.push_back(field);
+                field.clear();
+            } else {
+                field += c;
+            }
+        }
+        if (!field.empty()) {
+            fields.push_back(field);
+        }
+        
+        if (fields.size() >= 4) {
+            std::string test_dir = fields[0];
+            std::string result = fields[3];
+            
+            // Extract just the test name from the full path (e.g., "compliance-level-3/0032-conditionals" -> "0032-conditionals")
+            size_t last_slash = test_dir.find_last_of("/\\");
+            std::string test_name = (last_slash != std::string::npos) ? test_dir.substr(last_slash + 1) : test_dir;
+            
+            // Initialize stats if not seen before
+            if (dir_stats.find(test_name) == dir_stats.end()) {
+                dir_stats[test_name] = {0, 0};
+            }
+            
+            // Update statistics
+            dir_stats[test_name].first++;  // Total count
+            if (result == "SUCCESS") {
+                dir_stats[test_name].second++;  // Passed count
+            }
+        }
+    }
+    
+    // Only include test directories where ALL tests passed
+    for (const auto& [dir, stats] : dir_stats) {
+        if (stats.second == stats.first && stats.first > 0) {
+            passing_dirs.insert(dir);
+        }
+    }
+    
+    return passing_dirs;
+}
 // Process single test case directory (adapted from orion_tck_runner)
 static std::pair<int, int> process_test_case_directory(const fs::path& test_dir) {
     auto test_name = test_dir.filename().string();
@@ -437,8 +540,28 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
         return;
     }
     
-    // Process compliance-level-2 tests
-    BOOST_TEST_MESSAGE("Processing compliance-level-2");
+    // Check if selective mode is enabled
+    bool run_all = should_run_all_tests();
+    std::set<std::string> passing_dirs;
+    
+    if (!run_all) {
+        // Load baseline and determine passing test directories
+        auto baseline_path = find_baseline_for_version();
+        if (fs::exists(baseline_path)) {
+            passing_dirs = get_passing_test_dirs(baseline_path);
+            BOOST_TEST_MESSAGE("Selective mode: Running only " << passing_dirs.size() 
+                              << " passing Level 3 test directories (from baseline: " << baseline_path.string() << ")");
+            BOOST_TEST_MESSAGE("Set environment variable ORION_TCK_RUN_ALL=1 to run all tests");
+        } else {
+            BOOST_TEST_MESSAGE("Baseline not found at " << baseline_path.string() << ", running all tests");
+            run_all = true;
+        }
+    } else {
+        BOOST_TEST_MESSAGE("Comprehensive mode: Running ALL Level 3 tests (ORION_TCK_RUN_ALL=1)");
+    }
+    
+    // Process compliance-level-2 tests (ALWAYS RUN ALL - non-negotiable)
+    BOOST_TEST_MESSAGE("Processing compliance-level-2 (always run all - Level 2 compliance required)");
     
     int level2_total_cases = 0;
     int level2_passed_cases = 0;
@@ -466,18 +589,28 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
     BOOST_TEST_MESSAGE("Level-2 Results: " << level2_passed_cases << "/" << level2_total_cases 
                       << " passed (" << format_percentage(level2_rate) << "% success rate)");
     
-    // Process compliance-level-3 tests
-    BOOST_TEST_MESSAGE("Processing compliance-level-3");
+    // Process compliance-level-3 tests (selective filtering)
+    BOOST_TEST_MESSAGE("Processing compliance-level-3" << (run_all ? " (all tests)" : " (selective - passing tests only)"));
     
     int level3_total_cases = 0;
     int level3_passed_cases = 0;
     int level3_features = 0;
     int level3_passed_features = 0;
+    int level3_skipped_features = 0;
     
     auto level3_path = tck_base / "TestCases" / "compliance-level-3";
     if (fs::exists(level3_path) && fs::is_directory(level3_path)) {
         for (auto& entry : fs::directory_iterator(level3_path)) {
             if (entry.is_directory()) {
+                std::string test_name = entry.path().filename().string();
+                
+                // Selective filtering: Skip tests not in passing set (unless run_all is true)
+                if (!run_all && passing_dirs.count(test_name) == 0) {
+                    BOOST_TEST_MESSAGE("[SKIP] " << test_name << " (known to fail in baseline)");
+                    level3_skipped_features++;
+                    continue;
+                }
+                
                 level3_features++;
                 auto [executed, passed] = process_test_case_directory(entry.path());
                 level3_total_cases += executed;
@@ -491,6 +624,9 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
     }
     
     BOOST_TEST_MESSAGE("Processed " << level3_features << " test cases from compliance-level-3");
+    if (level3_skipped_features > 0) {
+        BOOST_TEST_MESSAGE("Skipped " << level3_skipped_features << " test cases (known failures from baseline)");
+    }
     double level3_rate = level3_total_cases > 0 ? (double(level3_passed_cases) / double(level3_total_cases)) * 100.0 : 0.0;
     BOOST_TEST_MESSAGE("Level-3 Results: " << level3_passed_cases << "/" << level3_total_cases 
                       << " passed (" << format_percentage(level3_rate) << "% success rate)");

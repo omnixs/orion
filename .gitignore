@@ -1,5 +1,6 @@
 # Build directories
 build/
+build-*/
 
 # Visual Studio Code settings
 .vscode/
@@ -7,12 +8,19 @@ build/
 # Documentation (excluding from repo, but keeping examples and key standards)
 docs/*
 !docs/examples/
-!docs/copilot_instructions.md
+!docs/formal-24-01-01.txt
+!docs/formal-24-01-01.pdf
 docs/prompts/
 docs/replies/
 
 # DMN TCK data files (log only, not the test repository)
 dat/log/
+
+# TCK test output files (temporary verification outputs)
+dat/tst/temp/
+dat/tck_*.csv
+dat/tck_*.properties
+dat/dmn-tck/TestResults/Orion/
 
 # Backup files
 *.zip

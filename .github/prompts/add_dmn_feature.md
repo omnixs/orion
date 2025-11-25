@@ -61,6 +61,67 @@ Follow [unit test instructions](../instructions/run_unit_tests.md) and [TCK test
 - Update copilot-instructions.md if pattern changes
 - Document design decisions
 
+### 6. Baseline Update (if TCK coverage improves)
+
+If your feature causes TCK tests to pass that were previously failing:
+
+**Windows (PowerShell):**
+```powershell
+# Generate updated baseline with improvements
+.\build\Release\orion_tck_runner.exe `
+  --output-csv dat\tck-baselines\1.0.0\tck_results.csv `
+  --output-properties dat\tck-baselines\1.0.0\tck_results.properties `
+  --log_level=error
+
+# Review the improvements
+git diff dat\tck-baselines\1.0.0\tck_results.properties
+# Should show increased level3_passed count
+
+# Commit updated baseline
+git add dat\tck-baselines\1.0.0\tck_results.*
+git commit -m "feat: Implement <feature> - improves Level 3 TCK coverage
+
+Added support for:
+- <feature 1>
+- <feature 2>
+
+TCK Impact:
+- level3_passed: X → Y (+Z tests)
+- level3_pass_rate: A% → B%
+- New passing tests: <test-name>
+
+Updated baseline to reflect improvements."
+```
+
+**Linux (Bash):**
+```bash
+# Generate updated baseline with improvements
+./build-release/orion_tck_runner \
+  --output-csv dat/tck-baselines/1.0.0/tck_results.csv \
+  --output-properties dat/tck-baselines/1.0.0/tck_results.properties \
+  --log_level=error
+
+# Review the improvements
+git diff dat/tck-baselines/1.0.0/tck_results.properties
+
+# Commit updated baseline
+git add dat/tck-baselines/1.0.0/tck_results.*
+git commit -m "feat: Implement <feature> - improves Level 3 TCK coverage
+
+TCK Impact:
+- level3_passed: X → Y (+Z tests)
+- level3_pass_rate: A% → B%
+
+Updated baseline to reflect improvements."
+```
+
+**Important Notes:**
+- Update baseline in **current version directory** (e.g., `1.0.0/`) during development
+- Only update baseline when tests **improve** (more passing tests)
+- Never update baseline to hide regressions (CI will catch this)
+- New version directories (e.g., `1.1.0/`) are created during release process
+- See [CONTRIBUTING.md](../../CONTRIBUTING.md) for full release workflow
+
 ## DMN-Specific Implementation Guidelines
 
 ### DMN 1.5 Specification Compliance
