@@ -71,12 +71,15 @@ jobs:
     
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
+      shell: cmd
       run: |
-        cmake -S . -B build `
-          -G "Visual Studio 17 2022" -A x64 `
-          -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-          -DVCPKG_TARGET_TRIPLET=x64-windows-static `
-          -DORION_BUILD_TESTS=ON `
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cmake -S . -B build ^
+          -G Ninja ^
+          -DCMAKE_BUILD_TYPE=Release ^
+          -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+          -DORION_BUILD_TESTS=ON ^
           -DORION_BUILD_APPS=ON
     
     - name: Build (Linux)
@@ -85,7 +88,10 @@ jobs:
     
     - name: Build (Windows)
       if: runner.os == 'Windows'
-      run: cmake --build build --config Release --parallel
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cmake --build build -j
     
     - name: Run Unit Tests (Linux)
       if: runner.os == 'Linux'
@@ -96,7 +102,7 @@ jobs:
     
     - name: Run Unit Tests (Windows)
       if: runner.os == 'Windows'
-      run: .\build\Release\tst_orion.exe --log_level=test_suite
+      run: .\build\tst_orion.exe --log_level=test_suite
       working-directory: ${{ github.workspace }}
       env:
         ORION_TCK_RUN_ALL: 1
@@ -158,7 +164,7 @@ jobs:
     - name: Run TCK Tests with Regression Detection (Windows)
       if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists == 'true'
       run: |
-        .\build\Release\orion_tck_runner.exe `
+        .\build\orion_tck_runner.exe `
           --baseline ${{ steps.baseline-windows.outputs.baseline_path }} `
           --regression-check `
           --level2-strict `
@@ -171,7 +177,7 @@ jobs:
     - name: Run TCK Tests without Regression Detection (Windows)
       if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists != 'true'
       run: |
-        .\build\Release\orion_tck_runner.exe `
+        .\build\orion_tck_runner.exe `
           --output-csv dat\tck_results_current.csv `
           --output-properties dat\tck_results.properties `
           --log_level=error
@@ -187,8 +193,6 @@ jobs:
         path: |
           build/orion_app*
           build/orion_tck_runner*
-          build/Release/orion_app.exe
-          build/Release/orion_tck_runner.exe
         retention-days: 7
     
     - name: Upload TCK test results
