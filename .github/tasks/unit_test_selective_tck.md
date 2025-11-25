@@ -1,11 +1,11 @@
 ---
 template: improve_quality.md
 agent: code-quality-refactor
-status: not-started
+status: completed
 category: code-quality
 priority: medium
 estimated-effort: "2-3 hours"
-actual-effort: ""
+actual-effort: "1.5 hours"
 ---
 
 # Task: Optimize Unit Tests to Skip Failing Level 3 TCK Tests
@@ -226,19 +226,101 @@ Measure-Command { .\build\Debug\tst_orion.exe --run_test=dmn_tck_levels --log_le
 
 ## Retrospective
 
-(To be filled after task completion)
-
 ### What Went Well
-- 
+
+- **Massive performance improvement**: 96.5% faster execution (25s → 0.9s) in selective mode
+- **Simple implementation**: Baseline CSV parsing was straightforward with only ~50 lines of code
+- **Clean integration**: Environment variable approach (`ORION_TCK_RUN_ALL`) provides flexibility without breaking existing workflows
+- **Immediate validation**: Both modes tested successfully on first compile
+- **No regressions**: Level 2 strict compliance (100% required) still enforced correctly
+- **Clear user feedback**: Test output clearly shows which tests are skipped and why
+- **Excellent code reuse**: Leveraged existing baseline CSV from TCK runner without duplication
 
 ### What Was Challenging
-- 
+
+- **CSV parsing**: Simple CSV parser needed to handle quoted fields correctly
+- **Path normalization**: Test directory names needed extraction from full paths (e.g., "compliance-level-3/0032-conditionals" → "0032-conditionals")
+- **Baseline location**: Had to search multiple paths to find baseline (workspace root, parent directories)
+- **Statistics tracking**: Added `level3_skipped_features` counter to track skipped tests separately
 
 ### Learnings
-- 
+
+1. **Baseline-driven testing is powerful**: Using existing regression baseline for test filtering avoided hardcoding test names
+2. **Performance impact was better than expected**: Estimated 50-70% improvement, achieved 96.5%
+3. **Environment variables are great for opt-in behavior**: Default to fast (selective), opt-in to comprehensive
+4. **Simple CSV parsing is sufficient**: No need for complex CSV library for this use case
+5. **Test output clarity matters**: Clear skip messages help users understand what's happening
+6. **Level 2 compliance is non-negotiable**: Keeping ALL Level 2 tests running ensures DMN standard compliance
+
+### Performance Metrics (Actual)
+
+| Mode | Execution Time | Level 2 Tests | Level 3 Tests | Total Tests |
+|------|----------------|---------------|---------------|-------------|
+| Selective (default) | 0.87s | 126/126 (all) | 32/32 (35 dirs) | 158 tests |
+| Comprehensive | 24.78s | 126/126 (all) | 476/3527 (~120 dirs) | ~3600 tests |
+| **Improvement** | **96.5%** | **0% (always 100%)** | **~93% fewer tests** | **~96% fewer tests** |
+
+**Time savings per test run**: ~24 seconds  
+**CI cost reduction**: ~96% fewer CPU seconds per unit test execution
 
 ### User Feedback
-- 
+
+**Question**: "Would it be possible to execute only the level 3 tck tests in the unit test that actual succeed?"
+
+**Answer**: ✅ Implemented successfully with baseline-driven filtering
+- Default behavior now skips failing Level 3 tests
+- Optional comprehensive mode for debugging
+- Level 2 compliance always enforced (100% required)
+- Clear test output shows what's skipped
+
+**Follow-up**: User expressed satisfaction with ~0.9s execution time vs previous ~25s
 
 ### Recommendations for Future Tasks
-- 
+
+1. **Consider applying pattern to CI workflows**: CI could use selective mode for PR checks, comprehensive mode for nightly builds
+2. **Baseline versioning strategy**: Document when/how to update baselines as new tests pass
+3. **Test categories beyond Level 2/3**: Could extend filtering to other test categories (e.g., performance tests, integration tests)
+4. **Metric collection**: Track skip counts and execution times in CI logs for trend analysis
+5. **Documentation**: Add example to main README showing fast local development workflow
+6. **Gradle/CMake integration**: Consider adding CMake test targets like `test-fast` (selective) and `test-full` (comprehensive)
+
+### Implementation Notes
+
+**Files Modified**:
+- `tst/bre/tck/test_tck_runner.cpp` - Added baseline parsing, filtering logic, environment variable check
+- `.github/instructions/run_unit_tests.md` - Documented selective vs comprehensive modes
+
+**Key Functions Added**:
+- `should_run_all_tests()` - Environment variable check
+- `find_baseline_for_version()` - Locate baseline CSV for current version
+- `get_passing_test_dirs()` - Parse baseline CSV and identify 100% passing test directories
+
+**Testing Strategy**:
+- ✅ Selective mode: 0.87s, 158 tests, 100% pass (Level 2 + passing Level 3 only)
+- ✅ Comprehensive mode: 24.78s, ~3600 tests, ~13% pass (Level 2 + all Level 3)
+- ✅ Level 2 strict: Still enforced with `BOOST_REQUIRE_EQUAL` (non-negotiable)
+
+**Git Workflow**:
+- Branch: `feature/unit-test-selective-tck`
+- Commit: `733d13f` - "feat: add selective TCK test execution for faster unit tests"
+- Status: Pushed to GitHub, ready for PR review
+
+### Task Success Validation
+
+All success criteria met:
+
+- [x] Baseline CSV parsing function implemented (`get_passing_test_dirs()`)
+- [x] Passing test directory detection logic implemented
+- [x] Environment variable `ORION_TCK_RUN_ALL` controls filtering
+- [x] Default behavior: Skip failing Level 3 tests (selective mode)
+- [x] ALL Level 2 tests always run (unchanged)
+- [x] Unit tests pass with selective mode (default) - 0.87s, 100% pass rate
+- [x] Unit tests pass with comprehensive mode (`ORION_TCK_RUN_ALL=1`) - 24.78s
+- [x] Execution time reduced by **96.5%** in selective mode (exceeded 50-70% target)
+- [x] Documentation updated in `.github/instructions/run_unit_tests.md`
+
+**Bonus achievements**:
+- Clear test output with skip reasons
+- Skipped test counter (`level3_skipped_features`)
+- Multiple search paths for baseline discovery
+- Simple CSV parser (no external dependencies)
