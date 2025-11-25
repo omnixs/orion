@@ -18,6 +18,7 @@ dat/log/
 dat/tst/temp/
 dat/tck_*.csv
 dat/tck_*.properties
+dat/dmn-tck/TestResults/Orion/
 
 # Backup files
 *.zip
