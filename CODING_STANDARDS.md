@@ -174,6 +174,96 @@ class BadEvaluator {
 };
 ```
 
+## C++ Core Guidelines - Key Rules
+
+**When writing or reviewing C++ code, follow these critical guidelines:**
+
+### Resource Management (RAII)
+- **R.1**: Manage resources automatically using resource handles and RAII
+- **R.3**: A raw pointer (`T*`) is non-owning
+- **R.5**: Prefer scoped objects, don't heap-allocate unnecessarily
+- **R.10**: Avoid `malloc()` and `free()` (use `new`/`delete` or better, containers/smart pointers)
+- **R.11**: Avoid calling `new` and `delete` explicitly (use `make_unique`/`make_shared`)
+- **R.20**: Use `unique_ptr` or `shared_ptr` to represent ownership
+- **R.21**: Prefer `unique_ptr` over `shared_ptr` unless sharing is needed
+- **R.22**: Use `make_shared()` to make `shared_ptr`s
+- **R.23**: Use `make_unique()` to make `unique_ptr`s
+
+### Classes
+- **C.36**: A destructor must not fail (declare `noexcept`)
+- **C.37**: Make destructors `noexcept`
+- **C.42**: If constructor cannot construct valid object, throw an exception
+- **C.44**: Prefer default constructors to be simple and non-throwing
+- **C.81**: Use `=delete` to disable default behavior
+- **C.83**: For value-like types, provide `noexcept` swap
+- **C.84**: A swap must not fail
+- **C.85**: Make swap `noexcept`
+- **C.149**: Use `unique_ptr` or `shared_ptr` to avoid forgetting to `delete` objects from `new`
+
+### Functions
+- **F.6**: If function must not throw, declare it `noexcept`
+- **F.15**: Prefer simple and conventional ways of passing information
+- **F.20**: For "out" values, prefer return values to output parameters
+- **F.26**: Use `unique_ptr<T>` to transfer ownership where pointer is needed
+- **F.27**: Use `shared_ptr<T>` to share ownership
+
+### Expressions & Statements
+- **ES.20**: Always initialize an object
+- **ES.23**: Prefer `{}` initializer syntax
+- **ES.24**: Use `unique_ptr<T>` to hold pointers
+- **ES.48**: Avoid casts (use proper types instead)
+- **ES.65**: Don't dereference an invalid pointer
+
+### Containers
+- **SL.con.1**: Prefer STL `array` or `vector` instead of C array
+- **SL.con.2**: Prefer `vector` by default unless you have reason for different container
+- **SL.con.3**: Avoid bounds errors
+
+### Anti-Patterns to Avoid
+- **catch(...)**: Almost always wrong - catch specific exceptions instead (or use `std::expected`)
+  ```cpp
+  // ❌ BAD: Catches everything, loses error information
+  try { process(); } 
+  catch(...) { return false; }
+  
+  // ✅ GOOD: Use std::expected for business logic errors
+  std::expected<Result, Error> process() {
+      if (!valid_input) {
+          return std::unexpected(Error::InvalidInput);
+      }
+      return result;
+  }
+  
+  // ✅ ACCEPTABLE: Catch specific exceptions for ContractViolations
+  try { process(); }
+  catch(const ContractViolation& e) { log_error(e.what()); std::terminate(); }
+  catch(const nlohmann::json::exception& e) { /* handle JSON errors */ }
+  ```
+
+- **Two-phase initialization**: Use constructors properly
+  ```cpp
+  // ❌ BAD: Two-phase init
+  Widget w;
+  if (!w.init()) return error;
+  
+  // ✅ GOOD: Constructor establishes invariant (throws ContractViolation if cannot construct)
+  Widget w(params);
+  ```
+
+- **goto exit**: Use RAII instead
+  ```cpp
+  // ❌ BAD: Manual cleanup with goto
+  if (error) goto cleanup;
+  cleanup: free(p);
+  
+  // ✅ GOOD: RAII handles cleanup
+  auto p = std::make_unique<T>();
+  ```
+
+- **`errno` for error handling**: Use `std::expected` or exceptions
+- **Exception specifications**: Don't use deprecated `throw(X,Y)` syntax (use `noexcept` where appropriate)
+- **Non-specific exceptions**: Don't `throw 7;` or `throw "error";` - use proper error types
+
 ## DMN 1.5 Compliance
 
 ### Mandatory Requirements

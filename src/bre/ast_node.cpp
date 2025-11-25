@@ -107,10 +107,16 @@ namespace orion::bre
                 {
                     return std::stod(value.get<std::string>());
                 }
-                catch (...)
+                catch (const std::invalid_argument&)
                 {
                     std::ostringstream oss;
                     oss << "Cannot convert string to number in " << operation;
+                    throw std::runtime_error(oss.str());
+                }
+                catch (const std::out_of_range&)
+                {
+                    std::ostringstream oss;
+                    oss << "Number out of range in " << operation;
                     throw std::runtime_error(oss.str());
                 }
             }
@@ -200,10 +206,16 @@ namespace orion::bre
                     // Parse as double
                     return std::stod(value);
                 }
-                catch (...)
+                catch (const std::invalid_argument&)
                 {
                     std::ostringstream oss;
                     oss << "Invalid number literal: '" << value << "'";
+                    throw std::runtime_error(oss.str());
+                }
+                catch (const std::out_of_range&)
+                {
+                    std::ostringstream oss;
+                    oss << "Number literal out of range: '" << value << "'";
                     throw std::runtime_error(oss.str());
             }
         }

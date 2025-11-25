@@ -128,9 +128,13 @@ namespace orion::bre::detail
             }
             return json(std::stoll(arg_str));
         }
-        catch (...)
+        catch (const std::invalid_argument&)
         {
             // Conversion failed - not a numeric literal
+        }
+        catch (const std::out_of_range&)
+        {
+            // Number out of range - not a valid numeric literal
         }
 
         return json{};
@@ -216,7 +220,12 @@ namespace orion::bre::detail
             // Now evaluate the numerical expression
             return eval_math_expression(result);
         }
-        catch (...)
+        catch (const std::regex_error&)
+        {
+            // Regex compilation/matching failed
+            return json{};
+        }
+        catch (const std::runtime_error&)
         {
             // Expression evaluation failed
             return json{};
@@ -247,9 +256,13 @@ namespace orion::bre::detail
                 return json(result);
             }
         }
-        catch (...)
+        catch (const std::invalid_argument&)
         {
-            // Parse error
+            // Parse error - invalid number format
+        }
+        catch (const std::out_of_range&)
+        {
+            // Parse error - number out of range
         }
 
         return json{};
@@ -540,9 +553,14 @@ double resolve_variable_from_context(std::string_view var_name, bool& found)
             found = true;
             return std::stod(value.get<std::string>());
         }
-        catch (...)
+        catch (const std::invalid_argument&)
         {
-            // String to number conversion failed
+            // String to number conversion failed - not a valid number
+            return 0.0;
+        }
+        catch (const std::out_of_range&)
+        {
+            // Number out of range
             return 0.0;
         }
     }

@@ -163,7 +163,10 @@ enum class TokKind : std::uint8_t
                 t.k = TokKind::NUMBER;
                 t.text = buf;
             }
-            catch (...) {
+            catch (const std::invalid_argument&) {
+                t.k = TokKind::INVALID;
+            }
+            catch (const std::out_of_range&) {
                 t.k = TokKind::INVALID;
             }
             return t;
@@ -1067,7 +1070,10 @@ static Value eval_range(const ERange* r, const json& ctx)
                     bool m = std::regex_match(args[0].str(), re);
                     return Value(m);
                 }
-                catch (...) { return make_null(); }
+                catch (const std::regex_error&) {
+                    // Invalid regex pattern - DMN spec says return null
+                    return make_null();
+                }
         }
         return make_null();
     }

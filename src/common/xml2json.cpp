@@ -37,9 +37,13 @@ namespace orion::common
                 {
                     return json(std::stod(std::string(value)));
                 }
-                catch (...)
+                catch (const std::invalid_argument&)
                 {
-                    return json(value); // fallback to string
+                    return json(value); // fallback to string if not a valid number
+                }
+                catch (const std::out_of_range&)
+                {
+                    return json(value); // fallback to string if out of range
                 }
             }
             else if (xsiType.find("integer") != std::string::npos || xsiType.find("int") != std::string::npos)
@@ -48,9 +52,13 @@ namespace orion::common
                 {
                     return json(std::stoll(std::string(value)));
                 }
-                catch (...)
+                catch (const std::invalid_argument&)
                 {
-                    return json(value); // fallback to string
+                    return json(value); // fallback to string if not a valid integer
+                }
+                catch (const std::out_of_range&)
+                {
+                    return json(value); // fallback to string if out of range
                 }
             }
             else if (xsiType.find("boolean") != std::string::npos)
@@ -84,9 +92,13 @@ namespace orion::common
                     return json(std::stod(std::string(value)));
                 }
             }
-            catch (...)
+            catch (const std::invalid_argument&)
             {
-                return json(value);
+                return json(value); // Not a number, return as string
+            }
+            catch (const std::out_of_range&)
+            {
+                return json(value); // Out of range, return as string
             }
         }
 
@@ -351,9 +363,9 @@ namespace orion::common
             {
                 doc.parse<0>(&buf[0]);
             }
-            catch (...)
+            catch (const rapidxml::parse_error&)
             {
-                return out;
+                return out; // XML parsing error
             }
 
             auto* root = doc.first_node();
@@ -468,9 +480,13 @@ namespace orion::common
                     }
                 }
             }
-            catch (...)
+            catch (const rapidxml::parse_error&)
             {
-                // Return empty object on parse error
+                // Return empty object on XML parse error
+            }
+            catch (const nlohmann::json::exception&)
+            {
+                // Return empty object on JSON operation error
             }
 
             return componentObj;

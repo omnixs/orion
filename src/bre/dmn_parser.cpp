@@ -71,9 +71,14 @@ namespace orion::bre
             feel::Parser parser;
             return parser.parse(tokens);
         }
-        catch (...)
+        catch (const std::runtime_error&)
         {
             // Parsing failed - will use unary_test_matches fallback
+            return nullptr;
+        }
+        catch (const std::invalid_argument&)
+        {
+            // Invalid expression - will use unary_test_matches fallback
             return nullptr;
         }
     }

@@ -114,9 +114,14 @@ namespace orion::bre
                         // Compare AST result with input value
                         entry_matches_result = (ast_result == input_value);
                     }
-                    catch (...)
+                    catch (const std::runtime_error&)
                     {
-                        // AST evaluation failed, fall back to unary_test_matches
+                        // AST evaluation failed (FEEL error), fall back to unary_test_matches
+                        entry_matches_result = detail::entry_matches(entry, input_value);
+                    }
+                    catch (const nlohmann::json::exception&)
+                    {
+                        // JSON operation failed, fall back to unary_test_matches
                         entry_matches_result = detail::entry_matches(entry, input_value);
                     }
                 }
@@ -156,9 +161,14 @@ namespace orion::bre
                                 {
                                     output_value = rule.outputEntries_ast[i]->evaluate(context);
                                 }
-                                catch (...)
+                                catch (const std::runtime_error&)
                                 {
-                                    // Fallback to literal string if evaluation fails
+                                    // FEEL evaluation failed, fallback to literal string
+                                    output_value = rule.outputEntries[i];
+                                }
+                                catch (const nlohmann::json::exception&)
+                                {
+                                    // JSON operation failed, fallback to literal string
                                     output_value = rule.outputEntries[i];
                                 }
                             }
@@ -207,9 +217,19 @@ namespace orion::bre
                         {
                             output_value = rule.outputEntries_ast[0]->evaluate(context);
                         }
-                        catch (...)
+                        catch (const std::runtime_error&)
                         {
-                            // Fallback to literal string if evaluation fails
+                            // FEEL evaluation failed, fallback to literal string
+                            string literal_value = !rule.outputEntries.empty() ? rule.outputEntries[0] : rule.outputEntry;
+                            if (!literal_value.empty() && literal_value.front() == '"' && literal_value.back() == '"')
+                            {
+                                literal_value = literal_value.substr(1, literal_value.length() - 2);
+                            }
+                            output_value = literal_value;
+                        }
+                        catch (const nlohmann::json::exception&)
+                        {
+                            // JSON operation failed, fallback to literal string
                             string literal_value = !rule.outputEntries.empty() ? rule.outputEntries[0] : rule.outputEntry;
                             if (!literal_value.empty() && literal_value.front() == '"' && literal_value.back() == '"')
                             {
@@ -284,9 +304,13 @@ namespace orion::bre
                         {
                             sum += std::stod(output.get<string>());
                         }
-                        catch (...)
+                        catch (const std::invalid_argument&)
                         {
                             // Skip non-numeric strings
+                        }
+                        catch (const std::out_of_range&)
+                        {
+                            // Skip out-of-range values
                         }
                     }
                 }
@@ -335,9 +359,13 @@ namespace orion::bre
                             val = std::stod(output.get<string>());
                             found_numeric = true;
                         }
-                        catch (...)
+                        catch (const std::invalid_argument&)
                         {
-                            continue;
+                            continue; // Skip non-numeric strings
+                        }
+                        catch (const std::out_of_range&)
+                        {
+                            continue; // Skip out-of-range values
                         }
                     }
 
@@ -381,9 +409,13 @@ namespace orion::bre
                             val = std::stod(output.get<string>());
                             found_numeric = true;
                         }
-                        catch (...)
+                        catch (const std::invalid_argument&)
                         {
-                            continue;
+                            continue; // Skip non-numeric strings
+                        }
+                        catch (const std::out_of_range&)
+                        {
+                            continue; // Skip out-of-range values
                         }
                     }
 
@@ -593,10 +625,14 @@ namespace orion::bre
                 debug("LiteralDecision AST result for '{}': {}", expression_text, ast_result.dump());
                 return ast_result;
             }
-            catch (...)
+            catch (const std::runtime_error&)
             {
-                // AST evaluation failed, fall back to legacy evaluation
+                // AST evaluation failed (FEEL error), fall back to legacy evaluation
                 // This handles BKM calls and complex expressions not yet supported by AST
+            }
+            catch (const nlohmann::json::exception&)
+            {
+                // JSON operation failed, fall back to legacy evaluation
             }
         }
 

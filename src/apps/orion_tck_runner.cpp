@@ -108,7 +108,7 @@ static std::vector<ParsedCase> parse_test_xml(const std::string& xml)
     std::string buf = xml;
     buf.push_back('\0');
     try { doc.parse<0>(&buf[0]); }
-    catch (...) { return out; }
+    catch (const rapidxml::parse_error&) { return out; } // XML parsing failed
     auto* root = doc.first_node();
     if (!root) return out;
     auto for_each_case = [&](rapidxml::xml_node<>* tc)
@@ -568,9 +568,9 @@ static std::string extract_output_value(
         
         return it->dump();
     }
-    catch (...)
+    catch (const nlohmann::json::exception&)
     {
-        return it->dump();
+        return it->dump(); // JSON operation failed, return as-is
     }
 }
 
@@ -591,18 +591,25 @@ static bool compare_values(std::string_view expected, std::string_view actual)
         double tolerance = std::max(1e-10, std::abs(expected_num) * 1e-10);
         return std::abs(expected_num - actual_num) <= tolerance;
     }
-    catch (...)
+    catch (const std::invalid_argument&)
     {
-        if (expected == "\"\"" && actual == "null")
-        {
-            return false;
-        }
-        if (expected == "null" && actual == "null")
-        {
-            return true;
-        }
-        return actual == expected;
+        // Not numeric values, fall through to string comparison
     }
+    catch (const std::out_of_range&)
+    {
+        // Out of range numeric values, fall through to string comparison
+    }
+    
+    // String comparison fallback
+    if (expected == "\"\"" && actual == "null")
+    {
+        return false;
+    }
+    if (expected == "null" && actual == "null")
+    {
+        return true;
+    }
+    return actual == expected;
 }
 
 // Helper: Write single test result to CSV
@@ -754,8 +761,8 @@ static TestStats execute_test_directory_set(
         try { 
             dmn_xml = read_file(di.dmn); 
         }
-        catch (...) { 
-            continue; 
+        catch (const std::exception&) { 
+            continue; // File read error, skip this test
         }
         
         bool feature_passed = true;
@@ -767,8 +774,8 @@ static TestStats execute_test_directory_set(
             try { 
                 xml = read_file(xf); 
             }
-            catch (...) { 
-                continue; 
+            catch (const std::exception&) { 
+                continue; // File read error, skip this test case
             }
             
             auto cases = orion::common::parse_test_xml(xml);
