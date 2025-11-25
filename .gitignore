@@ -14,6 +14,10 @@ docs/replies/
 # DMN TCK data files (log only, not the test repository)
 dat/log/
 
+# TCK test output files (temporary verification outputs)
+dat/tck_*.csv
+dat/tck_*.properties
+
 # Backup files
 *.zip
 *.backup
