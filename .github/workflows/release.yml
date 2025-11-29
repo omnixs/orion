@@ -1,0 +1,371 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version increment type'
+        required: true
+        type: choice
+        options:
+          - patch  # X.Y.Z → X.Y.(Z+1) - Bug fixes
+          - minor  # X.Y.Z → X.(Y+1).0 - New features
+          - major  # X.Y.Z → (X+1).0.0 - Breaking changes
+      release_notes:
+        description: 'Release notes (markdown supported)'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # Required for creating releases and pushing tags
+
+jobs:
+  version-bump:
+    name: Version Bump and Tag
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+      old_version: ${{ steps.current.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          
+      - name: Read current version
+        id: current
+        run: |
+          VERSION=$(grep -oP 'project\(orion VERSION \K[0-9.]+' CMakeLists.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+          
+      - name: Calculate new version
+        id: bump
+        run: |
+          IFS='.' read -r major minor patch <<< "${{ steps.current.outputs.version }}"
+          
+          case "${{ github.event.inputs.version_bump }}" in
+            major)
+              new_version="$((major + 1)).0.0"
+              ;;
+            minor)
+              new_version="$major.$((minor + 1)).0"
+              ;;
+            patch)
+              new_version="$major.$minor.$((patch + 1))"
+              ;;
+          esac
+          
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          echo "Version bump: ${{ steps.current.outputs.version }} → $new_version (${{ github.event.inputs.version_bump }})"
+          
+      - name: Update CMakeLists.txt
+        run: |
+          sed -i "s/project(orion VERSION [0-9.]*/project(orion VERSION ${{ steps.bump.outputs.new_version }}/" CMakeLists.txt
+          echo "Updated CMakeLists.txt to version ${{ steps.bump.outputs.new_version }}"
+          
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }}"
+          echo "Committed version bump"
+          
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ steps.bump.outputs.new_version }}" -m "Release v${{ steps.bump.outputs.new_version }}"
+          git push origin main
+          git push origin "v${{ steps.bump.outputs.new_version }}"
+          echo "Created and pushed tag v${{ steps.bump.outputs.new_version }}"
+
+  build-artifacts:
+    name: Build ${{ matrix.platform }}
+    needs: version-bump
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x64
+            archive_cmd: tar czf
+            archive_ext: tar.gz
+            triplet: x64-linux
+            cc: gcc-13
+            cxx: g++-13
+            lib_name: liborion_lib.a
+            exe_ext: ""
+          - os: windows-latest
+            platform: windows-x64
+            archive_cmd: 7z a -tzip
+            archive_ext: zip
+            triplet: x64-windows-static
+            lib_name: orion_lib.lib
+            exe_ext: .exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout at tag
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version-bump.outputs.new_version }}
+          submodules: recursive
+          
+      - name: Install vcpkg (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          
+      - name: Install vcpkg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
+          $HOME/vcpkg/bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+          
+      - name: Install GCC 13 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13 ninja-build
+          
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          CC=gcc-13 CXX=g++-13 cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=x64-linux \
+            -DORION_BUILD_TESTS=ON \
+            -DORION_BUILD_APPS=ON
+            
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DORION_BUILD_TESTS=ON `
+            -DORION_BUILD_APPS=ON
+            
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: cmake --build build -j$(nproc)
+        
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: cmake --build build --config Release --parallel
+        
+      - name: Run unit tests (Linux)
+        if: runner.os == 'Linux'
+        run: ./build/tst_orion --log_level=test_suite
+        
+      - name: Run unit tests (Windows)
+        if: runner.os == 'Windows'
+        run: .\build\Release\tst_orion.exe --log_level=test_suite
+        
+      - name: Generate TCK baseline (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ./build/orion_tck_runner \
+            --output-csv tck_results.csv \
+            --output-properties tck_results.properties \
+            --log_level=error
+        timeout-minutes: 15
+        continue-on-error: true
+        
+      - name: Generate TCK baseline (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .\build\Release\orion_tck_runner.exe `
+            --output-csv tck_results.csv `
+            --output-properties tck_results.properties `
+            --log_level=error
+        timeout-minutes: 15
+        continue-on-error: true
+        
+      - name: Package artifacts
+        shell: bash
+        run: |
+          VERSION="${{ needs.version-bump.outputs.new_version }}"
+          PLATFORM="${{ matrix.platform }}"
+          PKG_DIR="orion-${VERSION}"
+          
+          # Create package directory structure
+          mkdir -p "$PKG_DIR"/{lib,include,bin,cmake,tck-baseline,licenses}
+          
+          # Copy library (platform-specific paths)
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            cp build/${{ matrix.lib_name }} "$PKG_DIR/lib/"
+          else
+            cp build/Release/${{ matrix.lib_name }} "$PKG_DIR/lib/"
+          fi
+          
+          # Copy headers (preserve directory structure)
+          cp -r include/orion "$PKG_DIR/include/"
+          
+          # Copy CMake configuration files
+          cp build/orionConfig.cmake build/orionConfigVersion.cmake "$PKG_DIR/cmake/"
+          
+          # Copy executables (platform-specific paths)
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            cp build/orion_app "$PKG_DIR/bin/"
+            cp build/orion_tck_runner "$PKG_DIR/bin/"
+          else
+            cp build/Release/orion_app.exe "$PKG_DIR/bin/"
+            cp build/Release/orion_tck_runner.exe "$PKG_DIR/bin/"
+          fi
+          
+          # Copy TCK baseline
+          cp tck_results.csv tck_results.properties "$PKG_DIR/tck-baseline/" || echo "Warning: TCK baseline not found"
+          
+          # Copy license files
+          cp LICENSE NOTICE THIRD-PARTY-NOTICES.txt "$PKG_DIR/licenses/" || echo "Warning: Some license files not found"
+          
+          # Copy README
+          cp README.md "$PKG_DIR/"
+          
+          # Create archive
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            tar czf "orion-${VERSION}-${PLATFORM}.tar.gz" "$PKG_DIR"
+          else
+            7z a "orion-${VERSION}-${PLATFORM}.zip" "$PKG_DIR"
+          fi
+          
+          echo "Created package: orion-${VERSION}-${PLATFORM}.${{ matrix.archive_ext }}"
+          
+      - name: Generate checksums
+        shell: bash
+        run: |
+          VERSION="${{ needs.version-bump.outputs.new_version }}"
+          PLATFORM="${{ matrix.platform }}"
+          
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            sha256sum "orion-${VERSION}-${PLATFORM}.tar.gz" > "orion-${VERSION}-${PLATFORM}.sha256"
+          else
+            certutil -hashfile "orion-${VERSION}-${PLATFORM}.zip" SHA256 | findstr -v "hash" | findstr -v "CertUtil" > "orion-${VERSION}-${PLATFORM}.sha256"
+          fi
+          
+          echo "Generated checksum for $PLATFORM"
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: orion-${{ matrix.platform }}
+          path: |
+            orion-${{ needs.version-bump.outputs.new_version }}-${{ matrix.platform }}.${{ matrix.archive_ext }}
+            orion-${{ needs.version-bump.outputs.new_version }}-${{ matrix.platform }}.sha256
+          retention-days: 90
+
+  create-release:
+    name: Create GitHub Release
+    needs: [version-bump, build-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          
+      - name: Display artifact structure
+        run: |
+          echo "Downloaded artifacts:"
+          ls -R artifacts/
+          
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release-assets/ \;
+          echo "Release assets:"
+          ls -lh release-assets/
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version-bump.outputs.new_version }}
+          name: ORION v${{ needs.version-bump.outputs.new_version }}
+          body: |
+            # ORION v${{ needs.version-bump.outputs.new_version }}
+            
+            ${{ github.event.inputs.release_notes }}
+            
+            ## Downloads
+            
+            - **Linux**: `orion-${{ needs.version-bump.outputs.new_version }}-linux-x64.tar.gz`
+            - **Windows**: `orion-${{ needs.version-bump.outputs.new_version }}-windows-x64.zip`
+            
+            Each release includes:
+            - Static libraries (`liborion_lib.a` / `orion_lib.lib`)
+            - Headers (`include/orion/`)
+            - CMake configuration files
+            - Command-line tools (`orion_app`, `orion_tck_runner`)
+            - TCK test baseline
+            - License files
+            
+            ## Checksums (SHA256)
+            
+            Verify downloads with the corresponding `.sha256` files.
+            
+            ## Installation
+            
+            See [README.md](https://github.com/omnixs/orion/blob/main/README.md) for installation and usage instructions.
+          draft: false
+          prerelease: false
+          files: release-assets/*
+
+  update-baseline:
+    name: Update TCK Baseline
+    needs: [version-bump, build-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: orion-linux-x64
+          path: artifacts/
+          
+      - name: Extract and copy baseline
+        run: |
+          VERSION="${{ needs.version-bump.outputs.new_version }}"
+          
+          # Extract the archive
+          cd artifacts
+          tar xzf "orion-${VERSION}-linux-x64.tar.gz"
+          cd ..
+          
+          # Create baseline directory
+          mkdir -p "dat/tck-baselines/${VERSION}"
+          
+          # Copy baseline files
+          cp "artifacts/orion-${VERSION}/tck-baseline/tck_results.csv" "dat/tck-baselines/${VERSION}/" || echo "Warning: No CSV baseline"
+          cp "artifacts/orion-${VERSION}/tck-baseline/tck_results.properties" "dat/tck-baselines/${VERSION}/" || echo "Warning: No properties baseline"
+          
+          echo "Baseline copied to dat/tck-baselines/${VERSION}/"
+          ls -lh "dat/tck-baselines/${VERSION}/"
+          
+      - name: Commit baseline to repository
+        run: |
+          VERSION="${{ needs.version-bump.outputs.new_version }}"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add "dat/tck-baselines/${VERSION}"
+          
+          if git diff --staged --quiet; then
+            echo "No baseline changes to commit"
+          else
+            git commit -m "chore: add TCK baseline for version ${VERSION}"
+            git push origin main
+            echo "Baseline committed and pushed to main"
+          fi

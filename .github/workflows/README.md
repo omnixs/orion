@@ -35,8 +35,72 @@
 - Builds ORION in Release mode
 - Runs all unit tests
 - Runs complete DMN TCK compliance test suite (~1887 tests)
-- Uploads build artifacts (executables)
+- **Regression detection**: Compares results against baseline if exists
+- **Level 2 strict mode**: Enforces 100% Level 2 DMN compliance
+- Uploads build artifacts and TCK results
 - Validates production-ready configuration
+
+**Regression Detection:**
+- If baseline exists for current version → enforces no regressions (exit codes 2/3 fail build)
+- If no baseline exists → allows failures (development mode)
+
+**Exit code handling:**
+- **0**: All tests passed or no regressions
+- **1**: Expected failures (allowed)
+- **2**: Regression detected → **FAILS BUILD**
+- **3**: Level 2 compliance failure → **FAILS BUILD**
+
+---
+
+### `release.yml` - Automated Release
+**Purpose**: Automated release creation with artifacts and baselines  
+**Triggers**: Manual only (`workflow_dispatch`)  
+**Platforms**: Windows + Linux  
+**Configuration**: Release build  
+**Duration**: ~20-30 minutes  
+
+**Inputs:**
+- `version_bump`: Choose `patch`, `minor`, or `major` for semantic versioning
+- `release_notes`: Markdown-formatted release description
+
+**What it does:**
+
+**Phase 1 - Version Management:**
+- Reads current version from `CMakeLists.txt`
+- Calculates new version (e.g., 1.0.0 → 1.0.1 for patch)
+- Updates `CMakeLists.txt` with new version
+- Creates git tag (`vX.Y.Z`)
+- Commits and pushes to `main` branch
+
+**Phase 2 - Build Artifacts:**
+- Builds for Windows and Linux in Release mode
+- Runs full test suite (unit + TCK)
+- Generates TCK baseline for new version
+- Packages artifacts with:
+  - Static libraries (`liborion_lib.a` / `orion_lib.lib`)
+  - Headers (`include/orion/`)
+  - CMake configuration files
+  - Executables (`orion_app`, `orion_tck_runner`)
+  - TCK baseline
+  - License files
+- Generates SHA256 checksums
+
+**Phase 3 - GitHub Release:**
+- Creates GitHub Release with tag `vX.Y.Z`
+- Uploads platform archives (`.tar.gz` for Linux, `.zip` for Windows)
+- Uploads checksums
+- Publishes release notes
+
+**Phase 4 - Baseline Update:**
+- Extracts TCK baseline from Linux build
+- Commits to `dat/tck-baselines/{version}/`
+- Enables regression detection for future CI runs
+
+**Outputs:**
+- GitHub Release with downloadable artifacts
+- Version bump commit on `main`
+- Git tag `vX.Y.Z`
+- TCK baseline in repository
 
 ---
 

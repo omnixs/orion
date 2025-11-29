@@ -42,6 +42,54 @@
 - `--run_test=<pattern>` - Run tests matching pattern
 - `--list_content` - List all test cases without running
 
+## TCK Test Modes
+
+The DMN TCK comprehensive test (`dmn_tck_comprehensive`) supports two execution modes:
+
+### Selective Mode (Default - Fast)
+Runs only Level 3 TCK tests that are known to pass according to the baseline. This significantly speeds up unit test execution.
+
+**Windows:**
+```powershell
+# Default behavior - selective mode
+.\build\tst_orion.exe --run_test=dmn_tck_levels/dmn_tck_comprehensive
+```
+
+**Linux:**
+```bash
+# Default behavior - selective mode
+./build/tst_orion --run_test=dmn_tck_levels/dmn_tck_comprehensive
+```
+
+**Performance:**
+- Execution time: ~0.9 seconds
+- Level 2: All 126 tests (100% required)
+- Level 3: Only ~35 passing test directories
+- Skips: ~114 failing test directories
+
+### Comprehensive Mode (Full Coverage)
+Runs ALL Level 3 TCK tests for comprehensive validation. Enable by setting environment variable.
+
+**Windows:**
+```powershell
+$env:ORION_TCK_RUN_ALL="1"
+.\build\tst_orion.exe --run_test=dmn_tck_levels/dmn_tck_comprehensive
+```
+
+**Linux:**
+```bash
+export ORION_TCK_RUN_ALL=1
+./build/tst_orion --run_test=dmn_tck_levels/dmn_tck_comprehensive
+```
+
+**Performance:**
+- Execution time: ~25 seconds (Debug mode)
+- Level 2: All 126 tests (100% required)
+- Level 3: All ~120 test directories
+- Use for debugging or comprehensive validation
+
+**Note:** Level 2 tests ALWAYS run in full regardless of mode (DMN compliance requirement).
+
 ## Expected Output
 
 ```

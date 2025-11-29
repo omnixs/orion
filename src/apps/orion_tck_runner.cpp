@@ -383,6 +383,12 @@ struct Config
     std::string testFilter;
     bool verbose = false;
     bool stopOnFailure = false;
+    // Regression detection options
+    fs::path baselinePath;
+    bool regressionCheck = false;
+    bool level2Strict = false;
+    fs::path outputCsv;
+    fs::path outputProperties;
 };
 
 struct TestStats
@@ -397,11 +403,98 @@ struct TestStats
     std::size_t passed_features = 0;
 };
 
+// Baseline test result
+struct BaselineResult
+{
+    std::string testId;
+    int level = 0;
+    bool passed = false;
+};
+
+// Regression tracking
+struct RegressionInfo
+{
+    std::vector<std::string> regressions; // Test IDs that regressed
+    std::size_t level2Failures = 0;       // Level 2 test failures
+    bool hasRegressions() const { return !regressions.empty(); }
+};
+
 struct DirInfo {
     fs::path dir;
     fs::path dmn;
     std::vector<fs::path> xmls;
 };
+
+// Load baseline CSV file for regression detection
+// CSV format: "test_dir","test_case_id","result_node_id","result","detail"
+static std::map<std::string, BaselineResult> load_baseline(const fs::path& baselinePath)
+{
+    std::map<std::string, BaselineResult> baseline;
+    
+    if (baselinePath.empty() || !fs::exists(baselinePath)) {
+        return baseline;
+    }
+    
+    std::ifstream file(baselinePath);
+    if (!file) {
+        spdlog::warn("Cannot open baseline file: {}", baselinePath.string());
+        return baseline;
+    }
+    
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        // Parse CSV: "test_dir","test_case_id","result_node_id","result","detail"
+        std::vector<std::string> fields;
+        std::string field;
+        bool in_quotes = false;
+        
+        for (char ch : line) {
+            if (ch == '"') {
+                in_quotes = !in_quotes;
+            } else if (ch == ',' && !in_quotes) {
+                fields.push_back(field);
+                field.clear();
+            } else {
+                field += ch;
+            }
+        }
+        fields.push_back(field);  // Last field
+        
+        if (fields.size() >= 4) {
+            std::string test_dir = fields[0];
+            std::string test_case_id = fields[1];
+            std::string result_node_id = fields[2];
+            std::string result = fields[3];
+            
+            // Create unique test ID from natural key: test_dir + test_case_id + result_node_id
+            // This matches the TCK standard format used by all vendors
+            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id;
+            
+            // Determine level from test_dir (e.g., "compliance-level-2/...")
+            int level = 0;
+            if (test_dir.find("compliance-level-2") != std::string::npos) {
+                level = 2;
+            } else if (test_dir.find("compliance-level-3") != std::string::npos) {
+                level = 3;
+            }
+            
+            BaselineResult br;
+            br.testId = testId;
+            br.level = level;
+            br.passed = (result == "SUCCESS");
+            
+            baseline[testId] = br;
+        }
+    }
+    
+    spdlog::info("Loaded baseline with {} test results from {}", 
+                 baseline.size(), baselinePath.string());
+    
+    return baseline;
+}
 
 static Config parse_command_line(int argc, char** argv)
 {
@@ -416,15 +509,36 @@ static Config parse_command_line(int argc, char** argv)
         } else if (a == "--test" && i + 1 < argc) { config.testFilter = argv[++i];
         } else if (a == "--verbose") { config.verbose = true;
         } else if (a == "--stop-on-failure" || a == "--stop" || a == "-s") { config.stopOnFailure = true;
+        } else if (a == "--baseline" && i + 1 < argc) { config.baselinePath = argv[++i];
+        } else if (a == "--regression-check") { config.regressionCheck = true;
+        } else if (a == "--level2-strict") { config.level2Strict = true;
+        } else if (a == "--output-csv" && i + 1 < argc) { config.outputCsv = argv[++i];
+        } else if (a == "--output-properties" && i + 1 < argc) { config.outputProperties = argv[++i];
         } else if (a == "--help" || a == "-h") {
             spdlog::info("Usage: {} [options]", argv[0]);
             spdlog::info("Options:");
-            spdlog::info("  --root <path>         TCK root directory (default: auto-detect)");
-            spdlog::info("  --version <version>   Engine version (default: 0.1.0)");
-            spdlog::info("  --test <pattern>      Only run tests matching pattern (e.g., 0105-feel-math)");
-            spdlog::info("  --verbose             Enable verbose debug output");
-            spdlog::info("  --stop-on-failure     Stop testing on first failure");
-            spdlog::info("  --help                Show this help");
+            spdlog::info("  --root <path>           TCK root directory (default: auto-detect)");
+            spdlog::info("  --version <version>     Engine version (default: 0.1.0)");
+            spdlog::info("  --test <pattern>        Only run tests matching pattern (e.g., 0105-feel-math)");
+            spdlog::info("  --verbose               Enable verbose debug output");
+            spdlog::info("  --stop-on-failure       Stop testing on first failure");
+            spdlog::info("");
+            spdlog::info("Regression Detection:");
+            spdlog::info("  --baseline <path>       Path to baseline CSV for regression detection");
+            spdlog::info("  --regression-check      Enable regression detection (exit 2 if regressions found)");
+            spdlog::info("  --level2-strict         Fail on any Level 2 test failures (exit 3)");
+            spdlog::info("");
+            spdlog::info("Output Generation:");
+            spdlog::info("  --output-csv <path>     Generate results CSV (for baseline creation)");
+            spdlog::info("  --output-properties <path>  Generate summary properties file");
+            spdlog::info("");
+            spdlog::info("Exit Codes:");
+            spdlog::info("  0 - All tests passed OR no regressions detected");
+            spdlog::info("  1 - Expected test failures (normal during development)");
+            spdlog::info("  2 - Regression detected (previously passing test now fails)");
+            spdlog::info("  3 - Level 2 compliance failure (when --level2-strict enabled)");
+            spdlog::info("");
+            spdlog::info("  --help                  Show this help");
             exit(0);
         }
     }
@@ -722,7 +836,10 @@ static bool execute_single_test_case(
                 outExp.expected, (got.empty() ? "<none>" : got));
         }
         
-        std::string result_node_id = test_case.id.empty() ? "001" : test_case.id;
+        // Use output ID as result_node_id for proper TCK format compliance
+        // Priority: outExp.id > test_case.id > "001" (default fallback)
+        std::string result_node_id = outExp.id.empty() ? 
+            (test_case.id.empty() ? "001" : test_case.id) : outExp.id;
         write_csv_result(csv, test_dir, test_case_id, result_node_id, success, detail);
         
         if (success)
@@ -923,6 +1040,172 @@ static void print_summary(const TestStats& main_stats, const TestStats& extra_st
     }
 }
 
+// Detect regressions by comparing current results with baseline
+// CSV format: "test_dir","test_case_id","result_node_id","result","detail"
+static RegressionInfo detect_regressions(
+    const fs::path& currentCsvPath,
+    const std::map<std::string, BaselineResult>& baseline,
+    bool checkLevel2)
+{
+    RegressionInfo info;
+    
+    // Load current test results
+    std::ifstream file(currentCsvPath);
+    if (!file) {
+        spdlog::warn("Cannot open current results file for regression detection: {}", 
+                    currentCsvPath.string());
+        return info;
+    }
+    
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        // Parse CSV: "test_dir","test_case_id","result_node_id","result","detail"
+        std::vector<std::string> fields;
+        std::string field;
+        bool in_quotes = false;
+        
+        for (char ch : line) {
+            if (ch == '"') {
+                in_quotes = !in_quotes;
+            } else if (ch == ',' && !in_quotes) {
+                fields.push_back(field);
+                field.clear();
+            } else {
+                field += ch;
+            }
+        }
+        fields.push_back(field);  // Last field
+        
+        if (fields.size() >= 4) {
+            std::string test_dir = fields[0];
+            std::string test_case_id = fields[1];
+            std::string result_node_id = fields[2];
+            std::string result = fields[3];
+            
+            // Create unique test ID from natural key: test_dir + test_case_id + result_node_id
+            // This matches the TCK standard format used by all vendors
+            std::string testId = test_dir + "/" + test_case_id + "-" + result_node_id;
+            
+            // Determine level from test_dir (e.g., "compliance-level-2/...")
+            int level = 0;
+            if (test_dir.find("compliance-level-2") != std::string::npos) {
+                level = 2;
+            } else if (test_dir.find("compliance-level-3") != std::string::npos) {
+                level = 3;
+            }
+            
+            bool currentPassed = (result == "SUCCESS");
+            
+            // Check for Level 2 failures if strict mode enabled
+            if (checkLevel2 && level == 2 && !currentPassed) {
+                info.level2Failures++;
+            }
+            
+            // Check for regressions (baseline passed but current failed)
+            auto it = baseline.find(testId);
+            if (it != baseline.end() && it->second.passed && !currentPassed) {
+                info.regressions.push_back(testId);
+            }
+        }
+    }
+    
+    return info;
+}
+
+// Write properties file with summary statistics
+static void write_properties_file(
+    const fs::path& propertiesPath,
+    const fs::path& csvPath,
+    const TestStats& main_stats,
+    const TestStats& extra_stats)
+{
+    ensure_parent(propertiesPath);
+    std::ofstream props(propertiesPath);
+    if (!props) {
+        spdlog::warn("Cannot write properties file: {}", propertiesPath.string());
+        return;
+    }
+    
+    std::size_t total_tests = main_stats.total_cases + extra_stats.total_cases;
+    std::size_t passed_tests = main_stats.passed_cases + extra_stats.passed_cases;
+    std::size_t failed_tests = main_stats.failed_cases + extra_stats.failed_cases;
+    double pass_rate = total_tests > 0 ? (passed_tests * 100.0) / total_tests : 0.0;
+    
+    props << "total_tests=" << total_tests << "\n";
+    props << "passed_tests=" << passed_tests << "\n";
+    props << "failed_tests=" << failed_tests << "\n";
+    props << "pass_rate=" << std::fixed << std::setprecision(1) << pass_rate << "\n";
+    
+    // Calculate Level 2 and Level 3 stats by reading the CSV file
+    std::size_t level2_total = 0, level2_passed = 0;
+    std::size_t level3_total = 0, level3_passed = 0;
+    
+    std::ifstream csv_in(csvPath);
+    if (csv_in) {
+        std::string line;
+        std::getline(csv_in, line); // Skip header
+        
+        while (std::getline(csv_in, line)) {
+            if (line.empty()) continue;
+            
+            // Simple CSV parser (handles quoted fields)
+            std::vector<std::string> fields;
+            std::string field;
+            bool in_quotes = false;
+            
+            for (char ch : line) {
+                if (ch == '"') {
+                    in_quotes = !in_quotes;
+                } else if (ch == ',' && !in_quotes) {
+                    fields.push_back(field);
+                    field.clear();
+                } else {
+                    field += ch;
+                }
+            }
+            if (!field.empty()) {
+                fields.push_back(field);
+            }
+            
+            if (fields.size() >= 4) {
+                std::string test_dir = fields[0];
+                std::string result = fields[3];
+                
+                // Determine level from test_dir
+                bool is_level2 = (test_dir.find("compliance-level-2") != std::string::npos);
+                bool is_level3 = (test_dir.find("compliance-level-3") != std::string::npos);
+                bool passed = (result == "SUCCESS");
+                
+                if (is_level2) {
+                    level2_total++;
+                    if (passed) level2_passed++;
+                } else if (is_level3) {
+                    level3_total++;
+                    if (passed) level3_passed++;
+                }
+            }
+        }
+    }
+    
+    // Level 2 stats
+    double level2_rate = level2_total > 0 ? (level2_passed * 100.0) / level2_total : 0.0;
+    props << "level2_total=" << level2_total << "\n";
+    props << "level2_passed=" << level2_passed << "\n";
+    props << "level2_pass_rate=" << std::fixed << std::setprecision(1) << level2_rate << "\n";
+    
+    // Level 3 stats
+    double level3_rate = level3_total > 0 ? (level3_passed * 100.0) / level3_total : 0.0;
+    props << "level3_total=" << level3_total << "\n";
+    props << "level3_passed=" << level3_passed << "\n";
+    props << "level3_pass_rate=" << std::fixed << std::setprecision(1) << level3_rate << "\n";
+    
+    props.flush();
+    spdlog::info("Properties file written to: {}", propertiesPath.string());
+}
+
 int main(int argc, char** argv)
 {
     // Setup proper spdlog console logging with colors
@@ -936,19 +1219,64 @@ int main(int argc, char** argv)
         auto log = orion::common::init_hourly_logger("orion_tck_runner");
         log->info("TCK Runner started");
         
+        // Log command-line arguments for debugging
+        std::ostringstream cmd_args;
+        for (int i = 0; i < argc; ++i) {
+            if (i > 0) cmd_args << " ";
+            cmd_args << argv[i];
+        }
+        spdlog::info("Command line: {}", cmd_args.str());
+        log->info("Command line: {}", cmd_args.str());
+        
         Config config = parse_command_line(argc, argv);
+        
+        // Log configuration
+        spdlog::info("Configuration:");
+        spdlog::info("  TCK Root: {}", config.root.string());
+        spdlog::info("  Version: {}", config.version);
+        spdlog::info("  Test Filter: {}", config.testFilter.empty() ? "<none>" : config.testFilter);
+        spdlog::info("  Verbose: {}", config.verbose ? "true" : "false");
+        spdlog::info("  Stop on Failure: {}", config.stopOnFailure ? "true" : "false");
+        spdlog::info("  Baseline Path: {}", config.baselinePath.empty() ? "<none>" : config.baselinePath.string());
+        spdlog::info("  Regression Check: {}", config.regressionCheck ? "enabled" : "disabled");
+        spdlog::info("  Level 2 Strict: {}", config.level2Strict ? "enabled" : "disabled");
+        spdlog::info("  Output CSV: {}", config.outputCsv.empty() ? "<default>" : config.outputCsv.string());
+        spdlog::info("  Output Properties: {}", config.outputProperties.empty() ? "<default>" : config.outputProperties.string());
         
         // Enable debug logging if verbose mode is requested
         if (config.verbose) {
             spdlog::set_level(spdlog::level::debug);
         }
         
-        // Setup output files
-        fs::path outDir = config.root / "TestResults" / "Orion" / config.version;
-        ensure_parent(outDir / "dummy");
-        fs::path csvPath = outDir / "tck_results.csv";
+        // Load baseline if regression check is enabled
+        std::map<std::string, BaselineResult> baseline;
+        if (config.regressionCheck && !config.baselinePath.empty()) {
+            spdlog::info("Loading baseline from: {}", config.baselinePath.string());
+            baseline = load_baseline(config.baselinePath);
+            if (baseline.empty()) {
+                spdlog::warn("Regression check enabled but baseline is empty or could not be loaded");
+            } else {
+                spdlog::info("Baseline loaded: {} test results", baseline.size());
+            }
+        }
         
-        std::ofstream csv(csvPath, std::ios::binary | std::ios::trunc);
+        // Setup output files
+        fs::path csvPath;
+        std::ofstream csv;
+        
+        if (!config.outputCsv.empty()) {
+            // User-specified output path
+            csvPath = config.outputCsv;
+            ensure_parent(csvPath);
+            csv.open(csvPath, std::ios::binary | std::ios::trunc);
+        } else {
+            // Default output path
+            fs::path outDir = config.root / "TestResults" / "Orion" / config.version;
+            ensure_parent(outDir / "dummy");
+            csvPath = outDir / "tck_results.csv";
+            csv.open(csvPath, std::ios::binary | std::ios::trunc);
+        }
+        
         if (!csv) { throw std::runtime_error("Cannot write " + csvPath.string());
 }
         
@@ -963,9 +1291,35 @@ int main(int argc, char** argv)
         TestStats extra_stats = execute_test_directory_set(extra_dirs, extra_base, config, csv, "EXTRA");
         
         csv.flush();
+        csv.close();
         
         // Write results files
-        write_results_files(config, main_stats, extra_stats);
+        if (!config.outputProperties.empty()) {
+            // User-specified properties file
+            write_properties_file(config.outputProperties, csvPath, main_stats, extra_stats);
+        } else {
+            // Default properties file
+            write_results_files(config, main_stats, extra_stats);
+        }
+        
+        // Perform regression detection if enabled
+        RegressionInfo regressionInfo;
+        if (config.regressionCheck && !baseline.empty()) {
+            regressionInfo = detect_regressions(csvPath, baseline, config.level2Strict);
+            
+            if (regressionInfo.hasRegressions()) {
+                spdlog::error("REGRESSION DETECTED: {} test(s) that previously passed now fail:", 
+                             regressionInfo.regressions.size());
+                for (const auto& testId : regressionInfo.regressions) {
+                    spdlog::error("  - {}", testId);
+                }
+            }
+            
+            if (config.level2Strict && regressionInfo.level2Failures > 0) {
+                spdlog::error("LEVEL 2 COMPLIANCE FAILURE: {} Level 2 test(s) failed", 
+                             regressionInfo.level2Failures);
+            }
+        }
         
         // Print summary
         print_summary(main_stats, extra_stats, config);
@@ -977,6 +1331,18 @@ int main(int argc, char** argv)
         spdlog::info("TCK Runner completed: {}/{} test cases passed", total_passed, total_cases);
         log->flush();
         
+        // Determine exit code based on regression detection
+        if (config.level2Strict && regressionInfo.level2Failures > 0) {
+            spdlog::error("Exiting with code 3: Level 2 compliance failure");
+            return 3;  // Level 2 compliance failure
+        }
+        
+        if (config.regressionCheck && regressionInfo.hasRegressions()) {
+            spdlog::error("Exiting with code 2: Regression detected");
+            return 2;  // Regression detected
+        }
+        
+        // Normal exit codes
         return (main_stats.fail || extra_stats.fail) ? 1 : 0;
     }
     catch (const std::exception& ex)

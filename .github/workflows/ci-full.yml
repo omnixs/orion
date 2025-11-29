@@ -4,6 +4,12 @@ on:
   push:
     branches: [ "main" ]
     tags: [ "v*" ]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/tasks/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - 'NOTICE'
   schedule:
     # Run nightly at 3 AM UTC
     - cron: '0 3 * * *'
@@ -32,19 +38,33 @@ jobs:
       with:
         submodules: recursive
     
+    - name: Cache vcpkg
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          ~/.cache/vcpkg
+        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-
+    
     - name: Install vcpkg (Windows)
       if: runner.os == 'Windows'
       run: |
+        New-Item -ItemType Directory -Force -Path "C:\Users\runneradmin\AppData\Local\vcpkg\archives"
         git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
         C:\vcpkg\bootstrap-vcpkg.bat
         echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+        echo "VCPKG_DEFAULT_BINARY_CACHE=C:\Users\runneradmin\AppData\Local\vcpkg\archives" >> $env:GITHUB_ENV
     
     - name: Install vcpkg (Linux)
       if: runner.os == 'Linux'
       run: |
+        mkdir -p $HOME/.cache/vcpkg
         git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
         $HOME/vcpkg/bootstrap-vcpkg.sh
         echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+        echo "VCPKG_DEFAULT_BINARY_CACHE=$HOME/.cache/vcpkg" >> $GITHUB_ENV
     
     - name: Install GCC 13 (Linux)
       if: runner.os == 'Linux'
@@ -65,12 +85,15 @@ jobs:
     
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
+      shell: cmd
       run: |
-        cmake -S . -B build `
-          -G "Visual Studio 17 2022" -A x64 `
-          -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg\scripts\buildsystems\vcpkg.cmake" `
-          -DVCPKG_TARGET_TRIPLET=x64-windows-static `
-          -DORION_BUILD_TESTS=ON `
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cmake -S . -B build ^
+          -G Ninja ^
+          -DCMAKE_BUILD_TYPE=Release ^
+          -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+          -DORION_BUILD_TESTS=ON ^
           -DORION_BUILD_APPS=ON
     
     - name: Build (Linux)
@@ -79,28 +102,124 @@ jobs:
     
     - name: Build (Windows)
       if: runner.os == 'Windows'
-      run: cmake --build build --config Release --parallel
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        cmake --build build --parallel
     
     - name: Run Unit Tests (Linux)
       if: runner.os == 'Linux'
       run: ./build/tst_orion --log_level=test_suite
       working-directory: ${{ github.workspace }}
+      env:
+        ORION_TCK_RUN_ALL: 1
     
     - name: Run Unit Tests (Windows)
       if: runner.os == 'Windows'
-      run: .\build\Release\tst_orion.exe --log_level=test_suite
+      run: .\build\tst_orion.exe --log_level=test_suite
       working-directory: ${{ github.workspace }}
+      env:
+        ORION_TCK_RUN_ALL: 1
     
-    - name: Run TCK Tests (Linux)
+    - name: Detect version and baseline (Linux)
       if: runner.os == 'Linux'
-      run: ./build/orion_tck_runner --log_level=error
+      id: baseline-linux
+      run: |
+        VERSION=$(grep "project(orion VERSION" CMakeLists.txt | sed -E 's/.*VERSION ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        if [ -f "dat/tck-baselines/$VERSION/tck_results.csv" ]; then
+          echo "baseline_exists=true" >> $GITHUB_OUTPUT
+          echo "baseline_path=dat/tck-baselines/$VERSION/tck_results.csv" >> $GITHUB_OUTPUT
+          echo "Found baseline for version $VERSION"
+        else
+          echo "baseline_exists=false" >> $GITHUB_OUTPUT
+          echo "No baseline found for version $VERSION"
+        fi
+    
+    - name: Detect version and baseline (Windows)
+      if: runner.os == 'Windows'
+      id: baseline-windows
+      run: |
+        $VERSION = (Select-String -Path CMakeLists.txt -Pattern "project\(orion VERSION ([0-9]+\.[0-9]+\.[0-9]+)" | ForEach-Object { $_.Matches.Groups[1].Value })
+        echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+        if (Test-Path "dat\tck-baselines\$VERSION\tck_results.csv") {
+          echo "baseline_exists=true" >> $env:GITHUB_OUTPUT
+          echo "baseline_path=dat\tck-baselines\$VERSION\tck_results.csv" >> $env:GITHUB_OUTPUT
+          Write-Host "Found baseline for version $VERSION"
+        } else {
+          echo "baseline_exists=false" >> $env:GITHUB_OUTPUT
+          Write-Host "No baseline found for version $VERSION"
+        }
+    
+    - name: Run TCK Tests with Regression Detection (Linux)
+      if: runner.os == 'Linux' && steps.baseline-linux.outputs.baseline_exists == 'true'
+      id: tck-regression-linux
+      shell: bash
+      run: |
+        set +e  # disable exit-on-error so we can capture the runner exit code
+        ./build/orion_tck_runner \
+          --baseline ${{ steps.baseline-linux.outputs.baseline_path }} \
+          --regression-check \
+          --level2-strict \
+          --output-csv dat/tck_results_current.csv \
+          --output-properties dat/tck_results.properties \
+          --log_level=error
+        EXIT_CODE=$?
+        if [ $EXIT_CODE -eq 2 ]; then
+          echo "::error::Regression detected!"
+          exit 1
+        elif [ $EXIT_CODE -eq 3 ]; then
+          echo "::error::Level 2 compliance failure!"
+          exit 1
+        elif [ $EXIT_CODE -eq 1 ]; then
+          echo "Expected test failures (normal)"
+          exit 0
+        fi
+      working-directory: ${{ github.workspace }}
+      timeout-minutes: 15
+    
+    - name: Run TCK Tests without Regression Detection (Linux)
+      if: runner.os == 'Linux' && steps.baseline-linux.outputs.baseline_exists != 'true'
+      run: |
+        ./build/orion_tck_runner \
+          --output-csv dat/tck_results_current.csv \
+          --output-properties dat/tck_results.properties \
+          --log_level=error
       working-directory: ${{ github.workspace }}
       timeout-minutes: 15
       continue-on-error: true
     
-    - name: Run TCK Tests (Windows)
-      if: runner.os == 'Windows'
-      run: .\build\Release\orion_tck_runner.exe --log_level=error
+    - name: Run TCK Tests with Regression Detection (Windows)
+      if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists == 'true'
+      id: tck-regression-windows
+      run: |
+        .\build\orion_tck_runner.exe `
+          --baseline ${{ steps.baseline-windows.outputs.baseline_path }} `
+          --regression-check `
+          --level2-strict `
+          --output-csv dat\tck_results_current.csv `
+          --output-properties dat\tck_results.properties `
+          --log_level=error
+        if ($LASTEXITCODE -eq 2) {
+          Write-Error "Regression detected!"
+          exit 1
+        } elseif ($LASTEXITCODE -eq 3) {
+          Write-Error "Level 2 compliance failure!"
+          exit 1
+        } elseif ($LASTEXITCODE -eq 1) {
+          Write-Host "Expected test failures (normal)"
+          exit 0
+        }
+      working-directory: ${{ github.workspace }}
+      timeout-minutes: 15
+    
+    - name: Run TCK Tests without Regression Detection (Windows)
+      if: runner.os == 'Windows' && steps.baseline-windows.outputs.baseline_exists != 'true'
+      run: |
+        .\build\orion_tck_runner.exe `
+          --output-csv dat\tck_results_current.csv `
+          --output-properties dat\tck_results.properties `
+          --log_level=error
       working-directory: ${{ github.workspace }}
       timeout-minutes: 15
       continue-on-error: true
@@ -113,6 +232,14 @@ jobs:
         path: |
           build/orion_app*
           build/orion_tck_runner*
-          build/Release/orion_app.exe
-          build/Release/orion_tck_runner.exe
         retention-days: 7
+    
+    - name: Upload TCK test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: tck-results-${{ matrix.os }}
+        path: |
+          dat/tck_results_current.csv
+          dat/tck_results.properties
+        retention-days: 30
