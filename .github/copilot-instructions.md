@@ -90,6 +90,11 @@ for (auto& request : requests) {
 - [Performance Tests](./instructions/run_perf_tests.md) - Benchmarking
 - [Adaptive CI Loop](./instructions/adaptive_ci_loop.md) - Intelligent testing for refactoring
 
+**Documentation:**
+- [Architecture Overview](../docs/architecture.md) - Components, data flow, repository structure
+- [Testing Guide](../docs/testing.md) - Build instructions, running unit tests and TCK
+- [AI Development Story](../docs/ai-dev-story.md) - AI-only development methodology and metrics
+
 **Development:**
 - [DMN Feature Template](./prompts/add_dmn_feature.md) - Implement new FEEL features
 - [Code Quality Template](./prompts/improve_quality.md) - Iterative quality improvements

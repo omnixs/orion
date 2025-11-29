@@ -32,6 +32,13 @@ CMakePresets.json text eol=lf
 # DMN TCK submodule - don't normalize (external test data)
 dat/dmn-tck/** -text
 
+# Mark DMN TCK test data as vendored (exclude from language stats)
+dat/dmn-tck/** linguist-vendored
+
+# Mark GitHub workflows and docs as documentation
+.github/** linguist-documentation
+docs/** linguist-documentation
+
 # Shell scripts
 *.sh text eol=lf
 *.bash text eol=lf
