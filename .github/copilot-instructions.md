@@ -42,6 +42,12 @@ Following the defined process correctly is MORE IMPORTANT than completing work q
    - Instructions in `./instructions/*.md` are authoritative for those workflows
    - Never assume - always verify against the instruction files
 
+7. **Two-Phase Task Workflow**
+   - Phase 1 (Create Task): User requests task creation → Agent creates task file → STOP
+   - Phase 2 (Execute Task): User says "execute" → Agent creates branch → implements → tests → retrospective
+   - NEVER auto-execute after creating task file
+   - See [Development Workflow](#development-workflow) for complete process
+
 ## Architecture Overview
 
 ### Core Components (`src/bre/`)
@@ -96,6 +102,97 @@ for (auto& request : requests) {
 - DMN 1.5 Spec: `docs/formal-24-01-01.txt` - Official OMG specification
 
 ## Development Workflow
+
+### Two-Phase Task Execution (MANDATORY)
+
+> ⚠️ **CRITICAL PROCESS GATE**: This is a TWO-PHASE workflow with a HARD STOP between phases.
+
+#### Phase 1: Task Creation & Refinement (Planning)
+
+**When the user requests "create a task file":**
+
+User should provide:
+- Goal/objective of the task
+- Which template to use (from `.github/prompts/`): `add_dmn_feature`, `improve_quality`, `improve_perf`, `fix_bug`
+- Any specific requirements or constraints
+
+**Agent steps:**
+
+1. **Ask clarifying questions ONLY if needed** to resolve ambiguities or gather missing details
+   
+   When asking questions, use multiple-choice format:
+   ```
+   Question: [What needs clarification?]
+   
+   A) [Option A] - Pros: [key benefits] | Cons: [key tradeoffs]
+   B) [Option B] - Pros: [key benefits] | Cons: [key tradeoffs]  
+   C) [Option C] - Pros: [key benefits] | Cons: [key tradeoffs]
+   
+   Recommendation: [Letter] because [brief reason]
+   ```
+   
+   **User can respond:**
+   - Choose an option: "A", "B", or "C"
+   - Modify: "A, but [modification]"
+   - Combine: "A and B"
+   - Reject all: "None of the above, instead [alternative]"
+
+2. **Create task file** in `.github/tasks/<ISSUE_NUMBER>_<snake_case_title>.md`
+   - Use appropriate template from `.github/prompts/`
+   - Fill in all required YAML frontmatter fields
+   - Ensure success criteria are measurable
+
+3. **Wait for user refinement** 
+   - User may review and approve as-is
+   - User may edit task file directly
+   - User may ask you to refine specific sections
+
+4. ⚠️ **STOP - DO NOT PROCEED TO IMPLEMENTATION** ⚠️
+
+**DO NOT in Phase 1:**
+- ❌ Create feature branch (Phase 2 only)
+- ❌ Start implementation (Phase 2 only)
+- ❌ Make code changes (Phase 2 only)
+- ❌ Run build or tests (Phase 2 only)
+
+#### Phase 2: Task Execution (Implementation)
+
+**Trigger:** User explicitly says "execute" (or "implement", "run task", etc.)
+
+**Mandatory steps in order:**
+
+1. ✅ **Create feature branch** (NEVER work on main)
+   ```bash
+   git checkout -b feature/<task-name>
+   ```
+   
+2. ✅ **Implement changes** following task file instructions
+   - Follow applicable template from `.github/prompts/`
+   - Reference instruction files for build/test workflows
+   - Use evidence-based reasoning (read files before stating facts)
+
+3. ✅ **Verify with build + tests**
+   - Follow [Build Instructions](./instructions/build.md)
+   - Follow [Test Instructions](./instructions/run_unit_tests.md)
+   - No shortcuts - each step must pass
+
+4. ✅ **Fill retrospective** in task file (MANDATORY before completion)
+   - Step 1: ASK user "What worked? What was unclear?" 
+   - Step 2: After user feedback, analyze execution
+   - Document: what worked, what was problematic, blockers, actual effort
+   
+5. ✅ **Commit** with reference to task file in message
+   ```bash
+   git commit -m "feat: <description>
+   
+   Task: .github/tasks/<task-file>.md"
+   ```
+
+**Process Validation Checkpoints:**
+- ✅ Did user say "create task"? → Execute Phase 1 only, then STOP
+- ✅ Did user say "execute"? → Verify task file exists, then execute Phase 2
+- ✅ Is retrospective filled before marking complete? → Mandatory, ask user for feedback first
+- ✅ Was branch created before any code changes? → Mandatory, never work on main
 
 ### Task-Based Development
 
