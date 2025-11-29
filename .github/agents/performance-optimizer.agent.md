@@ -60,12 +60,12 @@ You analyze performance bottlenecks using profiling data and benchmarks, then ge
 ### Phase 1: Baseline Establishment
 
 1. **Verify Release build with debug symbols**
-   - Follow [build instructions](../instructions/build.md)
+   - Follow [Build Instructions](../instructions/build.md)
    - Build configuration: Release or RelWithDebInfo
    - Command: `cmake --build build --config Release`
 
 2. **Capture baseline benchmarks**
-   - Follow [performance test instructions](../instructions/run_perf_tests.md)
+   - Follow [Performance Test Instructions](../instructions/run_perf_tests.md)
    - Command: `.\build\Release\orion-bench.exe --benchmark_repetitions=20 --benchmark_out=baseline.json`
    - Minimum repetitions: 20 (for statistical significance)
    - Record: Mean, median, stddev, CV% for each benchmark
