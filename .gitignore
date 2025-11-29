@@ -10,6 +10,7 @@ docs/*
 !docs/examples/
 !docs/formal-24-01-01.txt
 !docs/formal-24-01-01.pdf
+!docs/orion.png
 docs/prompts/
 docs/replies/
 
