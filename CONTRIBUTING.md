@@ -131,6 +131,83 @@ CI automatically adapts based on baseline presence:
 # Continue on error until baseline established
 ```
 
+### Example: Adding a New FEEL Function
+
+This example demonstrates the AI-only workflow for implementing a new feature.
+
+**Scenario:** Implement `upper case()` FEEL function (DMN 1.5 Section 10.3.4.3)
+
+**Step 1: Create Task File**
+```bash
+# Copy template
+cp .github/prompts/add_dmn_feature.md .github/tasks/13_feel_upper_case.md
+
+# Fill in YAML frontmatter
+---
+template: add_dmn_feature.md
+agent: general
+status: not-started
+category: feature
+priority: medium
+estimated-effort: "4-6 hours"
+---
+```
+
+**Step 2: Define Requirements**
+- DMN spec section: 10.3.4.3 (String functions)
+- Syntax: `upper case(string)`
+- TCK tests: `0084-feel-upper-case` (if exists)
+- Expected: "hello" → "HELLO"
+
+**Step 3: Create Feature Branch**
+```bash
+git checkout -b feature/feel-upper-case
+```
+
+**Step 4: AI Implementation Prompt**
+```
+Implement `upper case()` FEEL built-in function according to DMN 1.5 Section 10.3.4.3:
+
+1. Add lexer token if needed (src/bre/feel/lexer.cpp)
+2. Update parser grammar (src/bre/feel/parser.cpp)
+3. Add evaluator logic (src/bre/feel/evaluator.cpp)
+4. Add unit tests (tst/bre/feel/test_evaluator_string.cpp)
+5. Verify TCK test 0084-feel-upper-case passes (if exists)
+
+Follow CODING_STANDARDS.md for naming and error handling.
+```
+
+**Step 5: Verification**
+```bash
+# Build and test
+cmake --build build --config Debug
+.\build\Debug\tst_orion.exe --run_test=*upper_case*
+
+# Run TCK
+.\build\Debug\orion_tck_runner.exe --test 0084
+
+# Check code quality
+clang-tidy src/bre/feel/evaluator.cpp -p build/
+```
+
+**Step 6: Fill Retrospective in Task File**
+Document what worked, what was unclear, and actual effort.
+
+**Step 7: Commit and PR**
+```bash
+git add .
+git commit -m "feat: Implement upper case() FEEL function
+
+Task: .github/tasks/13_feel_upper_case.md"
+git push origin feature/feel-upper-case
+```
+
+**Key Principles:**
+- ✅ AI generates code, humans review and own correctness
+- ✅ Task file documents process and requirements
+- ✅ TCK and unit tests validate implementation
+- ✅ Retrospective captures learnings for future tasks
+
 ## Release Process
 
 ORION uses an automated release workflow to ensure consistent, reproducible releases.

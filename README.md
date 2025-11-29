@@ -4,6 +4,9 @@
 [![Version](https://img.shields.io/github/v/release/omnixs/orion)](https://github.com/omnixs/orion/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![CI](https://github.com/omnixs/orion/actions/workflows/ci-full.yml/badge.svg)](https://github.com/omnixs/orion/actions/workflows/ci-full.yml)
+[![C++](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus)](https://en.cppreference.com/w/cpp/23)
+[![DMN](https://img.shields.io/badge/DMN-1.5-orange)](https://www.omg.org/spec/DMN/)
+[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/1.0.0/)
 
 <img src="docs/orion.png" align="right" width="180" alt="ORION Logo">
 
@@ -17,6 +20,14 @@ focusing on **decision tables** with an emphasis on performance, correctness, an
 - **Status:** Early stage (APIs may evolve)
 - **DMN Compliance:** Level 1 and Level 2 compatible
 - **Goals:** fast rule evaluation, clean table model, clear extensibility points
+
+## Why Orion?
+
+- **Native C++23** - No JVM dependency, designed for high-performance backend integration
+- **DMN Standards Focus** - Implements DMN 1.5 Level 2 with 100% TCK compliance (126/126 tests)
+- **Lightweight & Embeddable** - Static library suitable for embedding in larger systems
+- **Production-Quality Testing** - 3,814 automated tests (279 unit + 3,535 TCK)
+- **AI-Only Codebase** - Demonstrates rigorous AI-generated code with human oversight
 
 ## Download
 
@@ -44,6 +55,24 @@ Each release includes:
 - Pluggable logger interface (optional spdlog integration)
 - Deterministic tests and benchmarks
 - DMN TCK (Technology Compatibility Kit) test runner
+
+## Current Limitations
+
+**DMN Feature Coverage:**
+- ✅ Level 2: 100% (126/126 tests) - Decision tables with UNIQUE, FIRST, COLLECT hit policies
+- ⏳ Level 3: 13.7% (484/3,535 tests) - Partial FEEL expression support
+- ❌ Boxed expressions, decision services, and advanced DMN features not yet implemented
+
+**FEEL Language Support:**
+- ✅ Basic arithmetic, comparisons, boolean logic, string operations
+- ✅ Built-in functions: abs(), substring(), string length, matches()
+- ⏳ Limited date/time, list, and context operations
+- ❌ Advanced functions, quantified expressions (some, every)
+
+**API Stability:**
+- Version 1.0.1 released: Stable API with semantic versioning
+- Thread-safety: Single-threaded usage model (share-nothing across threads)
+- See [CHANGELOG.md](CHANGELOG.md) for version history
 
 ## Quick Start
 
@@ -127,6 +156,27 @@ int main() {
 ```
 
 See `docs/examples/consumer-project/` for a complete working example with build configuration.
+
+## Examples & Documentation
+
+- **[Architecture Overview](docs/architecture.md)** - Components, data flow, repository structure
+- **[Testing Guide](docs/testing.md)** - Build instructions, running unit tests and TCK
+- **[AI Development Story](docs/ai-dev-story.md)** - How this project was built using AI-only workflow
+- **[Consumer Project Example](docs/examples/consumer-project/)** - Integrate Orion into your CMake project
+- **[DMN Examples](dat/tst/)** - Sample DMN files for testing
+
+## Getting Help
+
+**Questions & Support:**
+- 🐛 **Bug Reports**: [Open an issue](https://github.com/omnixs/orion/issues/new) with reproduction steps
+- 💡 **Feature Requests**: [Open an issue](https://github.com/omnixs/orion/issues/new) describing use case
+- 📖 **Documentation**: See [docs/](docs/) for architecture, testing, and AI workflow guides
+- 💬 **Usage Questions**: [Open an issue](https://github.com/omnixs/orion/issues) with "question" label
+
+**Before Opening an Issue:**
+1. Check existing issues for duplicates
+2. Review [docs/testing.md](docs/testing.md) for test execution help
+3. Include DMN file, input JSON, and error messages for bug reports
 
 ## Contributing
 

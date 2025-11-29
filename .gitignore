@@ -11,6 +11,9 @@ docs/*
 !docs/formal-24-01-01.txt
 !docs/formal-24-01-01.pdf
 !docs/orion.png
+!docs/architecture.md
+!docs/testing.md
+!docs/ai-dev-story.md
 docs/prompts/
 docs/replies/
 
