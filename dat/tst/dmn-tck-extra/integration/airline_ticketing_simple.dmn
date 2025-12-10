@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" 
+             xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/" 
+             id="airline-ticketing"
+             name="AirlineTicketing">
+  
+  <!-- BaseFare Decision Table -->
+  <decision id="d_BaseFare" name="BaseFare">
+    <variable name="BaseFare" typeRef="number"/>
+    <decisionTable id="dt_BaseFare" hitPolicy="UNIQUE">
+      <input id="input1">
+        <inputExpression typeRef="string">
+          <text>PassengerType</text>
+        </inputExpression>
+      </input>
+      <input id="input2">
+        <inputExpression typeRef="string">
+          <text>Class</text>
+        </inputExpression>
+      </input>
+      <output id="output1" name="BaseFare" typeRef="number"/>
+      
+      <!-- Adult fares -->
+      <rule id="rule1">
+        <inputEntry><text>"Adult"</text></inputEntry>
+        <inputEntry><text>"Economy"</text></inputEntry>
+        <outputEntry><text>200</text></outputEntry>
+      </rule>
+      <rule id="rule2">
+        <inputEntry><text>"Adult"</text></inputEntry>
+        <inputEntry><text>"Business"</text></inputEntry>
+        <outputEntry><text>500</text></outputEntry>
+      </rule>
+      <rule id="rule3">
+        <inputEntry><text>"Adult"</text></inputEntry>
+        <inputEntry><text>"First"</text></inputEntry>
+        <outputEntry><text>1000</text></outputEntry>
+      </rule>
+      
+      <!-- Child fares -->
+      <rule id="rule4">
+        <inputEntry><text>"Child"</text></inputEntry>
+        <inputEntry><text>"Economy"</text></inputEntry>
+        <outputEntry><text>100</text></outputEntry>
+      </rule>
+      <rule id="rule5">
+        <inputEntry><text>"Child"</text></inputEntry>
+        <inputEntry><text>"Business"</text></inputEntry>
+        <outputEntry><text>250</text></inputEntry>
+      </rule>
+      <rule id="rule6">
+        <inputEntry><text>"Child"</text></inputEntry>
+        <inputEntry><text>"First"</text></inputEntry>
+        <outputEntry><text>500</text></outputEntry>
+      </rule>
+      
+      <!-- Senior fares -->
+      <rule id="rule7">
+        <inputEntry><text>"Senior"</text></inputEntry>
+        <inputEntry><text>"Economy"</text></inputEntry>
+        <outputEntry><text>160</text></outputEntry>
+      </rule>
+      <rule id="rule8">
+        <inputEntry><text>"Senior"</text></inputEntry>
+        <inputEntry><text>"Business"</text></inputEntry>
+        <outputEntry><text>400</text></outputEntry>
+      </rule>
+      <rule id="rule9">
+        <inputEntry><text>"Senior"</text></inputEntry>
+        <inputEntry><text>"First"</text></inputEntry>
+        <outputEntry><text>800</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  
+  <!-- BaggageFee Literal Decision -->
+  <decision id="d_BaggageFee" name="BaggageFee">
+    <variable name="BaggageFee" typeRef="number"/>
+    <literalExpression>
+      <text>if BaggageCount &lt;= 1 then 0 else if BaggageCount = 2 then 30 else 30 + (BaggageCount - 2) * 50</text>
+    </literalExpression>
+  </decision>
+  
+  <!-- TotalPrice Literal Decision (depends on BaseFare and BaggageFee) -->
+  <decision id="d_TotalPrice" name="TotalPrice">
+    <variable name="TotalPrice" typeRef="number"/>
+    <literalExpression>
+      <text>BaseFare + BaggageFee</text>
+    </literalExpression>
+  </decision>
+  
+</definitions>
