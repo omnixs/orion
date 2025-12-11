@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmn:definitions xmlns:dmn="http://www.omg.org/spec/DMN/20180521/MODEL/" xmlns="http://example.com/dmn" xmlns:feel="http://www.omg.org/spec/DMN/20180521/FEEL/" xmlns:kie="http://www.drools.org/kie/dmn/1.2" xmlns:dmndi="http://www.omg.org/spec/DMN/20180521/DMNDI/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" id="Definitions_1" name="Sample" typeLanguage="http://www.omg.org/spec/DMN/20180521/FEEL/" namespace="http://example.com/dmn">
+  <dmn:extensionElements/>
+  <dmn:inputData id="_16E58A42-C8B3-4F5E-9BE3-D3405688D721" name="BaggageCount">
+    <dmn:extensionElements/>
+    <dmn:variable id="_267112C5-F19D-4ACF-A9F6-AAC5939709A4" name="BaggageCount" typeRef="number"/>
+  </dmn:inputData>
+  <dmn:inputData id="_2D339A1C-6D47-4587-9DCF-720451665960" name="Class">
+    <dmn:extensionElements/>
+    <dmn:variable id="_1A65EE42-56F0-49D2-9CD7-E0D6BE61D3E7" name="Class" typeRef="string"/>
+  </dmn:inputData>
+  <dmn:inputData id="_96243C74-8F0F-42D0-B569-71B3FC82B442" name="PassengerType">
+    <dmn:extensionElements/>
+    <dmn:variable id="_7345396E-F24D-404C-916F-AA7DD9E0AC1A" name="PassengerType" typeRef="string"/>
+  </dmn:inputData>
+  <dmn:decision id="_2B5D2D9B-E249-471E-AD02-674BA541B6DD" name="BaseFare">
+    <dmn:extensionElements/>
+    <dmn:variable id="_86DB72B4-FF42-49A8-B6C0-F9EDE697D775" name="BaseFare" typeRef="number"/>
+    <dmn:informationRequirement id="_82F71A44-F4CB-4F24-8255-4CF68F944252">
+      <dmn:requiredInput href="#_96243C74-8F0F-42D0-B569-71B3FC82B442"/>
+    </dmn:informationRequirement>
+    <dmn:informationRequirement id="_0704C6CA-B556-4838-872A-C8402F108428">
+      <dmn:requiredInput href="#_2D339A1C-6D47-4587-9DCF-720451665960"/>
+    </dmn:informationRequirement>
+    <dmn:decisionTable id="_68B110E7-1DE4-4D27-8E96-87930E7F4D96" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row">
+      <dmn:input id="_B7BAD2FD-1586-4173-992F-E86174A4C75F">
+        <dmn:inputExpression id="_77A3EEC4-6E47-4C1F-B42E-999FE6D22480" typeRef="string">
+          <dmn:text>PassengerType</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="_BA4CCE17-3645-4DDB-AA1B-2DFA9E35E563">
+        <dmn:inputExpression id="_628746F7-6322-4BDC-A396-F55EC33B7303" typeRef="string">
+          <dmn:text>Class</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:output id="_634FFD40-A7A4-4D95-892B-C4A5256A8E22"/>
+      <dmn:annotation name="annotation-1"/>
+      <dmn:rule id="_6C1DADF9-C7C2-4BC5-B09A-FCA148156CB1">
+        <dmn:inputEntry id="_A799CC5E-88BE-4296-9981-87CCEEDECA6E">
+          <dmn:text>"Adult"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_DA12B592-A2D9-4805-AA2E-7BCF2CAE3C25">
+          <dmn:text>"Economy"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_E46A78A0-7ABF-440A-9466-96814971EAD7">
+          <dmn:text>200</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_2910A553-A672-4B15-B4CE-804584A16C65">
+        <dmn:inputEntry id="_B0CE09BC-E93B-4557-BE0D-DE1CE876F376">
+          <dmn:text>"Adult"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_F1F885BC-67D0-46FB-9F71-C43338EE6C80">
+          <dmn:text>"Business"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_E8FEBA42-AD18-46B4-B27B-0F31D591B03C">
+          <dmn:text>500</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_58D8D5F2-1C80-43FB-9976-55843436FB96">
+        <dmn:inputEntry id="_048ADF4C-FDCE-40DA-BDE1-8684A4935464">
+          <dmn:text>"Adult"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_CD17A815-9500-450F-8392-9D5FD657F641">
+          <dmn:text>"First"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_10FE0143-1069-40CE-9613-E31C678D3BE3">
+          <dmn:text>1000</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_A9BE6DC6-1A10-4237-8119-2EFCA094817E">
+        <dmn:inputEntry id="_8106BDD2-9383-4C12-AE40-7CBCFC83920D">
+          <dmn:text>"Child"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_FAB04534-A8EB-41DC-910B-516ADD69BAB7">
+          <dmn:text>"Economy"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_326FA8D5-5477-4369-B2EA-3915F73D9F81">
+          <dmn:text>100</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_F6FA4B93-CC86-4EED-A0C5-828E1F5438C3">
+        <dmn:inputEntry id="_99BC88D1-FC16-4663-A9BE-57877183538F">
+          <dmn:text>"Child"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_3B869B66-ACF8-4DDA-AA78-75A66F8DD4AC">
+          <dmn:text>"Business"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_36330F03-0EF5-4080-BB6B-230DFF2C881F">
+          <dmn:text>250</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_DC973A79-C8BA-4A58-A8A5-8512732B35CD">
+        <dmn:inputEntry id="_A9391523-BA96-4D27-9849-DBCC9A252FE2">
+          <dmn:text>"Child"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_48378CA0-E4FD-4D02-8899-54D7B03CF081">
+          <dmn:text>"First"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_E33186A2-7558-471C-BC7E-941CB23D7B06">
+          <dmn:text>500</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_3B32CBFB-E191-4CA7-8FE5-0AEC558B1783">
+        <dmn:inputEntry id="_3784BD74-36A0-4ADF-B6F4-FEAA8562029C">
+          <dmn:text>"Senior"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_7160686E-55B2-44DD-8D50-847CF7629A90">
+          <dmn:text>"Economy"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_3A114D75-23A3-40E2-9DB1-CAE4B9AD4BF8">
+          <dmn:text>160</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_FFC5CC5F-6F5D-4B3F-9396-ED92B7CA12FB">
+        <dmn:inputEntry id="_7121F42A-D5C8-46FA-8E34-36717B0A095C">
+          <dmn:text>"Senior"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_70C8544C-FA37-4D43-A3ED-68F825D23620">
+          <dmn:text>"Business"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_99294E3E-BC25-4A2F-8B17-683F51C47271">
+          <dmn:text>400</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+      <dmn:rule id="_3F90C413-D92F-4476-A242-4F95E65F2FB3">
+        <dmn:inputEntry id="_342D53FF-39A9-49CE-9933-E6DAA1A07EE3">
+          <dmn:text>"Senior"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_857E62C1-5DDE-4C7E-B5D0-53774C6A717E">
+          <dmn:text>"First"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_00CDAC7C-2A19-4BC2-9908-B16336497991">
+          <dmn:text>800</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+    </dmn:decisionTable>
+  </dmn:decision>
+  <dmn:decision id="_F671F952-7E2B-44AC-B32E-F2090196C678" name="BaggageFee">
+    <dmn:extensionElements/>
+    <dmn:variable id="_13D4BDAF-2429-4F23-AC4D-B8E2101DAF35" name="BaggageFee" typeRef="number"/>
+    <dmn:informationRequirement id="_375A651A-EE58-4FBF-A4D9-FCB60144244A">
+      <dmn:requiredInput href="#_16E58A42-C8B3-4F5E-9BE3-D3405688D721"/>
+    </dmn:informationRequirement>
+    <dmn:literalExpression id="_89A03372-788E-4724-A8B8-18AAC66D9D4C">
+      <dmn:text>if BaggageCount &lt;= 1 then 0
+else if BaggageCount = 2 then 30
+else 30 + (BaggageCount - 2) * 50</dmn:text>
+    </dmn:literalExpression>
+  </dmn:decision>
+  <dmn:decision id="_5705CC9C-1B11-4B27-97D6-271F928FBAF1" name="TotalPrice">
+    <dmn:extensionElements/>
+    <dmn:variable id="_77003991-E760-4C6F-B2D3-7C89588439B4" name="TotalPrice" typeRef="number"/>
+    <dmn:informationRequirement id="_3AF878C2-DE9C-4F62-A697-32BD330CE379">
+      <dmn:requiredDecision href="#_2B5D2D9B-E249-471E-AD02-674BA541B6DD"/>
+    </dmn:informationRequirement>
+    <dmn:informationRequirement id="_A11E8977-E5D0-4675-A28D-03B9EEDB51AA">
+      <dmn:requiredDecision href="#_F671F952-7E2B-44AC-B32E-F2090196C678"/>
+    </dmn:informationRequirement>
+    <dmn:literalExpression id="_33F109EC-C331-4773-82FD-4D471D189119">
+      <dmn:text>BaseFare + BaggageFee</dmn:text>
+    </dmn:literalExpression>
+  </dmn:decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="_3D6A2817-EFA6-4361-8693-3C999C2F082A" name="DRG">
+      <di:extension>
+        <kie:ComponentsWidthsExtension>
+          <kie:ComponentWidths dmnElementRef="_68B110E7-1DE4-4D27-8E96-87930E7F4D96">
+            <kie:width>50</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>224</kie:width>
+            <kie:width>339</kie:width>
+          </kie:ComponentWidths>
+          <kie:ComponentWidths dmnElementRef="_89A03372-788E-4724-A8B8-18AAC66D9D4C">
+            <kie:width>300</kie:width>
+          </kie:ComponentWidths>
+          <kie:ComponentWidths dmnElementRef="_33F109EC-C331-4773-82FD-4D471D189119">
+            <kie:width>300</kie:width>
+          </kie:ComponentWidths>
+        </kie:ComponentsWidthsExtension>
+      </di:extension>
+      <dmndi:DMNShape id="dmnshape-drg-_16E58A42-C8B3-4F5E-9BE3-D3405688D721" dmnElementRef="_16E58A42-C8B3-4F5E-9BE3-D3405688D721" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="450" y="321" width="100" height="50"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="dmnshape-drg-_2D339A1C-6D47-4587-9DCF-720451665960" dmnElementRef="_2D339A1C-6D47-4587-9DCF-720451665960" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="285" y="321" width="100" height="50"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="dmnshape-drg-_96243C74-8F0F-42D0-B569-71B3FC82B442" dmnElementRef="_96243C74-8F0F-42D0-B569-71B3FC82B442" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="162" y="321" width="100" height="50"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="dmnshape-drg-_2B5D2D9B-E249-471E-AD02-674BA541B6DD" dmnElementRef="_2B5D2D9B-E249-471E-AD02-674BA541B6DD" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="231" y="219" width="100" height="50"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="dmnshape-drg-_F671F952-7E2B-44AC-B32E-F2090196C678" dmnElementRef="_F671F952-7E2B-44AC-B32E-F2090196C678" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="450" y="219" width="100" height="50"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="dmnshape-drg-_5705CC9C-1B11-4B27-97D6-271F928FBAF1" dmnElementRef="_5705CC9C-1B11-4B27-97D6-271F928FBAF1" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="341" y="117" width="100" height="50"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="dmnedge-drg-_82F71A44-F4CB-4F24-8255-4CF68F944252-AUTO-TARGET" dmnElementRef="_82F71A44-F4CB-4F24-8255-4CF68F944252">
+        <di:waypoint x="212" y="346"/>
+        <di:waypoint x="281" y="269"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="dmnedge-drg-_0704C6CA-B556-4838-872A-C8402F108428-AUTO-TARGET" dmnElementRef="_0704C6CA-B556-4838-872A-C8402F108428">
+        <di:waypoint x="335" y="346"/>
+        <di:waypoint x="281" y="269"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="dmnedge-drg-_375A651A-EE58-4FBF-A4D9-FCB60144244A-AUTO-TARGET" dmnElementRef="_375A651A-EE58-4FBF-A4D9-FCB60144244A">
+        <di:waypoint x="500" y="346"/>
+        <di:waypoint x="500" y="269"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="dmnedge-drg-_3AF878C2-DE9C-4F62-A697-32BD330CE379-AUTO-TARGET" dmnElementRef="_3AF878C2-DE9C-4F62-A697-32BD330CE379">
+        <di:waypoint x="281" y="244"/>
+        <di:waypoint x="391" y="167"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="dmnedge-drg-_A11E8977-E5D0-4675-A28D-03B9EEDB51AA-AUTO-TARGET" dmnElementRef="_A11E8977-E5D0-4675-A28D-03B9EEDB51AA">
+        <di:waypoint x="500" y="244"/>
+        <di:waypoint x="391" y="167"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</dmn:definitions>
