@@ -697,6 +697,10 @@ namespace orion::bre
             {
                 return feel::evaluate_date_function(args);
             }
+            else if (funcName == "duration")
+            {
+                return feel::evaluate_duration_function(args);
+            }
             else
             {
                 std::ostringstream oss;

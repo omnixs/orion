@@ -417,5 +417,28 @@ namespace orion::bre::feel {
      */
     [[nodiscard]] json evaluate_date_function(const std::vector<json>& args);
 
+    /**
+     * @brief Creates a duration value from an ISO 8601 duration string
+     * @param args Vector containing exactly 1 string argument in ISO 8601 duration format
+     * @return Duration as ISO string, or null if parsing fails
+     * 
+     * DMN 1.5 Section 10.3.2.3: duration(from)
+     * Supported formats:
+     * - P[n]Y[n]M[n]DT[n]H[n]M[n]S - Full ISO 8601 duration
+     * - P[n]DT[n]H - Days and hours (primary task scope)
+     * - PT[n]H - Hours only
+     * - P[n]D - Days only
+     * 
+     * Examples:
+     * - duration("P5D") → 5 days
+     * - duration("PT10H") → 10 hours
+     * - duration("P2DT6H") → 2 days and 6 hours
+     * - duration(null) → null
+     * 
+     * Note: Uses existing parse_duration() which supports full ISO 8601 format.
+     * Returns the input string if valid (for string-based comparison in unary.cpp).
+     */
+    [[nodiscard]] json evaluate_duration_function(const std::vector<json>& args);
+
 } // namespace orion::bre
 

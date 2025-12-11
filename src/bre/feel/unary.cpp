@@ -20,6 +20,7 @@
 #include <orion/bre/feel/types.hpp>
 #include <regex>
 #include <charconv>
+#include <iostream>
 #include "common/util.hpp" // added for orion::common::trim, split
 
 namespace orion::bre::feel {
@@ -138,12 +139,14 @@ namespace orion::bre::feel {
     static std::optional<int> try_compare_durations(std::string_view lhs, std::string_view rhs)
     {
         auto duration_lhs = parse_duration(lhs);
-        if (!duration_lhs) { return std::nullopt;
-}
+        if (!duration_lhs) {
+            return std::nullopt;
+        }
         
         auto duration_rhs = parse_duration(rhs);
-        if (!duration_rhs) { return std::nullopt;
-}
+        if (!duration_rhs) {
+            return std::nullopt;
+        }
         
         if (duration_lhs->total_months != duration_rhs->total_months)
         {
@@ -159,42 +162,46 @@ namespace orion::bre::feel {
     // Main dispatcher: Try each type comparison in order
     static int cmp_values(std::string_view lhs, std::string_view rhs)
     {
+        // Unquote string literals for comparison
+        std::string lhs_unquoted = unquote(std::string(lhs));
+        std::string rhs_unquoted = unquote(std::string(rhs));
+        
         // Try numeric comparison
         double num_lhs = 0.0;
         double num_rhs = 0.0;
-        if (parse_number(lhs, num_lhs) && parse_number(rhs, num_rhs))
+        if (parse_number(lhs_unquoted, num_lhs) && parse_number(rhs_unquoted, num_rhs))
         {
             return compare_numbers(num_lhs, num_rhs);
         }
         
         // Try date comparison
-        if (auto result = try_compare_dates(lhs, rhs))
+        if (auto result = try_compare_dates(lhs_unquoted, rhs_unquoted))
         {
             return *result;
         }
         
         // Try time comparison
-        if (auto result = try_compare_times(lhs, rhs))
+        if (auto result = try_compare_times(lhs_unquoted, rhs_unquoted))
         {
             return *result;
         }
         
         // Try datetime comparison
-        if (auto result = try_compare_datetimes(lhs, rhs))
+        if (auto result = try_compare_datetimes(lhs_unquoted, rhs_unquoted))
         {
             return *result;
         }
         
         // Try duration comparison
-        if (auto result = try_compare_durations(lhs, rhs))
+        if (auto result = try_compare_durations(lhs_unquoted, rhs_unquoted))
         {
             return *result;
         }
         
-        // Fallback: String comparison
-        if (lhs < rhs) { return -1;
+        // Fallback: String comparison (use unquoted for consistent behavior)
+        if (lhs_unquoted < rhs_unquoted) { return -1;
 }
-        if (lhs > rhs) { return 1;
+        if (lhs_unquoted > rhs_unquoted) { return 1;
 }
         return 0;
     }

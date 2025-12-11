@@ -181,13 +181,22 @@ namespace orion::bre
         for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
         {
             InputClause ic{};
+            
+            // Get label from input element attribute
+            if (auto* label_attr = in->first_attribute("label")) {
+                ic.label = label_attr->value();
+            }
+            
+            // Parse input expression
             auto* ie = in->first_node("inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
+                // Get expression text from <text> element
                 auto* txt = ie->first_node("text");
-                if ((txt != nullptr) && (txt->value() != nullptr)) { ic.label = txt->value();
+                if ((txt != nullptr) && (txt->value() != nullptr)) { 
+                    ic.inputExpression = txt->value();
 }
             }
             dt.inputs.push_back(std::move(ic));
@@ -430,13 +439,22 @@ namespace orion::bre
         for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
         {
             InputClause ic{};
+            
+            // Get label from input element attribute
+            if (auto* label_attr = in->first_attribute("label")) {
+                ic.label = label_attr->value();
+            }
+            
+            // Parse input expression
             auto* ie = in->first_node("inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
+                // Get expression text from <text> element
                 auto* txt = ie->first_node("text");
-            if ((txt != nullptr) && (txt->value() != nullptr)) { ic.label = txt->value();
+                if ((txt != nullptr) && (txt->value() != nullptr)) { 
+                    ic.inputExpression = txt->value();
 }
         }
         decision_table.inputs.push_back(std::move(ic));

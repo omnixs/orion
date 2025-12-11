@@ -20,8 +20,11 @@
 #include <orion/api/logger.hpp>
 #include <orion/bre/business_knowledge_model.hpp>
 #include <orion/bre/bkm_manager.hpp>
+#include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/parser.hpp>
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
 using namespace std;
 using json = nlohmann::json;
@@ -99,7 +102,30 @@ namespace orion::bre
                 const auto& input = inputs[i];
                 const auto& entry = rule.inputEntries[i];
 
-                json input_value = detail::get_value_from_label(context, input.label);
+                // Evaluate input expression if present, otherwise use label lookup
+                json input_value;
+                if (!input.inputExpression.empty())
+                {
+                    // Input has an expression - evaluate it as FEEL
+                    try
+                    {
+                        feel::Lexer lexer;
+                        auto tokens = lexer.tokenize(input.inputExpression);
+                        feel::Parser parser;
+                        auto ast = parser.parse(tokens);
+                        input_value = ast->evaluate(context);
+                    }
+                    catch (...)
+                    {
+                        // Expression evaluation failed - use null
+                        input_value = nullptr;
+                    }
+                }
+                else
+                {
+                    // No expression - use label lookup (legacy behavior)
+                    input_value = detail::get_value_from_label(context, input.label);
+                }
 
                 // Phase 3: Use cached AST if available, otherwise fall back to unary_test_matches
                 bool entry_matches_result = false;
