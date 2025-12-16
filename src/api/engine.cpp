@@ -47,6 +47,7 @@ namespace orion
             std::map<std::string, std::unique_ptr<DecisionTable>> decision_tables_;
             BKMManager bkm_manager_; // Use BKMManager instead of raw map
             std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
+            std::string namespace_uri_; // Stored DMN namespace from definitions element
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
@@ -79,6 +80,9 @@ namespace orion
                 // Parse the entire DMN model to get all decisions
                 DmnParser parser;
                 auto model = parser.parse(dmn_xml);
+                
+                // Store namespace information from parsed model
+                pimpl->namespace_uri_ = model.namespace_uri;
                 
                 // Process all decisions in the model
                 for (auto& decision : model.decisions)
@@ -198,6 +202,12 @@ namespace orion
             pimpl->decision_tables_.clear();
             pimpl->bkm_manager_.clear();
             pimpl->literal_decisions_.clear();
+            pimpl->namespace_uri_.clear();
+        }
+
+        string BusinessRulesEngine::get_namespace() const
+        {
+            return pimpl->namespace_uri_;
         }
 
         vector<string> BusinessRulesEngine::validate_models() const

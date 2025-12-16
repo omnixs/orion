@@ -62,6 +62,9 @@ namespace orion::api
         // Clear all loaded models
         void clear();
 
+        // Get namespace URI from loaded DMN model
+        [[nodiscard]] std::string get_namespace() const;
+
         // Validation
         [[nodiscard]] std::vector<std::string> validate_models() const;
     };
