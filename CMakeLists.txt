@@ -265,6 +265,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/test_main.cpp
       tst/bre/test_hit_policy_debug.cpp
       tst/bre/test_airline_ticketing.cpp
+      tst/bre/test_namespace_support.cpp
       # TCK-specific tests
       tst/bre/tck/test_tck_runner.cpp
       tst/bre/tck/test_tck_0112_comparison.cpp
