@@ -82,6 +82,15 @@ Each release includes:
 - CMake 3.26 or later
 - vcpkg package manager
 
+**Dependencies** (automatically installed by vcpkg):
+- nlohmann-json - JSON library
+- PCRE2 - Perl-compatible regular expressions (for FEEL `matches()` function)
+- CTRE - Compile-time regular expressions (internal implementation)
+- spdlog - Logging framework
+- RapidXML - XML parsing
+- Boost.Test - Unit testing (dev only)
+- Google Benchmark - Performance testing (dev only)
+
 ### Setup vcpkg
 
 ```bash
