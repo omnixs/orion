@@ -21,6 +21,13 @@ BOOST_AUTO_TEST_CASE(test_matches_true_cases)
 {
     nlohmann::json context = nlohmann::json::object();
     
+    // XPath/DMN spec: partial (substring) matching is default behavior
+    // Per W3C XPath fn:matches: "returns true if input or SOME SUBSTRING matches"
+    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abcdef", "abc"))", context), true);  // substring at start
+    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abcdef", "cde"))", context), true);  // substring in middle
+    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abcdef", "def"))", context), true);  // substring at end
+    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("testing", "test"))", context), true); // substring match
+    
     // Simple patterns
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abc", "a.*"))", context), true);
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abc", ".*c"))", context), true);
@@ -53,13 +60,11 @@ BOOST_AUTO_TEST_CASE(test_matches_false_cases)
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abc", "x.*"))", context), false);
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("test", "^abc"))", context), false);
     
-    // Partial matches don't count (full-string match required)
-    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abcdef", "abc"))", context), false);
-    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("testing", "test"))", context), false);
-    
-    // Case sensitivity
-    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("ABC", "abc"))", context), false);
-    
+    // XPath/DMN spec: partial (substring) matching is default behavior
+    // Per W3C XPath: "returns true if input or SOME SUBSTRING matches"
+    // To require full-string match, pattern must use anchors: ^pattern$
+    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abcdef", "^abc$"))", context), false);
+    BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("testing", "^test$"))", context), false);
     // Character class mismatch
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("123", "[a-z]+"))", context), false);
 }

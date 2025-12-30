@@ -124,13 +124,14 @@ namespace orion::bre::feel {
             reinterpret_cast<PCRE2_SPTR>(input.data()),
             input.size(),
             0, // start offset
-            PCRE2_ANCHORED | PCRE2_ENDANCHORED, // Full-string match (not partial)
+            0, // XPath/DMN spec: partial match (substring search) - see W3C XPath fn:matches
             match_data_,
             nullptr // use default match context
         );
 
         // rc >= 0 means match found (rc is number of capturing groups + 1)
-        // DMN matches() requires full-string matching, not partial
+        // Per XPath spec: "returns true if input or SOME SUBSTRING matches"
+        // DMN 1.5 Section 10.3.4.3 delegates to XQuery/XPath semantics
         return rc >= 0;
     }
 
