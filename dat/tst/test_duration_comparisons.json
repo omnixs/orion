@@ -1,0 +1,85 @@
+{
+  "test_cases": [
+    {
+      "name": "Too short - P3D",
+      "input": {
+        "WaitTime": "P3D"
+      },
+      "expected_output": {
+        "Eligibility": "Too Short"
+      }
+    },
+    {
+      "name": "Boundary - exactly P5D (eligible)",
+      "input": {
+        "WaitTime": "P5D"
+      },
+      "expected_output": {
+        "Eligibility": "Eligible"
+      }
+    },
+    {
+      "name": "Boundary - PT120H equals P5D (eligible)",
+      "input": {
+        "WaitTime": "PT120H"
+      },
+      "expected_output": {
+        "Eligibility": "Eligible"
+      }
+    },
+    {
+      "name": "Middle - P7D (eligible)",
+      "input": {
+        "WaitTime": "P7D"
+      },
+      "expected_output": {
+        "Eligibility": "Eligible"
+      }
+    },
+    {
+      "name": "Boundary - exactly P10D (eligible)",
+      "input": {
+        "WaitTime": "P10D"
+      },
+      "expected_output": {
+        "Eligibility": "Eligible"
+      }
+    },
+    {
+      "name": "Boundary - PT240H equals P10D (eligible)",
+      "input": {
+        "WaitTime": "PT240H"
+      },
+      "expected_output": {
+        "Eligibility": "Eligible"
+      }
+    },
+    {
+      "name": "Too long - P15D",
+      "input": {
+        "WaitTime": "P15D"
+      },
+      "expected_output": {
+        "Eligibility": "Too Long"
+      }
+    },
+    {
+      "name": "Combined format - P2DT12H (eligible)",
+      "input": {
+        "WaitTime": "P2DT12H"
+      },
+      "expected_output": {
+        "Eligibility": "Too Short"
+      }
+    },
+    {
+      "name": "Zero duration - P0D (too short)",
+      "input": {
+        "WaitTime": "P0D"
+      },
+      "expected_output": {
+        "Eligibility": "Too Short"
+      }
+    }
+  ]
+}

@@ -272,6 +272,8 @@ if(ORION_BUILD_TESTS)
       tst/bre/tck/test_tck_0112_collection.cpp
       tst/bre/tck/test_tck_0112_rule_order.cpp
       tst/bre/tck/test_tck_0118_priority.cpp
+      # Duration comparison DMN test
+      tst/bre/test_duration_comparisons.cpp
       # FEEL unit tests
       tst/bre/feel/test_lexer.cpp
       tst/bre/feel/test_lexer_decimal_numbers.cpp
@@ -288,6 +290,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_evaluator_null_arithmetic.cpp
       tst/bre/feel/test_evaluator_property_access.cpp
       tst/bre/feel/test_evaluator_builtin_math.cpp
+      tst/bre/feel/test_evaluator_duration.cpp
       tst/bre/feel/test_feel_segfault_debug.cpp
       tst/bre/feel/test_function_registry.cpp
       tst/bre/feel/test_named_parameters.cpp

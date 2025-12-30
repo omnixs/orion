@@ -43,10 +43,9 @@ Following the defined process correctly is MORE IMPORTANT than completing work q
    - Never assume - always verify against the instruction files
 
 7. **Two-Phase Task Workflow**
-   - Phase 1 (Create Task): User requests task creation → Agent creates task file → STOP
+   - Phase 1 (Create Task): User requests task creation → Agent creates task file based on task_template.md → STOP
    - Phase 2 (Execute Task): User says "execute" → Agent creates branch → implements → tests → retrospective
    - NEVER auto-execute after creating task file
-   - See [Development Workflow](#development-workflow) for complete process
 
 ## Architecture Overview
 

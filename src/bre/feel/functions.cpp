@@ -17,11 +17,13 @@
  */
 
 #include <orion/bre/feel/functions.hpp>
+#include <orion/bre/feel/types.hpp>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <algorithm>
 #include <format>
+#include <iostream>
 
 namespace orion::bre::feel {
 
@@ -1306,6 +1308,51 @@ json evaluate_date_function(const std::vector<json>& args)
         
         // Format as ISO 8601 string: YYYY-MM-DD
         return std::format("{:04d}-{:02d}-{:02d}", year_num, month_num, day_num);
+    }
+
+    // Invalid argument count
+    return nullptr;
+}
+
+json evaluate_duration_function(const std::vector<json>& args)
+{
+    // duration() can be called with:
+    // 1. One string argument: duration("P5DT10H")
+    
+    if (args.size() == 1)
+    {
+        // Parse from ISO 8601 duration string
+        const auto& duration_str = args[0];
+        
+        // DMN null propagation
+        if (duration_str.is_null())
+        {
+            return nullptr;
+        }
+        
+        // Type validation
+        if (!duration_str.is_string())
+        {
+            return nullptr;
+        }
+        
+        std::string duration_string = duration_str.get<std::string>();
+        
+        // Validate using parse_duration() from types.cpp
+        // This supports full ISO 8601: P[n]Y[n]M[n]DT[n]H[n]M[n]S
+        auto parsed = parse_duration(duration_string);
+        if (!parsed)
+        {
+            // Invalid duration format
+            return nullptr;
+        }
+        
+        // Return the validated duration string
+        // Note: We return the string (not a Duration object) because:
+        // 1. Duration comparisons in unary.cpp work with string_view
+        // 2. Consistent with date() which returns ISO string
+        // 3. Keeps JSON representation simple
+        return duration_string;
     }
 
     // Invalid argument count

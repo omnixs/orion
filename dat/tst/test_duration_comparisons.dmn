@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/"
+             id="duration_comparison_test"
+             name="Duration Comparison Test"
+             namespace="http://orion.bre/dmn/tests">
+    
+    <decision id="eligibility_decision" name="Eligibility Decision">
+        <variable name="Eligibility" typeRef="string"/>
+        <informationRequirement>
+            <requiredInput href="#wait_time_input"/>
+        </informationRequirement>
+        <decisionTable id="eligibility_table" hitPolicy="FIRST">
+            <input id="input_wait_time" label="Wait Time">
+                <inputExpression typeRef="string">
+                    <text>duration(WaitTime)</text>
+                </inputExpression>
+            </input>
+            <output id="output_eligibility" label="Eligibility" typeRef="string"/>
+            
+            <!-- Rule 1: Less than 5 days -->
+            <rule id="rule_too_short">
+                <inputEntry>
+                    <text>&lt; "P5D"</text>
+                </inputEntry>
+                <outputEntry>
+                    <text>"Too Short"</text>
+                </outputEntry>
+            </rule>
+            
+            <!-- Rule 2: Between 5 and 10 days (inclusive) -->
+            <rule id="rule_eligible">
+                <inputEntry>
+                    <text>["P5D".."P10D"]</text>
+                </inputEntry>
+                <outputEntry>
+                    <text>"Eligible"</text>
+                </outputEntry>
+            </rule>
+            
+            <!-- Rule 3: Greater than 10 days -->
+            <rule id="rule_too_long">
+                <inputEntry>
+                    <text>&gt; "P10D"</text>
+                </inputEntry>
+                <outputEntry>
+                    <text>"Too Long"</text>
+                </outputEntry>
+            </rule>
+            
+            <!-- Rule 4: Catchall -->
+            <rule id="rule_default">
+                <inputEntry>
+                    <text>-</text>
+                </inputEntry>
+                <outputEntry>
+                    <text>"Unknown"</text>
+                </outputEntry>
+            </rule>
+        </decisionTable>
+    </decision>
+    
+    <inputData id="wait_time_input" name="WaitTime">
+        <variable name="WaitTime" typeRef="string"/>
+    </inputData>
+</definitions>
