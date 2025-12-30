@@ -264,6 +264,8 @@ if(ORION_BUILD_TESTS)
   add_executable(tst_orion
       tst/bre/test_main.cpp
       tst/bre/test_hit_policy_debug.cpp
+      tst/bre/test_airline_ticketing.cpp
+      tst/bre/test_namespace_support.cpp
       # TCK-specific tests
       tst/bre/tck/test_tck_runner.cpp
       tst/bre/tck/test_tck_0112_comparison.cpp
@@ -311,6 +313,7 @@ if(ORION_BUILD_TESTS)
   source_group(TREE ${CMAKE_SOURCE_DIR} FILES
     tst/bre/test_main.cpp
     tst/bre/test_hit_policy_debug.cpp
+    tst/bre/test_airline_ticketing.cpp
     # TCK-specific tests
     tst/bre/tck/test_tck_runner.cpp
     tst/bre/tck/test_tck_0112_comparison.cpp

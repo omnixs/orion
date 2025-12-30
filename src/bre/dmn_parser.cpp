@@ -398,6 +398,13 @@ namespace orion::bre
 }
 
         DmnModel model;
+        
+        // Extract namespace from definitions element (DMN 1.5 specification)
+        if (auto* namespace_attr = root->first_attribute("namespace"))
+        {
+            model.namespace_uri = std::string(namespace_attr->value());
+        }
+        // If no namespace attribute, namespace_uri remains empty (default behavior)
 
         // Parse all decisions in the model
         for (auto* decision_node = root->first_node("decision"); decision_node != nullptr; decision_node = decision_node->

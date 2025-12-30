@@ -40,6 +40,7 @@ namespace orion::bre
     // DMN Model structure (needs to be defined)
     struct DmnModel
     {
+        std::string namespace_uri;  // DMN 1.5 namespace from definitions element
         std::vector<Decision> decisions;
     };
 
