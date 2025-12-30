@@ -1080,6 +1080,11 @@ json evaluate_matches_function(const std::vector<json>& args)
     std::string input_val = input.get<std::string>();
     std::string pattern_val = pattern.get<std::string>();
 
+    // DMN spec: empty pattern matches only empty input
+    if (pattern_val.empty()) {
+        return input_val.empty();
+    }
+
     // Handle optional flags parameter
     std::string flags_val;
     if (args.size() == 3)

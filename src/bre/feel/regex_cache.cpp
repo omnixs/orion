@@ -124,13 +124,13 @@ namespace orion::bre::feel {
             reinterpret_cast<PCRE2_SPTR>(input.data()),
             input.size(),
             0, // start offset
-            0, // no options - partial match (equivalent to std::regex_search)
+            PCRE2_ANCHORED | PCRE2_ENDANCHORED, // Full-string match (not partial)
             match_data_,
             nullptr // use default match context
         );
 
         // rc >= 0 means match found (rc is number of capturing groups + 1)
-        // DMN matches() does partial matching, not full-string matching
+        // DMN matches() requires full-string matching, not partial
         return rc >= 0;
     }
 
