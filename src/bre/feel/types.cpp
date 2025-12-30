@@ -19,17 +19,24 @@
 #include <orion/bre/feel/types.hpp>
 #include <ctre.hpp>
 #include <climits>  // For INT_MAX
+#include <charconv> // For std::from_chars
 
 namespace orion::bre::feel {
+    // Helper to parse integer from string_view without allocation
+    inline int parse_int(std::string_view sv) {
+        int value = 0;
+        std::from_chars(sv.data(), sv.data() + sv.size(), value);
+        return value;
+    }
     std::optional<Date> parse_date(std::string_view str)
     {
         // CTRE compile-time regex for date pattern
         if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2}))">(str))
         {
             Date date;
-            date.y = std::stoi(match.get<1>().to_string());
-            date.m = std::stoi(match.get<2>().to_string());
-            date.d = std::stoi(match.get<3>().to_string());
+            date.y = parse_int(match.get<1>().to_view());
+            date.m = parse_int(match.get<2>().to_view());
+            date.d = parse_int(match.get<3>().to_view());
             return date;
         }
         return std::nullopt;
@@ -40,11 +47,11 @@ namespace orion::bre::feel {
         // CTRE compile-time regex for time patterns
         if (auto match = ctre::match<R"((\d{2}):(\d{2}):(\d{2}))">(str))
         {
-            return Time{std::stoi(match.get<1>().to_string()), std::stoi(match.get<2>().to_string()), std::stoi(match.get<3>().to_string())};
+            return Time{parse_int(match.get<1>().to_view()), parse_int(match.get<2>().to_view()), parse_int(match.get<3>().to_view())};
         }
         if (auto match = ctre::match<R"((\d{2}):(\d{2}))">(str))
         {
-            return Time{std::stoi(match.get<1>().to_string()), std::stoi(match.get<2>().to_string()), 0};
+            return Time{parse_int(match.get<1>().to_view()), parse_int(match.get<2>().to_view()), 0};
         }
         return std::nullopt;
     }
@@ -54,8 +61,8 @@ namespace orion::bre::feel {
         // CTRE compile-time regex for datetime pattern
         if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}))">(str))
         {
-            Date date{std::stoi(match.get<1>().to_string()), std::stoi(match.get<2>().to_string()), std::stoi(match.get<3>().to_string())};
-            Time time_val{std::stoi(match.get<4>().to_string()), std::stoi(match.get<5>().to_string()), std::stoi(match.get<6>().to_string())};
+            Date date{parse_int(match.get<1>().to_view()), parse_int(match.get<2>().to_view()), parse_int(match.get<3>().to_view())};
+            Time time_val{parse_int(match.get<4>().to_view()), parse_int(match.get<5>().to_view()), parse_int(match.get<6>().to_view())};
             return DateTime{date, time_val};
         }
         return std::nullopt;
