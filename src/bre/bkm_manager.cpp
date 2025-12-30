@@ -24,7 +24,7 @@
 #include <orion/bre/contract_violation.hpp>
 #include "../common/util.hpp"  // Reuse existing utility functions
 #include "feel/util_internal.hpp"
-#include <regex>     // For BKM function call parsing
+#include <ctre.hpp>
 #include <stdexcept>
 #include <algorithm>
 #include <set>       // For std::set
@@ -245,38 +245,40 @@ namespace orion::bre
     {
         // Pattern: PMT(Loan.amount, Loan.rate, Loan.term)+fee
         // First, check if this contains a BKM function call
-        std::regex bkm_call_regex(R"(\b([A-Za-z][A-Za-z0-9_]*)\s*\(\s*([^)]*)\s*\))");
-        std::smatch match;
-        string expr_str(expression);  // regex_search requires std::string
-
-    if (std::regex_search(expr_str, match, bkm_call_regex))
-    {
-        std::string func_name = match[1].str();
-        std::string args_str = match[2].str();
-        
-        debug("Found function call: {} with args: {}", func_name, args_str);
-
-        // Check if this is a built-in function - if so, fall back to FEEL evaluation
-        const auto& builtin_functions = get_builtin_functions();
-        if (builtin_functions.find(func_name) != builtin_functions.end())
+        // CTRE compile-time regex for BKM call pattern
+        if (auto match = ctre::search<R"(\b([A-Za-z][A-Za-z0-9_]*)\s*\(\s*([^)]*)\s*\))">(expression))
         {
-            debug("Using FEEL evaluator for builtin function: {}", func_name);
-            return feel::Evaluator::evaluate(expression, context);
-        }           // Process BKM call
+            std::string func_name = match.get<1>().to_string();
+            std::string args_str = match.get<2>().to_string();
+        
+            debug("Found function call: {} with args: {}", func_name, args_str);
+
+            // Check if this is a built-in function - if so, fall back to FEEL evaluation
+            const auto& builtin_functions = get_builtin_functions();
+            if (builtin_functions.find(func_name) != builtin_functions.end())
+            {
+                debug("Using FEEL evaluator for builtin function: {}", func_name);
+                return feel::Evaluator::evaluate(expression, context);
+            }
+            
+            // Process BKM call
             nlohmann::json bkm_result = process_bkm_call(func_name, args_str, context, available_bkms);
 
             // Check if there's additional arithmetic (e.g., +fee)
-            std::string full_match = match[0].str();
-            size_t match_end = expr_str.find(full_match) + full_match.length();
+            std::string_view full_match = match.get<0>().to_view();
+            size_t match_start = full_match.data() - expression.data();
+            size_t match_end = match_start + full_match.size();
 
-        if (match_end < expr_str.length())
-        {
-            std::string remainder = expr_str.substr(match_end);
-            debug("Processing arithmetic remainder: '{}'", remainder);
-            json final_result = handle_arithmetic_remainder(bkm_result, remainder, context);
-            debug("Final result after arithmetic: {}", final_result.dump());
-            return final_result;
-        }           return bkm_result;
+            if (match_end < expression.length())
+            {
+                std::string remainder(expression.substr(match_end));
+                debug("Processing arithmetic remainder: '{}'", remainder);
+                json final_result = handle_arithmetic_remainder(bkm_result, remainder, context);
+                debug("Final result after arithmetic: {}", final_result.dump());
+                return final_result;
+            }
+
+            return bkm_result;
         }
 
         // Use the full feel::Evaluator for logical and other complex expressions

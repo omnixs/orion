@@ -18,6 +18,7 @@
 
 #include <orion/bre/feel/expr.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 
 #include <nlohmann/json.hpp>
 #include <cctype>
@@ -27,7 +28,6 @@
 #include <memory>
 #include <cmath>
 #include <limits>
-#include <regex>
 #include <algorithm>
 #include <variant>
 #include "util_internal.hpp"
@@ -1064,19 +1064,21 @@ static Value eval_range(const ERange* r, const json& ctx)
         {
             if (args.size() == 2 && args[0].is_str() && args[1].is_str())
             {
-                try
-                {
-                    std::regex re(args[1].str(), std::regex::ECMAScript);
-                    bool m = std::regex_match(args[0].str(), re);
-                    return Value(m);
-                }
-                catch (const std::regex_error&) {
+                // Use PCRE2 via cache for runtime pattern compilation
+                // Pattern syntax is PCRE2 (documented behavior)
+                auto& cache = orion::bre::feel::get_regex_cache();
+                auto compiled = cache.get_or_compile(args[1].str());
+                
+                if (!compiled) {
                     // Invalid regex pattern - DMN spec says return null
                     return make_null();
                 }
+                
+                bool m = compiled->matches(args[0].str());
+                return Value(m);
+            }
+            return make_null();
         }
-        return make_null();
-    }
     
     if (func_name == "all")
     {

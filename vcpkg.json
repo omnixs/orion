@@ -6,7 +6,9 @@
     "rapidxml",
     "spdlog",
     "boost-test",
-    "benchmark"
+    "benchmark",
+    "ctre",
+    "pcre2"
   ],
   "features": {
     "spdlog": {

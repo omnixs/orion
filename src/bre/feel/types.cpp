@@ -17,55 +17,48 @@
  */
 
 #include <orion/bre/feel/types.hpp>
-#include <regex>
+#include <ctre.hpp>
 #include <climits>  // For INT_MAX
 
 namespace orion::bre::feel {
     std::optional<Date> parse_date(std::string_view str)
     {
-        static const std::regex regex_pattern(R"((\d{4})-(\d{2})-(\d{2}))");
-        std::smatch match;
-        std::string str_copy(str);  // regex requires std::string
-        if (!std::regex_match(str_copy, match, regex_pattern))
+        // CTRE compile-time regex for date pattern
+        if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2}))">(str))
         {
-            return std::nullopt;
+            Date date;
+            date.y = std::stoi(match.get<1>().to_string());
+            date.m = std::stoi(match.get<2>().to_string());
+            date.d = std::stoi(match.get<3>().to_string());
+            return date;
         }
-        Date date;
-        date.y = std::stoi(match[1]);
-        date.m = std::stoi(match[2]);
-        date.d = std::stoi(match[3]);
-        return date;
+        return std::nullopt;
     }
 
     std::optional<Time> parse_time(std::string_view str)
     {
-        static const std::regex regex_time_full(R"((\d{2}):(\d{2}):(\d{2}))");
-        static const std::regex regex_time_short(R"((\d{2}):(\d{2}))");
-        std::smatch match;
-        std::string str_copy(str);  // regex requires std::string
-        if (std::regex_match(str_copy, match, regex_time_full))
+        // CTRE compile-time regex for time patterns
+        if (auto match = ctre::match<R"((\d{2}):(\d{2}):(\d{2}))">(str))
         {
-            return Time{std::stoi(match[1]), std::stoi(match[2]), std::stoi(match[3])};
+            return Time{std::stoi(match.get<1>().to_string()), std::stoi(match.get<2>().to_string()), std::stoi(match.get<3>().to_string())};
         }
-        if (std::regex_match(str_copy, match, regex_time_short))
+        if (auto match = ctre::match<R"((\d{2}):(\d{2}))">(str))
         {
-            return Time{std::stoi(match[1]), std::stoi(match[2]), 0};
+            return Time{std::stoi(match.get<1>().to_string()), std::stoi(match.get<2>().to_string()), 0};
         }
         return std::nullopt;
     }
 
     std::optional<DateTime> parse_datetime(std::string_view str)
     {
-        static const std::regex regex_pattern(R"((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}))");
-        std::smatch match;
-        std::string str_copy(str);  // regex requires std::string
-        if (!std::regex_match(str_copy, match, regex_pattern))
+        // CTRE compile-time regex for datetime pattern
+        if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}))">(str))
         {
-            return std::nullopt;
+            Date date{std::stoi(match.get<1>().to_string()), std::stoi(match.get<2>().to_string()), std::stoi(match.get<3>().to_string())};
+            Time time_val{std::stoi(match.get<4>().to_string()), std::stoi(match.get<5>().to_string()), std::stoi(match.get<6>().to_string())};
+            return DateTime{date, time_val};
         }
-        Date date{std::stoi(match[1]), std::stoi(match[2]), std::stoi(match[3])};
-        Time time_val{std::stoi(match[4]), std::stoi(match[5]), std::stoi(match[6])};
-        return DateTime{date, time_val};
+        return std::nullopt;
     }
 
     std::optional<Duration> parse_duration(std::string_view str)
