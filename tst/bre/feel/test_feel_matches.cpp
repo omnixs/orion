@@ -172,7 +172,7 @@ BOOST_AUTO_TEST_CASE(test_concurrent_matches)
     // Clear cache
     get_regex_cache().clear();
     
-    auto match_func = [&context](int thread_id) {
+    auto match_func = [&context]([[maybe_unused]] int thread_id) {
         for (int i = 0; i < 100; ++i) {
             // Use a mix of patterns - just execute without logging to avoid output garbling
             auto r1 = Evaluator::evaluate(R"(matches("test", "t.*t"))", context);
