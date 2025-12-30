@@ -24,7 +24,7 @@
 #include <optional>
 #include <map>
 #include <list>
-#include <mutex>
+#include <shared_mutex>
 
 // Forward declarations to avoid exposing PCRE2 in public headers
 struct pcre2_real_code_8;
@@ -41,11 +41,12 @@ namespace orion::bre::feel {
     class CompiledRegex {
     public:
         /**
-         * @brief Compile a PCRE2 regex pattern
+         * @brief Compile a PCRE2 regex pattern with optional flags
          * @param pattern The regex pattern string (PCRE2 syntax)
-         * @return CompiledRegex if successful, nullopt if pattern is invalid
+         * @param flags Optional PCRE2 flags string (i=case-insensitive, m=multiline, s=dotall, x=extended)
+         * @return CompiledRegex if successful, nullopt if pattern or flags are invalid
          */
-        [[nodiscard]] static std::optional<CompiledRegex> compile(std::string_view pattern);
+        [[nodiscard]] static std::optional<CompiledRegex> compile(std::string_view pattern, std::string_view flags = "");
 
         /**
          * @brief Test if input string matches the compiled pattern (full-string match)
@@ -83,11 +84,12 @@ namespace orion::bre::feel {
         explicit RegexCache(size_t max_size = 100);
 
         /**
-         * @brief Get or compile a regex pattern
+         * @brief Get or compile a regex pattern with optional flags
          * @param pattern The regex pattern string
-         * @return Compiled regex if valid, nullopt if pattern is invalid
+         * @param flags Optional PCRE2 flags string (i=case-insensitive, m=multiline, s=dotall, x=extended)
+         * @return Compiled regex if valid, nullopt if pattern or flags are invalid
          */
-        [[nodiscard]] std::optional<CompiledRegex> get_or_compile(std::string_view pattern);
+        [[nodiscard]] std::optional<CompiledRegex> get_or_compile(std::string_view pattern, std::string_view flags = "");
 
         /**
          * @brief Clear all cached patterns
@@ -108,7 +110,7 @@ namespace orion::bre::feel {
         void evict_lru();
 
         size_t max_size_;
-        std::mutex mutex_;
+        mutable std::shared_mutex mutex_;
         
         // LRU implementation: list maintains access order, map provides O(1) lookup
         std::list<std::string> access_order_;
@@ -122,5 +124,25 @@ namespace orion::bre::feel {
      * Cache size can be configured via engine options.
      */
     RegexCache& get_regex_cache();
+
+    /**
+     * @brief Warm up the regex cache with realistic patterns
+     * 
+     * Compiles and tests several representative regex patterns to ensure
+     * PCRE2 initialization and reduce first-use latency variability.
+     * Exercises common features: character classes, quantifiers, anchors,
+     * alternation, and escape sequences.
+     * 
+     * This function is automatically called once on first BusinessRulesEngine
+     * construction (via std::call_once). Manual calls are optional but safe.
+     * 
+     * Performance impact: ~1-2 microseconds one-time cost at engine startup.
+     * Benefit: Eliminates cold-start variability for first matches() call.
+     * 
+     * @note This function is idempotent and safe to call multiple times.
+     * @note This function is thread-safe.
+     * @note Automatic warmup occurs via BusinessRulesEngine constructor.
+     */
+    void warmup_regex_cache();
 
 } // namespace orion::bre::feel

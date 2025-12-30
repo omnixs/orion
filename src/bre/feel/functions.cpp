@@ -17,6 +17,7 @@
  */
 
 #include <orion/bre/feel/functions.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -1064,7 +1065,7 @@ json evaluate_matches_function(const std::vector<json>& args)
     const auto& input = args[0];
     const auto& pattern = args[1];
 
-    // DMN null propagation
+    // DMN null propagation for input and pattern
     if (input.is_null() || pattern.is_null())
     {
         return nullptr;
@@ -1079,10 +1080,47 @@ json evaluate_matches_function(const std::vector<json>& args)
     std::string input_val = input.get<std::string>();
     std::string pattern_val = pattern.get<std::string>();
 
-    // For now, implement simple substring matching (not full regex)
-    // This is a simplified implementation - full regex would use std::regex
-    // TODO: Add full regex support with flags parameter
-    return input_val.find(pattern_val) != std::string::npos;
+    // Handle optional flags parameter
+    std::string flags_val;
+    if (args.size() == 3)
+    {
+        const auto& flags = args[2];
+        // DMN spec: null flags is treated as empty string (no flags)
+        if (!flags.is_null())
+        {
+            if (!flags.is_string())
+            {
+                return nullptr; // Invalid flags type
+            }
+            flags_val = flags.get<std::string>();
+        }
+    }
+
+    // FEEL strings use double-backslash for a literal backslash, but PCRE2 expects single
+    // Unescape FEEL string escape sequences: double-backslash becomes single-backslash
+    std::string unescaped_pattern;
+    unescaped_pattern.reserve(pattern_val.size());
+    for (size_t i = 0; i < pattern_val.size(); ++i) {
+        if (pattern_val[i] == '\\' && i + 1 < pattern_val.size() && pattern_val[i + 1] == '\\') {
+            unescaped_pattern += '\\';
+            ++i; // Skip next backslash
+        } else {
+            unescaped_pattern += pattern_val[i];
+        }
+    }
+
+    // Use PCRE2 via regex_cache for runtime pattern compilation
+    // Pattern syntax is PCRE2 (DMN 1.5 compliant)
+    auto& cache = orion::bre::feel::get_regex_cache();
+    auto compiled = cache.get_or_compile(unescaped_pattern, flags_val);
+    
+    if (!compiled) {
+        // Invalid regex pattern or invalid flags - DMN spec says return null
+        return nullptr;
+    }
+    
+    bool match_result = compiled->matches(input_val);
+    return match_result;
 }
 
 json evaluate_split_function(const std::vector<json>& args)

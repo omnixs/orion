@@ -20,6 +20,7 @@
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#include <mutex>
 
 namespace orion::bre::feel {
 
@@ -68,15 +69,29 @@ namespace orion::bre::feel {
         }
     }
 
-    std::optional<CompiledRegex> CompiledRegex::compile(std::string_view pattern)
+    std::optional<CompiledRegex> CompiledRegex::compile(std::string_view pattern, std::string_view flags)
     {
         int error_code = 0;
         PCRE2_SIZE error_offset = 0;
 
+        // Parse PCRE2 flags from DMN flags string
+        uint32_t pcre2_options = 0;
+        for (char flag : flags) {
+            switch (flag) {
+                case 'i': pcre2_options |= PCRE2_CASELESS; break;
+                case 'm': pcre2_options |= PCRE2_MULTILINE; break;
+                case 's': pcre2_options |= PCRE2_DOTALL; break;
+                case 'x': pcre2_options |= PCRE2_EXTENDED; break;
+                default:
+                    // Invalid flag - return null per DMN spec
+                    return std::nullopt;
+            }
+        }
+
         pcre2_code* code = pcre2_compile(
             reinterpret_cast<PCRE2_SPTR>(pattern.data()),
             pattern.size(),
-            0, // options
+            pcre2_options,
             &error_code,
             &error_offset,
             nullptr // use default compile context
@@ -109,20 +124,14 @@ namespace orion::bre::feel {
             reinterpret_cast<PCRE2_SPTR>(input.data()),
             input.size(),
             0, // start offset
-            PCRE2_ANCHORED, // full-string match (equivalent to std::regex_match)
+            0, // no options - partial match (equivalent to std::regex_search)
             match_data_,
             nullptr // use default match context
         );
 
-        // rc >= 0 means match found (rc is number of capturing groups)
-        // We also need to verify it matched the entire string
-        if (rc >= 0) {
-            PCRE2_SIZE* ovector = pcre2_get_ovector_pointer(match_data_);
-            // ovector[0] = start of match, ovector[1] = end of match
-            return ovector[0] == 0 && ovector[1] == input.size();
-        }
-
-        return false;
+        // rc >= 0 means match found (rc is number of capturing groups + 1)
+        // DMN matches() does partial matching, not full-string matching
+        return rc >= 0;
     }
 
     // RegexCache implementation
@@ -132,12 +141,16 @@ namespace orion::bre::feel {
     {
     }
 
-    std::optional<CompiledRegex> RegexCache::get_or_compile(std::string_view pattern)
+    std::optional<CompiledRegex> RegexCache::get_or_compile(std::string_view pattern, std::string_view flags)
     {
+        // Create cache key from pattern + flags (flags affect compilation)
         std::string pattern_key(pattern);
+        pattern_key += "\0"; // Null separator
+        pattern_key += flags;
         
         {
-            std::lock_guard<std::mutex> lock(mutex_);
+            // Use shared_lock for read-only cache lookup (allows concurrent reads)
+            std::shared_lock<std::shared_mutex> lock(mutex_);
             
             // Check if pattern is in cache
             auto it = cache_.find(pattern_key);
@@ -149,19 +162,20 @@ namespace orion::bre::feel {
                 // However, our CompiledRegex is move-only, so we need to recompile
                 // Alternative: make CompiledRegex copyable by sharing the pcre2_code via shared_ptr
                 // For now, return by recompiling (we can optimize this later if needed)
-                return CompiledRegex::compile(pattern);
+                return CompiledRegex::compile(pattern, flags);
             }
         }
         
         // Not in cache - compile it
-        auto compiled = CompiledRegex::compile(pattern);
+        auto compiled = CompiledRegex::compile(pattern, flags);
         if (!compiled) {
-            // Invalid pattern
+            // Invalid pattern or invalid flags
             return std::nullopt;
         }
         
         {
-            std::lock_guard<std::mutex> lock(mutex_);
+            // Use unique_lock for cache modification (exclusive access)
+            std::unique_lock<std::shared_mutex> lock(mutex_);
             
             // Evict if at capacity
             if (cache_.size() >= max_size_) {
@@ -170,7 +184,7 @@ namespace orion::bre::feel {
             
             // Add to cache
             access_order_.push_front(pattern_key);
-            cache_.emplace(pattern_key, std::make_pair(CompiledRegex::compile(pattern).value(), access_order_.begin()));
+            cache_.emplace(pattern_key, std::make_pair(CompiledRegex::compile(pattern, flags).value(), access_order_.begin()));
         }
         
         return compiled;
@@ -191,14 +205,14 @@ namespace orion::bre::feel {
 
     void RegexCache::clear()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::unique_lock<std::shared_mutex> lock(mutex_);
         cache_.clear();
         access_order_.clear();
     }
 
     size_t RegexCache::size() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::shared_lock<std::shared_mutex> lock(mutex_);
         return cache_.size();
     }
 
@@ -208,6 +222,49 @@ namespace orion::bre::feel {
         // Default size of 100, can be configured via engine options
         static RegexCache cache(100);
         return cache;
+    }
+
+    void warmup_regex_cache()
+    {
+        // Use std::call_once to ensure warmup happens exactly once, even with multiple callers
+        static std::once_flag warmup_flag;
+        std::call_once(warmup_flag, []() {
+            // Warm up PCRE2 with realistic patterns that exercise common features
+            // This reduces first-use latency and initializes PCRE2 internal structures
+            
+            // Pattern exercises:
+            // - Character classes: [0-9], [A-Za-z]
+            // - Quantifiers: {2,4}, +, *
+            // - Anchors: ^, $, \b
+            // - Alternation: |
+            // - Escape sequences: \d, \w, \s
+            const char* warmup_patterns[] = {
+                "[0-9]{2,4}",           // Digits with quantifier
+                "^[A-Za-z]+$",          // Letters with anchors
+                "\\d+\\.\\d+",            // Floating point numbers
+                "\\b\\w+\\b",            // Word boundaries
+                "(true|false|null)",   // Alternation with groups
+            };
+            
+            const char* warmup_inputs[] = {
+                "123",
+                "abc",
+                "3.14",
+                "word",
+                "true",
+            };
+            
+            // Compile and match each pattern to initialize PCRE2
+            for (size_t i = 0; i < 5; ++i) {
+                auto pattern = CompiledRegex::compile(warmup_patterns[i]);
+                if (pattern) {
+                    [[maybe_unused]] bool result = pattern->matches(warmup_inputs[i]);
+                }
+            }
+            
+            // Also add one pattern to the global cache
+            [[maybe_unused]] auto cached = get_regex_cache().get_or_compile("[0-9]+");
+        });
     }
 
 } // namespace orion::bre::feel

@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -60,7 +61,13 @@ namespace orion
         };
 
         // Constructor/Destructor
-        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>()) {}
+        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>())
+        {
+            // Warm up PCRE2 regex cache on first engine construction
+            // warmup_regex_cache() uses internal std::call_once for one-time execution
+            bre::feel::warmup_regex_cache();
+        }
+        
         BusinessRulesEngine::~BusinessRulesEngine() = default;
 
         // Move constructor and assignment
