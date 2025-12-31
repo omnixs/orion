@@ -106,6 +106,14 @@ namespace orion::bre::feel {
          */
         [[nodiscard]] size_t max_size() const { return max_size_; }
 
+        /**
+         * @brief Warm up cache with common regex patterns
+         * 
+         * Compiles representative patterns to initialize PCRE2 and reduce
+         * first-use latency variability. Safe to call multiple times.
+         */
+        void warmup();
+
     private:
         void evict_lru();
 
@@ -120,9 +128,13 @@ namespace orion::bre::feel {
     /**
      * @brief Get the global regex cache instance
      * 
+     * @deprecated Use engine-scoped cache instead for proper resource management
+     * 
      * Thread-safe singleton for caching dynamic FEEL matches() patterns.
-     * Cache size can be configured via engine options.
+     * This global cache is deprecated and will be removed in a future version.
+     * Use the per-engine cache passed through EvaluationContext instead.
      */
+    [[deprecated("Use engine-scoped cache via EvaluationContext")]]
     RegexCache& get_regex_cache();
 
     /**

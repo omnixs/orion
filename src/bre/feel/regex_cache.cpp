@@ -217,7 +217,7 @@ namespace orion::bre::feel {
         return cache_.size();
     }
 
-    // Global regex cache singleton
+    // Global regex cache singleton (deprecated - use engine-scoped cache instead)
     RegexCache& get_regex_cache()
     {
         // Default size of 100, can be configured via engine options
@@ -225,46 +225,53 @@ namespace orion::bre::feel {
         return cache;
     }
 
+    // Instance method for warming up regex cache
+    void RegexCache::warmup()
+    {
+        // Warm up PCRE2 with realistic patterns that exercise common features
+        // This reduces first-use latency and initializes PCRE2 internal structures
+        
+        // Pattern exercises:
+        // - Character classes: [0-9], [A-Za-z]
+        // - Quantifiers: {2,4}, +, *
+        // - Anchors: ^, $, \b
+        // - Alternation: |
+        // - Escape sequences: \d, \w, \s
+        const char* warmup_patterns[] = {
+            "[0-9]{2,4}",           // Digits with quantifier
+            "^[A-Za-z]+$",          // Letters with anchors
+            "\\d+\\.\\d+",            // Floating point numbers
+            "\\b\\w+\\b",            // Word boundaries
+            "(true|false|null)",   // Alternation with groups
+        };
+        
+        const char* warmup_inputs[] = {
+            "123",
+            "abc",
+            "3.14",
+            "word",
+            "true",
+        };
+        
+        // Compile and match each pattern to initialize PCRE2
+        for (size_t i = 0; i < 5; ++i) {
+            auto pattern = CompiledRegex::compile(warmup_patterns[i]);
+            if (pattern) {
+                [[maybe_unused]] bool result = pattern->matches(warmup_inputs[i]);
+            }
+        }
+        
+        // Also add one pattern to this cache instance
+        [[maybe_unused]] auto cached = get_or_compile("[0-9]+");
+    }
+
+    // Global warmup function (deprecated - use RegexCache::warmup() instead)
     void warmup_regex_cache()
     {
         // Use std::call_once to ensure warmup happens exactly once, even with multiple callers
         static std::once_flag warmup_flag;
         std::call_once(warmup_flag, []() {
-            // Warm up PCRE2 with realistic patterns that exercise common features
-            // This reduces first-use latency and initializes PCRE2 internal structures
-            
-            // Pattern exercises:
-            // - Character classes: [0-9], [A-Za-z]
-            // - Quantifiers: {2,4}, +, *
-            // - Anchors: ^, $, \b
-            // - Alternation: |
-            // - Escape sequences: \d, \w, \s
-            const char* warmup_patterns[] = {
-                "[0-9]{2,4}",           // Digits with quantifier
-                "^[A-Za-z]+$",          // Letters with anchors
-                "\\d+\\.\\d+",            // Floating point numbers
-                "\\b\\w+\\b",            // Word boundaries
-                "(true|false|null)",   // Alternation with groups
-            };
-            
-            const char* warmup_inputs[] = {
-                "123",
-                "abc",
-                "3.14",
-                "word",
-                "true",
-            };
-            
-            // Compile and match each pattern to initialize PCRE2
-            for (size_t i = 0; i < 5; ++i) {
-                auto pattern = CompiledRegex::compile(warmup_patterns[i]);
-                if (pattern) {
-                    [[maybe_unused]] bool result = pattern->matches(warmup_inputs[i]);
-                }
-            }
-            
-            // Also add one pattern to the global cache
-            [[maybe_unused]] auto cached = get_regex_cache().get_or_compile("[0-9]+");
+            get_regex_cache().warmup();
         });
     }
 

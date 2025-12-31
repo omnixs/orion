@@ -36,6 +36,9 @@
 
 namespace orion::bre::feel {
     using json = nlohmann::json;
+    
+    // Forward declaration
+    struct EvaluationContext;
 
     /**
      * @brief Boolean negation function
@@ -372,13 +375,14 @@ namespace orion::bre::feel {
     /**
      * @brief Test if string matches pattern
      * @param args Vector containing 2-3 arguments [input, pattern, flags?]
+     * @param eval_ctx Evaluation context with regex cache (optional, uses global if null)
      * @return true if input matches pattern, false otherwise
      * 
      * DMN 1.5 Section 10.3.4.3: String functions
      * - matches("foobar", "foo") → true
      * - matches("foobar", "baz") → false
      */
-    [[nodiscard]] json evaluate_matches_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_matches_function(const std::vector<json>& args, EvaluationContext* eval_ctx = nullptr);
 
     /**
      * @brief Split string into list by delimiter

@@ -526,7 +526,8 @@ namespace orion::bre
     }
 
     // Implementation of DecisionTable::evaluate
-    json DecisionTable::evaluate(const json& context) const
+    json DecisionTable::evaluate(const json& context,
+                                 orion::bre::feel::EvaluationContext* eval_ctx) const
     {
         // Step 1: Validate input values against allowed values
         validate_input_values(context);
@@ -609,7 +610,8 @@ namespace orion::bre
 
     // Implementation of LiteralDecision::evaluate
     json LiteralDecision::evaluate(const json& context,
-                                   const std::map<std::string, BusinessKnowledgeModel>& available_bkms) const
+                                   const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                   orion::bre::feel::EvaluationContext* eval_ctx) const
     {
         if (expression_text.empty())
         {
@@ -621,7 +623,7 @@ namespace orion::bre
         {
             try
             {
-                json ast_result = expression_ast->evaluate(context);
+                json ast_result = expression_ast->evaluate(context, eval_ctx);
                 debug("LiteralDecision AST result for '{}': {}", expression_text, ast_result.dump());
                 return ast_result;
             }

@@ -17,6 +17,7 @@
  */
 
 #include <orion/bre/feel/functions.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <cmath>
 #include <stdexcept>
@@ -1054,7 +1055,7 @@ json evaluate_replace_function(const std::vector<json>& args)
     return result;
 }
 
-json evaluate_matches_function(const std::vector<json>& args)
+json evaluate_matches_function(const std::vector<json>& args, EvaluationContext* eval_ctx)
 {
     // Validate argument count (2 or 3 - flags is optional)
     if (args.size() < 2 || args.size() > 3)
@@ -1114,10 +1115,9 @@ json evaluate_matches_function(const std::vector<json>& args)
         }
     }
 
-    // Use PCRE2 via regex_cache for runtime pattern compilation
-    // Pattern syntax is PCRE2 (DMN 1.5 compliant)
-    auto& cache = orion::bre::feel::get_regex_cache();
-    auto compiled = cache.get_or_compile(unescaped_pattern, flags_val);
+    // Use engine-scoped cache if available, otherwise fallback to global cache
+    RegexCache* cache_ptr = (eval_ctx && eval_ctx->regex_cache) ? eval_ctx->regex_cache : &get_regex_cache();
+    auto compiled = cache_ptr->get_or_compile(unescaped_pattern, flags_val);
     
     if (!compiled) {
         // Invalid regex pattern or invalid flags - DMN spec says return null

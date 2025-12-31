@@ -72,6 +72,10 @@
 #include "ast_node.hpp"
 #include "feel/unary.hpp"
 
+namespace orion::bre::feel {
+    struct EvaluationContext;  // Forward declaration
+}
+
 namespace orion::bre
 {
     /**
@@ -264,7 +268,9 @@ namespace orion::bre
         DecisionTable& operator=(const DecisionTable&) = delete;
 
         // Evaluate with given context
-        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& context) const;
+        [[nodiscard]] nlohmann::json evaluate(
+            const nlohmann::json& context,
+            orion::bre::feel::EvaluationContext* eval_ctx = nullptr) const;
 
     private:
         // Helper functions for evaluate() - refactored from 507-line function
@@ -315,8 +321,10 @@ namespace orion::bre
         std::unique_ptr<ASTNode> expression_ast;
 
         // Evaluate with context
-        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& context,
-                                const std::map<std::string, BusinessKnowledgeModel>& available_bkms) const;
+        [[nodiscard]] nlohmann::json evaluate(
+            const nlohmann::json& context,
+            const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+            orion::bre::feel::EvaluationContext* eval_ctx = nullptr) const;
     };
 
     /**
