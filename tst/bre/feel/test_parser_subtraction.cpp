@@ -21,6 +21,7 @@
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using namespace orion::bre;
@@ -169,8 +170,12 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_subtraction)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     json context = json::object();
-    auto result = ast->evaluate(context);
+    auto result = ast->evaluate(context, eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
@@ -178,8 +183,12 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_subtraction_with_spaces)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // 10 - 5 = 5
-    auto result = orion::bre::feel::Evaluator::evaluate("10 - 5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("10 - 5", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
@@ -187,8 +196,12 @@ BOOST_AUTO_TEST_CASE(test_eval_subtraction_with_spaces)
 
 BOOST_AUTO_TEST_CASE(test_eval_negative_addition)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // 10+-5 = 5
-    auto result = orion::bre::feel::Evaluator::evaluate("10+-5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("10+-5", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
@@ -196,8 +209,12 @@ BOOST_AUTO_TEST_CASE(test_eval_negative_addition)
 
 BOOST_AUTO_TEST_CASE(test_eval_negative_subtraction)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // -10+-5 = -15
-    auto result = orion::bre::feel::Evaluator::evaluate("-10+-5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("-10+-5", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -15.0);
@@ -205,8 +222,12 @@ BOOST_AUTO_TEST_CASE(test_eval_negative_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_double_negative_subtraction)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // -10--5 = -10 - (-5) = -10 + 5 = -5
-    auto result = orion::bre::feel::Evaluator::evaluate("-10--5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("-10--5", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -5.0);
@@ -214,8 +235,12 @@ BOOST_AUTO_TEST_CASE(test_eval_double_negative_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_parenthesized_negative)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // (-10)+(-5) = -15
-    auto result = orion::bre::feel::Evaluator::evaluate("(-10)+(-5)", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("(-10)+(-5)", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -15.0);
@@ -223,8 +248,12 @@ BOOST_AUTO_TEST_CASE(test_eval_parenthesized_negative)
 
 BOOST_AUTO_TEST_CASE(test_eval_parenthesized_subtraction)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // (-10)-(-5) = -10 - (-5) = -10 + 5 = -5
-    auto result = orion::bre::feel::Evaluator::evaluate("(-10)-(-5)", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("(-10)-(-5)", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -5.0);
@@ -232,8 +261,12 @@ BOOST_AUTO_TEST_CASE(test_eval_parenthesized_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_complex_expression)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // (10+20)-(-5+3) = 30 - (-2) = 30 + 2 = 32
-    auto result = orion::bre::feel::Evaluator::evaluate("(10+20)-(-5+3)", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("(10+20)-(-5+3)", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 32.0);
@@ -241,8 +274,12 @@ BOOST_AUTO_TEST_CASE(test_eval_complex_expression)
 
 BOOST_AUTO_TEST_CASE(test_eval_division_with_negative)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // 10+20/-5-3 = 10 + (20/(-5)) - 3 = 10 + (-4) - 3 = 10 - 4 - 3 = 3
-    auto result = orion::bre::feel::Evaluator::evaluate("10+20/-5-3", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("10+20/-5-3", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 3.0);
@@ -250,8 +287,12 @@ BOOST_AUTO_TEST_CASE(test_eval_division_with_negative)
 
 BOOST_AUTO_TEST_CASE(test_eval_chained_subtraction)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    
     // 100-20-10-5 = ((100-20)-10)-5 = 65
-    auto result = orion::bre::feel::Evaluator::evaluate("100-20-10-5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("100-20-10-5", json::object(), eval_ctx);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 65.0);

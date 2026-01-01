@@ -98,13 +98,15 @@ namespace orion::bre::feel {
      * params.push_back(std::move(p));
      * 
      * json context = {};
-     * std::vector<json> args = bind_parameters("abs", params, context);
+     * EvaluationContext eval_ctx{&regex_cache};
+     * std::vector<json> args = bind_parameters("abs", params, context, eval_ctx);
      * // args[0] = -42
      * ```
      */
     std::vector<json> bind_parameters(
         const std::string& functionName,
         const std::vector<FunctionParameter>& parameters,
-        const json& context
+        const json& context,
+        const EvaluationContext& eval_ctx
     );
 } // namespace orion::bre::feel

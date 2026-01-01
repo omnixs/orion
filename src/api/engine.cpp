@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -48,6 +49,7 @@ namespace orion
             BKMManager bkm_manager_; // Use BKMManager instead of raw map
             std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
             std::string namespace_uri_; // Stored DMN namespace from definitions element
+            bre::feel::RegexCache regex_cache_; // Instance-scoped regex cache
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
@@ -60,7 +62,12 @@ namespace orion
         };
 
         // Constructor/Destructor
-        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>()) {}
+        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>())
+        {
+            // Warm up instance regex cache
+            pimpl->regex_cache_.warmup();
+        }
+        
         BusinessRulesEngine::~BusinessRulesEngine() = default;
 
         // Move constructor and assignment
@@ -127,10 +134,14 @@ namespace orion
             json data = json::parse(data_json);
             json results = json::object();
 
+            // Create evaluation context with engine's regex cache
+            bre::feel::EvaluationContext eval_ctx;
+            eval_ctx.regex_cache = &pimpl->regex_cache_;
+
             // Evaluate all decision tables
             for (const auto& [name, dt] : pimpl->decision_tables_)
             {
-                json result = dt->evaluate(data);
+                json result = dt->evaluate(data, eval_ctx);
                 results[name] = result;
             }
 
@@ -142,7 +153,7 @@ namespace orion
                     // Use BKMManager to create BKM map for evaluation
                     auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
 
-                    json result = ld->evaluate(data, bkm_map);
+                    json result = ld->evaluate(data, bkm_map, eval_ctx);
                     results[name] = result;
                 }
                 catch ([[maybe_unused]] const exception& e)

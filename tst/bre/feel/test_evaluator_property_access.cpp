@@ -20,6 +20,8 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include "orion/bre/ast_node.hpp"
 #include <nlohmann/json.hpp>
 
@@ -34,6 +36,9 @@ BOOST_AUTO_TEST_SUITE(test_property_access_suite)
 
 BOOST_AUTO_TEST_CASE(test_lexer_simple_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.principal");
     
@@ -48,6 +53,9 @@ BOOST_AUTO_TEST_CASE(test_lexer_simple_property_access)
 
 BOOST_AUTO_TEST_CASE(test_lexer_chained_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("person.address.city");
     
@@ -61,6 +69,9 @@ BOOST_AUTO_TEST_CASE(test_lexer_chained_property_access)
 
 BOOST_AUTO_TEST_CASE(test_lexer_property_in_expression)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.principal * loan.rate");
     
@@ -79,6 +90,9 @@ BOOST_AUTO_TEST_CASE(test_lexer_property_in_expression)
 
 BOOST_AUTO_TEST_CASE(test_parser_simple_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.principal");
     
@@ -95,6 +109,9 @@ BOOST_AUTO_TEST_CASE(test_parser_simple_property_access)
 
 BOOST_AUTO_TEST_CASE(test_parser_chained_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("person.address.city");
     
@@ -120,6 +137,9 @@ BOOST_AUTO_TEST_CASE(test_parser_chained_property_access)
 
 BOOST_AUTO_TEST_CASE(test_parser_property_in_arithmetic)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.principal * loan.rate");
     
@@ -143,6 +163,9 @@ BOOST_AUTO_TEST_CASE(test_parser_property_in_arithmetic)
 
 BOOST_AUTO_TEST_CASE(test_parser_parenthesized_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("(loan).principal");
     
@@ -163,6 +186,9 @@ BOOST_AUTO_TEST_CASE(test_parser_parenthesized_property_access)
 
 BOOST_AUTO_TEST_CASE(test_eval_simple_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.principal");
     
@@ -176,12 +202,15 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_property_access)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(context, eval_ctx);
     BOOST_CHECK_EQUAL(result.get<int>(), 100000);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_chained_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("person.address.city");
     
@@ -199,12 +228,15 @@ BOOST_AUTO_TEST_CASE(test_eval_chained_property_access)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(context, eval_ctx);
     BOOST_CHECK_EQUAL(result.get<std::string>(), "Boston");
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_in_arithmetic)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.principal * loan.rate");
     
@@ -218,12 +250,15 @@ BOOST_AUTO_TEST_CASE(test_eval_property_in_arithmetic)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(context, eval_ctx);
     BOOST_CHECK_CLOSE(result.get<double>(), 5000.0, 0.001);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_complex_expression_with_properties)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // Expression from TCK test: (loan.principal*loan.rate/12)/(1-(1+loan.rate/12)**-loan.termMonths)
     std::string expr = "(loan.principal * loan.rate / 12) / (1 - (1 + loan.rate / 12) ** -loan.termMonths)";
     
@@ -241,7 +276,7 @@ BOOST_AUTO_TEST_CASE(test_eval_complex_expression_with_properties)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(context, eval_ctx);
     
     // Monthly payment should be around 599.55
     BOOST_CHECK_CLOSE(result.get<double>(), 599.55, 1.0); // Within 1%
@@ -249,6 +284,9 @@ BOOST_AUTO_TEST_CASE(test_eval_complex_expression_with_properties)
 
 BOOST_AUTO_TEST_CASE(test_eval_property_with_decimal_number)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // Ensure we can distinguish property access from decimal numbers
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("obj.value + .872");
@@ -262,7 +300,7 @@ BOOST_AUTO_TEST_CASE(test_eval_property_with_decimal_number)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(context, eval_ctx);
     BOOST_CHECK_CLOSE(result.get<double>(), 1.0, 0.001);
 }
 
@@ -272,6 +310,9 @@ BOOST_AUTO_TEST_CASE(test_eval_property_with_decimal_number)
 
 BOOST_AUTO_TEST_CASE(test_eval_missing_property)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("loan.missingField");
     
@@ -284,11 +325,14 @@ BOOST_AUTO_TEST_CASE(test_eval_missing_property)
         }}
     };
     
-    BOOST_CHECK_THROW((void)ast->evaluate(context), std::runtime_error);
+    BOOST_CHECK_THROW((void)ast->evaluate(context, eval_ctx), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_on_non_object)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("x.field");
     
@@ -299,11 +343,14 @@ BOOST_AUTO_TEST_CASE(test_eval_property_on_non_object)
         {"x", 42} // x is a number, not an object
     };
     
-    BOOST_CHECK_THROW((void)ast->evaluate(context), std::runtime_error);
+    BOOST_CHECK_THROW((void)ast->evaluate(context, eval_ctx), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_on_null)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("x.field");
     
@@ -314,7 +361,7 @@ BOOST_AUTO_TEST_CASE(test_eval_property_on_null)
         {"x", nullptr} // x is null
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(context, eval_ctx);
     BOOST_CHECK(result.is_null()); // DMN: null propagation
 }
 
@@ -324,6 +371,9 @@ BOOST_AUTO_TEST_CASE(test_eval_property_on_null)
 
 BOOST_AUTO_TEST_CASE(test_eval_property_naming_variants)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("person.firstName");
     
@@ -337,7 +387,7 @@ BOOST_AUTO_TEST_CASE(test_eval_property_naming_variants)
         }}
     };
     
-    json result1 = ast->evaluate(context1);
+    json result1 = ast->evaluate(context1, eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<std::string>(), "John");
     
     // Test with lowercase property name
@@ -347,12 +397,15 @@ BOOST_AUTO_TEST_CASE(test_eval_property_naming_variants)
         }}
     };
     
-    json result2 = ast->evaluate(context2);
+    json result2 = ast->evaluate(context2, eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<std::string>(), "Jane");
 }
 
 BOOST_AUTO_TEST_CASE(test_parser_invalid_property_access)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("obj.");
     
@@ -362,6 +415,9 @@ BOOST_AUTO_TEST_CASE(test_parser_invalid_property_access)
 
 BOOST_AUTO_TEST_CASE(test_parser_property_access_with_number)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("obj.123");
     

@@ -9,6 +9,8 @@
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include "orion/bre/ast_node.hpp"
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -17,7 +19,7 @@ using namespace orion::bre::feel;
 /**
  * Helper function to parse and evaluate an expression
  */
-json parse_and_evaluate(const std::string& expression, const json& context = json::object())
+json parse_and_evaluate(const std::string& expression, const json& context, const EvaluationContext& eval_ctx)
 {
     Lexer lexer;
     auto tokens = lexer.tokenize(expression);
@@ -25,7 +27,7 @@ json parse_and_evaluate(const std::string& expression, const json& context = jso
     Parser parser;
     auto ast = parser.parse(tokens);
     
-    return ast->evaluate(context);
+    return ast->evaluate(context, eval_ctx);
 }
 
 BOOST_AUTO_TEST_SUITE(test_feel_parser_suite)
@@ -36,42 +38,60 @@ BOOST_AUTO_TEST_SUITE(test_feel_parser_suite)
 
 BOOST_AUTO_TEST_CASE(TestParseLiteralInteger)
 {
-    auto result = parse_and_evaluate("42");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("42", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number_integer());
     BOOST_CHECK_EQUAL(result.get<int>(), 42);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLiteralDecimal)
 {
-    auto result = parse_and_evaluate("3.14");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("3.14", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number_float());
     BOOST_CHECK_CLOSE(result.get<double>(), 3.14, 0.001);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLiteralString)
 {
-    auto result = parse_and_evaluate("\"Hello World\"");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("\"Hello World\"", json::object(), eval_ctx);
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "Hello World");
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLiteralTrue)
 {
-    auto result = parse_and_evaluate("true");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("true", json::object(), eval_ctx);
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result.get<bool>(), true);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLiteralFalse)
 {
-    auto result = parse_and_evaluate("false");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("false", json::object(), eval_ctx);
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result.get<bool>(), false);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLiteralNull)
 {
-    auto result = parse_and_evaluate("null");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("null", json::object(), eval_ctx);
     BOOST_CHECK(result.is_null());
 }
 
@@ -81,32 +101,44 @@ BOOST_AUTO_TEST_CASE(TestParseLiteralNull)
 
 BOOST_AUTO_TEST_CASE(TestParseVariable)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = {{"age", 25}};
-    auto result = parse_and_evaluate("age", context);
+    auto result = parse_and_evaluate("age", context, eval_ctx);
     BOOST_CHECK(result.is_number_integer());
     BOOST_CHECK_EQUAL(result.get<int>(), 25);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseVariableWithSpaces)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = {{"Monthly Salary", 10000}};
-    auto result = parse_and_evaluate("Monthly Salary", context);
+    auto result = parse_and_evaluate("Monthly Salary", context, eval_ctx);
     BOOST_CHECK(result.is_number_integer());
     BOOST_CHECK_EQUAL(result.get<int>(), 10000);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseVariableWithUnderscore)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = {{"Monthly_Salary", 10000}};
-    auto result = parse_and_evaluate("Monthly Salary", context);
+    auto result = parse_and_evaluate("Monthly Salary", context, eval_ctx);
     BOOST_CHECK(result.is_number_integer());
     BOOST_CHECK_EQUAL(result.get<int>(), 10000);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseUndefinedVariable)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = json::object();
-    BOOST_CHECK_THROW(parse_and_evaluate("undefined_var", context), std::runtime_error);
+    BOOST_CHECK_THROW(parse_and_evaluate("undefined_var", context, eval_ctx), std::runtime_error);
 }
 
 // ============================================================================
@@ -115,42 +147,60 @@ BOOST_AUTO_TEST_CASE(TestParseUndefinedVariable)
 
 BOOST_AUTO_TEST_CASE(TestParseAddition)
 {
-    auto result = parse_and_evaluate("5 + 3");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("5 + 3", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 8.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseSubtraction)
 {
-    auto result = parse_and_evaluate("10 - 4");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("10 - 4", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 6.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseMultiplication)
 {
-    auto result = parse_and_evaluate("6 * 7");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("6 * 7", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 42.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseDivision)
 {
-    auto result = parse_and_evaluate("20 / 4");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("20 / 4", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseDivisionByZero)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // Division by zero should return null per DMN 1.5 spec, not throw exception
-    auto result = parse_and_evaluate("10 / 0");
+    auto result = parse_and_evaluate("10 / 0", json::object(), eval_ctx);
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(TestParseExponentiation)
 {
-    auto result = parse_and_evaluate("2 ** 8");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("2 ** 8", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 256.0);
 }
@@ -161,25 +211,37 @@ BOOST_AUTO_TEST_CASE(TestParseExponentiation)
 
 BOOST_AUTO_TEST_CASE(TestPrecedenceMultiplicationBeforeAddition)
 {
-    auto result = parse_and_evaluate("1 + 2 * 3");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("1 + 2 * 3", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<double>(), 7.0); // Not 9
 }
 
 BOOST_AUTO_TEST_CASE(TestPrecedenceExponentiationBeforeMultiplication)
 {
-    auto result = parse_and_evaluate("2 * 3 ** 2");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("2 * 3 ** 2", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<double>(), 18.0); // Not 36
 }
 
 BOOST_AUTO_TEST_CASE(TestPrecedenceParenthesesOverride)
 {
-    auto result = parse_and_evaluate("(1 + 2) * 3");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("(1 + 2) * 3", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<double>(), 9.0); // Not 7
 }
 
 BOOST_AUTO_TEST_CASE(TestPrecedenceComplexExpression)
 {
-    auto result = parse_and_evaluate("2 + 3 * 4 - 5");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("2 + 3 * 4 - 5", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<double>(), 9.0); // 2 + 12 - 5
 }
 
@@ -189,54 +251,72 @@ BOOST_AUTO_TEST_CASE(TestPrecedenceComplexExpression)
 
 BOOST_AUTO_TEST_CASE(TestParseLessThan)
 {
-    auto result = parse_and_evaluate("5 < 10");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("5 < 10", json::object(), eval_ctx);
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result.get<bool>(), true);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseGreaterThan)
 {
-    auto result = parse_and_evaluate("15 > 10");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("15 > 10", json::object(), eval_ctx);
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result.get<bool>(), true);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLessOrEqual)
 {
-    auto result1 = parse_and_evaluate("5 <= 10");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result1 = parse_and_evaluate("5 <= 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<bool>(), true);
     
-    auto result2 = parse_and_evaluate("10 <= 10");
+    auto result2 = parse_and_evaluate("10 <= 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<bool>(), true);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseGreaterOrEqual)
 {
-    auto result1 = parse_and_evaluate("15 >= 10");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result1 = parse_and_evaluate("15 >= 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<bool>(), true);
     
-    auto result2 = parse_and_evaluate("10 >= 10");
+    auto result2 = parse_and_evaluate("10 >= 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<bool>(), true);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseEquality)
 {
-    auto result1 = parse_and_evaluate("10 = 10");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result1 = parse_and_evaluate("10 = 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<bool>(), true);
     
-    auto result2 = parse_and_evaluate("10 == 10");
+    auto result2 = parse_and_evaluate("10 == 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<bool>(), true);
     
-    auto result3 = parse_and_evaluate("10 = 5");
+    auto result3 = parse_and_evaluate("10 = 5", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result3.get<bool>(), false);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseInequality)
 {
-    auto result1 = parse_and_evaluate("10 != 5");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result1 = parse_and_evaluate("10 != 5", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<bool>(), true);
     
-    auto result2 = parse_and_evaluate("10 != 10");
+    auto result2 = parse_and_evaluate("10 != 10", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<bool>(), false);
 }
 
@@ -246,32 +326,41 @@ BOOST_AUTO_TEST_CASE(TestParseInequality)
 
 BOOST_AUTO_TEST_CASE(TestParseLogicalAnd)
 {
-    auto result1 = parse_and_evaluate("true and true");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result1 = parse_and_evaluate("true and true", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<bool>(), true);
     
-    auto result2 = parse_and_evaluate("true and false");
+    auto result2 = parse_and_evaluate("true and false", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<bool>(), false);
     
-    auto result3 = parse_and_evaluate("false and false");
+    auto result3 = parse_and_evaluate("false and false", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result3.get<bool>(), false);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLogicalOr)
 {
-    auto result1 = parse_and_evaluate("true or false");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result1 = parse_and_evaluate("true or false", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result1.get<bool>(), true);
     
-    auto result2 = parse_and_evaluate("false or true");
+    auto result2 = parse_and_evaluate("false or true", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result2.get<bool>(), true);
     
-    auto result3 = parse_and_evaluate("false or false");
+    auto result3 = parse_and_evaluate("false or false", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result3.get<bool>(), false);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseLogicalAndPrecedence)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // 'and' has higher precedence than 'or'
-    auto result = parse_and_evaluate("false or true and false");
+    auto result = parse_and_evaluate("false or true and false", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<bool>(), false); // false or (true and false) = false or false = false
 }
 
@@ -281,14 +370,20 @@ BOOST_AUTO_TEST_CASE(TestParseLogicalAndPrecedence)
 
 BOOST_AUTO_TEST_CASE(TestParseUnaryMinus)
 {
-    auto result = parse_and_evaluate("-42");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("-42", json::object(), eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -42.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseUnaryMinusExpression)
 {
-    auto result = parse_and_evaluate("-(5 + 3)");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("-(5 + 3)", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<double>(), -8.0);
 }
 
@@ -298,14 +393,20 @@ BOOST_AUTO_TEST_CASE(TestParseUnaryMinusExpression)
 
 BOOST_AUTO_TEST_CASE(TestParseStringConcatenation)
 {
-    auto result = parse_and_evaluate("\"Hello \" + \"World\"");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("\"Hello \" + \"World\"", json::object(), eval_ctx);
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "Hello World");
 }
 
 BOOST_AUTO_TEST_CASE(TestParseStringNumberConcatenation)
 {
-    auto result = parse_and_evaluate("\"Age: \" + 25");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("\"Age: \" + 25", json::object(), eval_ctx);
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "Age: 25");
 }
@@ -316,33 +417,45 @@ BOOST_AUTO_TEST_CASE(TestParseStringNumberConcatenation)
 
 BOOST_AUTO_TEST_CASE(TestParseComplexLogicalExpression)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = {{"age", 25}, {"priority", 7}};
-    auto result = parse_and_evaluate("age >= 18 and priority > 5", context);
+    auto result = parse_and_evaluate("age >= 18 and priority > 5", context, eval_ctx);
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result.get<bool>(), true);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseComplexArithmeticWithVariables)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = {{"salary", 10000}, {"bonus", 2000}};
-    auto result = parse_and_evaluate("(salary + bonus) * 12", context);
+    auto result = parse_and_evaluate("(salary + bonus) * 12", context, eval_ctx);
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 144000.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseNestedParentheses)
 {
-    auto result = parse_and_evaluate("((2 + 3) * (4 + 5))");
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    auto result = parse_and_evaluate("((2 + 3) * (4 + 5))", json::object(), eval_ctx);
     BOOST_CHECK_EQUAL(result.get<double>(), 45.0);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseDMNLikeExpression)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json context = {
         {"Monthly Salary", 10000},
         {"Monthly Expenses", 3000}
     };
-    auto result = parse_and_evaluate("Monthly Salary - Monthly Expenses > 5000", context);
+    auto result = parse_and_evaluate("Monthly Salary - Monthly Expenses > 5000", context, eval_ctx);
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result.get<bool>(), true); // 10000 - 3000 = 7000 > 5000
 }
@@ -353,17 +466,26 @@ BOOST_AUTO_TEST_CASE(TestParseDMNLikeExpression)
 
 BOOST_AUTO_TEST_CASE(TestParseInvalidExpression)
 {
-    BOOST_CHECK_THROW(parse_and_evaluate("5 + + 3"), std::runtime_error);
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    BOOST_CHECK_THROW(parse_and_evaluate("5 + + 3", json::object(), eval_ctx), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseUnmatchedParenthesis)
 {
-    BOOST_CHECK_THROW(parse_and_evaluate("(5 + 3"), std::runtime_error);
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    BOOST_CHECK_THROW(parse_and_evaluate("(5 + 3", json::object(), eval_ctx), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(TestParseEmptyExpression)
 {
-    BOOST_CHECK_THROW(parse_and_evaluate(""), std::runtime_error);
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
+    BOOST_CHECK_THROW(parse_and_evaluate("", json::object(), eval_ctx), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

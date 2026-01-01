@@ -18,6 +18,7 @@
 
 #include <orion/bre/feel/expr.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 
 #include <nlohmann/json.hpp>
 #include <cctype>
@@ -27,7 +28,6 @@
 #include <memory>
 #include <cmath>
 #include <limits>
-#include <regex>
 #include <algorithm>
 #include <variant>
 #include "util_internal.hpp"
@@ -1064,19 +1064,13 @@ static Value eval_range(const ERange* r, const json& ctx)
         {
             if (args.size() == 2 && args[0].is_str() && args[1].is_str())
             {
-                try
-                {
-                    std::regex re(args[1].str(), std::regex::ECMAScript);
-                    bool m = std::regex_match(args[0].str(), re);
-                    return Value(m);
-                }
-                catch (const std::regex_error&) {
-                    // Invalid regex pattern - DMN spec says return null
-                    return make_null();
-                }
+                // NOTE: matches() in legacy eval_feel_literal() path is not supported
+                // The modern evaluation path (ast_node.cpp with EvaluationContext) should be used instead
+                // This legacy path is only for simple literals and doesn't have access to RegexCache
+                return make_null();  // Return null to indicate unsupported operation
+            }
+            return make_null();
         }
-        return make_null();
-    }
     
     if (func_name == "all")
     {
@@ -1302,11 +1296,11 @@ static Value eval_range(const ERange* r, const json& ctx)
 
 } // end anonymous namespace
 
-    bool eval_feel_literal(std::string_view expr, const json& ctx, json& out, std::string& err)
+    bool eval_feel_literal(std::string_view expr, const json& ctx, json& out, std::string& err, const EvaluationContext& eval_ctx)
     {
         try {
             // Use main parser for consistent parsing behavior
-            out = orion::bre::feel::Parser::eval_expression(expr, ctx);
+            out = orion::bre::feel::Parser::eval_expression(expr, ctx, eval_ctx);
             return true;
         }
         catch (const std::exception& e) {

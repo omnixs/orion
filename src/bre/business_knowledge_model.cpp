@@ -34,7 +34,8 @@ namespace orion::bre
 
     nlohmann::json BusinessKnowledgeModel::invoke(const std::vector<nlohmann::json>& args,
                                                   const nlohmann::json& context,
-                                                  const std::map<std::string, BusinessKnowledgeModel>& available_bkms)
+                                                  const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                                  const orion::bre::feel::EvaluationContext& eval_ctx)
     const
     {
         // Contract: BKM must have a name
@@ -72,6 +73,6 @@ namespace orion::bre
         }
 
         // Evaluate the BKM expression with the enhanced context
-        return evaluate_bkm_expression(expression_text, bkm_context, available_bkms);
+        return evaluate_bkm_expression(expression_text, bkm_context, available_bkms, eval_ctx);
     }
 } // namespace orion::bre

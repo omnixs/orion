@@ -11,6 +11,8 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 
 using namespace orion::bre::feel;
 
@@ -50,6 +52,9 @@ std::string tokensToString(const std::vector<Token>& tokens)
 
 BOOST_AUTO_TEST_CASE(TestSimpleNumber)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("42");
     
@@ -61,6 +66,9 @@ BOOST_AUTO_TEST_CASE(TestSimpleNumber)
 
 BOOST_AUTO_TEST_CASE(TestDecimalNumber)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("3.14");
     
@@ -71,6 +79,9 @@ BOOST_AUTO_TEST_CASE(TestDecimalNumber)
 
 BOOST_AUTO_TEST_CASE(TestNegativeNumber)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("-42");
     
@@ -81,6 +92,9 @@ BOOST_AUTO_TEST_CASE(TestNegativeNumber)
 
 BOOST_AUTO_TEST_CASE(TestScientificNotation)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("1.5e-10");
     
@@ -91,6 +105,9 @@ BOOST_AUTO_TEST_CASE(TestScientificNotation)
 
 BOOST_AUTO_TEST_CASE(TestStringLiteral)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("\"Hello World\"");
     
@@ -101,6 +118,9 @@ BOOST_AUTO_TEST_CASE(TestStringLiteral)
 
 BOOST_AUTO_TEST_CASE(TestIdentifier)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("age");
     
@@ -111,6 +131,9 @@ BOOST_AUTO_TEST_CASE(TestIdentifier)
 
 BOOST_AUTO_TEST_CASE(TestIdentifierWithSpaces)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("Monthly Salary");
     
@@ -121,6 +144,9 @@ BOOST_AUTO_TEST_CASE(TestIdentifierWithSpaces)
 
 BOOST_AUTO_TEST_CASE(TestKeywords)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     
     auto tokens1 = lexer.tokenize("true");
@@ -141,6 +167,9 @@ BOOST_AUTO_TEST_CASE(TestKeywords)
 
 BOOST_AUTO_TEST_CASE(TestArithmeticOperators)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     
     auto tokens = lexer.tokenize("1 + 2 - 3 * 4 / 5");
@@ -160,6 +189,9 @@ BOOST_AUTO_TEST_CASE(TestArithmeticOperators)
 
 BOOST_AUTO_TEST_CASE(TestExponentiation)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("2 ** 3");
     
@@ -170,6 +202,9 @@ BOOST_AUTO_TEST_CASE(TestExponentiation)
 
 BOOST_AUTO_TEST_CASE(TestComparisonOperators)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     
     auto tokens = lexer.tokenize("age >= 18");
@@ -184,6 +219,9 @@ BOOST_AUTO_TEST_CASE(TestComparisonOperators)
 
 BOOST_AUTO_TEST_CASE(TestParentheses)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("(age + 5) * 2");
     
@@ -195,6 +233,9 @@ BOOST_AUTO_TEST_CASE(TestParentheses)
 
 BOOST_AUTO_TEST_CASE(TestComplexExpression)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("age >= 18 and priority > 5");
     
@@ -218,6 +259,9 @@ BOOST_AUTO_TEST_CASE(TestComplexExpression)
 
 BOOST_AUTO_TEST_CASE(TestStringConcatenation)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     Lexer lexer;
     auto tokens = lexer.tokenize("\"Greeting \" + Name");
     

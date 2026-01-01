@@ -6,6 +6,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include "../../../src/bre/feel/util_internal.hpp"
 
 using json = nlohmann::json;
@@ -13,6 +14,9 @@ using json = nlohmann::json;
 BOOST_AUTO_TEST_SUITE(feel_null_arithmetic_debug)
 
 BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Evaluator evaluator;
     json context = {};
     
@@ -37,7 +41,7 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     BOOST_TEST_MESSAGE("Testing through orion::bre::feel::Evaluator::evaluate():");
     for (const auto& test_case : null_cases) {
         BOOST_TEST_MESSAGE("Expression: " << test_case.expression);
-        json result = evaluator.evaluate(test_case.expression, context);
+        json result = evaluator.evaluate(test_case.expression, context, eval_ctx);
         BOOST_TEST_MESSAGE("  Result: " << result);
         
         if (result.is_null()) {

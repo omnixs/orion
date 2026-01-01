@@ -19,6 +19,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include <string>
 #include <vector>
 #include <map>
@@ -39,12 +40,14 @@ namespace orion::bre
          * @param args Resolved argument values
          * @param context JSON context for evaluation
          * @param available_bkms Map of available BKMs for recursive calls
+         * @param eval_ctx Evaluation context with regex cache
          * @return Result of BKM evaluation
          * @throws contract_violation if preconditions are violated
          */
         [[nodiscard]] nlohmann::json invoke(const std::vector<nlohmann::json>& args,
                               const nlohmann::json& context,
-                              const std::map<std::string, BusinessKnowledgeModel>& available_bkms) const;
+                              const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                              const orion::bre::feel::EvaluationContext& eval_ctx) const;
 
         /**
          * @brief Validate BKM structure

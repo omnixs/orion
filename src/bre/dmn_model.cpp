@@ -88,7 +88,7 @@ namespace orion::bre
     }
 
     // Helper: Collect all matching rules based on input conditions
-    std::vector<json> DecisionTable::find_matching_rules(const json& context) const
+    std::vector<json> DecisionTable::find_matching_rules(const json& context, orion::bre::feel::EvaluationContext& eval_ctx) const
     {
         vector<json> matching_outputs;
 
@@ -113,7 +113,7 @@ namespace orion::bre
                         auto tokens = lexer.tokenize(input.inputExpression);
                         feel::Parser parser;
                         auto ast = parser.parse(tokens);
-                        input_value = ast->evaluate(context);
+                        input_value = ast->evaluate(context, eval_ctx);
                     }
                     catch (...)
                     {
@@ -135,7 +135,7 @@ namespace orion::bre
                     // Use pre-parsed AST for complex FEEL expressions
                     try
                     {
-                        json ast_result = rule.inputEntries_ast[i]->evaluate(context);
+                        json ast_result = rule.inputEntries_ast[i]->evaluate(context, eval_ctx);
                         
                         // Compare AST result with input value
                         entry_matches_result = (ast_result == input_value);
@@ -185,7 +185,7 @@ namespace orion::bre
                                 // Use pre-parsed AST to evaluate output expression
                                 try
                                 {
-                                    output_value = rule.outputEntries_ast[i]->evaluate(context);
+                                    output_value = rule.outputEntries_ast[i]->evaluate(context, eval_ctx);
                                 }
                                 catch (const std::runtime_error&)
                                 {
@@ -241,7 +241,7 @@ namespace orion::bre
                         // Use pre-parsed AST to evaluate output expression
                         try
                         {
-                            output_value = rule.outputEntries_ast[0]->evaluate(context);
+                            output_value = rule.outputEntries_ast[0]->evaluate(context, eval_ctx);
                         }
                         catch (const std::runtime_error&)
                         {
@@ -552,13 +552,14 @@ namespace orion::bre
     }
 
     // Implementation of DecisionTable::evaluate
-    json DecisionTable::evaluate(const json& context) const
+    json DecisionTable::evaluate(const json& context,
+                                 [[maybe_unused]] orion::bre::feel::EvaluationContext& eval_ctx) const
     {
         // Step 1: Validate input values against allowed values
         validate_input_values(context);
 
         // Step 2: Find all matching rules based on input conditions
-        vector<json> matching_outputs = find_matching_rules(context);
+        vector<json> matching_outputs = find_matching_rules(context, eval_ctx);
 
         // Step 3: If no matches, return empty result
         if (matching_outputs.empty())
@@ -635,7 +636,8 @@ namespace orion::bre
 
     // Implementation of LiteralDecision::evaluate
     json LiteralDecision::evaluate(const json& context,
-                                   const std::map<std::string, BusinessKnowledgeModel>& available_bkms) const
+                                   const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                   orion::bre::feel::EvaluationContext& eval_ctx) const
     {
         if (expression_text.empty())
         {
@@ -647,7 +649,7 @@ namespace orion::bre
         {
             try
             {
-                json ast_result = expression_ast->evaluate(context);
+                json ast_result = expression_ast->evaluate(context, eval_ctx);
                 debug("LiteralDecision AST result for '{}': {}", expression_text, ast_result.dump());
                 return ast_result;
             }
@@ -663,7 +665,7 @@ namespace orion::bre
         }
 
         // Fallback: Use evaluate_bkm_expression which handles both BKM calls and regular FEEL expressions
-        json result = evaluate_bkm_expression(expression_text, context, available_bkms);
+        json result = evaluate_bkm_expression(expression_text, context, available_bkms, eval_ctx);
         return result;
     }
 }

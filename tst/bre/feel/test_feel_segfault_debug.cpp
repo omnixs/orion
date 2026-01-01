@@ -6,6 +6,8 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/expr.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -14,6 +16,9 @@ BOOST_AUTO_TEST_SUITE(feel_segfault_debug)
 
 BOOST_AUTO_TEST_CASE(test_and_expression_with_null)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // This is the exact expression causing the segfault in TCK tests
     std::string expr = "A and B";
     json ctx = {{"A", nullptr}, {"B", true}};
@@ -21,7 +26,7 @@ BOOST_AUTO_TEST_CASE(test_and_expression_with_null)
     std::string err;
     
     // This should not segfault
-    bool result = orion::bre::feel::eval_feel_literal(expr, ctx, out, err);
+    bool result = orion::bre::feel::eval_feel_literal(expr, ctx, out, err, eval_ctx);
     
     if (result) {
         // In DMN ternary logic: null AND true = null
@@ -33,6 +38,9 @@ BOOST_AUTO_TEST_CASE(test_and_expression_with_null)
 
 BOOST_AUTO_TEST_CASE(test_and_expression_variations)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     json out;
     std::string err;
     
@@ -53,7 +61,7 @@ BOOST_AUTO_TEST_CASE(test_and_expression_variations)
     };
     
     for (const auto& test_case : test_cases) {
-        bool result = orion::bre::feel::eval_feel_literal(test_case.expr, test_case.ctx, out, err);
+        bool result = orion::bre::feel::eval_feel_literal(test_case.expr, test_case.ctx, out, err, eval_ctx);
         BOOST_REQUIRE_MESSAGE(result, "Expression '" + test_case.expr + 
                              "' with context " + test_case.ctx.dump() + 
                              " failed: " + err);
@@ -69,13 +77,16 @@ BOOST_AUTO_TEST_CASE(test_and_expression_variations)
 
 BOOST_AUTO_TEST_CASE(test_or_expression_with_null)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // Test OR expressions as well
     std::string expr = "A or B";
     json ctx = {{"A", nullptr}, {"B", true}};
     json out;
     std::string err;
     
-    bool result = orion::bre::feel::eval_feel_literal(expr, ctx, out, err);
+    bool result = orion::bre::feel::eval_feel_literal(expr, ctx, out, err, eval_ctx);
     
     if (result) {
         // In DMN ternary logic: null OR true = true

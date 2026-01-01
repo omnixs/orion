@@ -6,6 +6,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -16,11 +17,14 @@ BOOST_AUTO_TEST_SUITE(test_list_operations_suite)
 // Test: Empty list literal
 BOOST_AUTO_TEST_CASE(test_empty_list_literal)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 0);
@@ -29,11 +33,14 @@ BOOST_AUTO_TEST_CASE(test_empty_list_literal)
 // Test: Simple number list
 BOOST_AUTO_TEST_CASE(test_number_list_literal)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[1, 2, 3]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -45,11 +52,14 @@ BOOST_AUTO_TEST_CASE(test_number_list_literal)
 // Test: String list
 BOOST_AUTO_TEST_CASE(test_string_list_literal)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[\"apple\", \"banana\", \"cherry\"]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -61,11 +71,14 @@ BOOST_AUTO_TEST_CASE(test_string_list_literal)
 // Test: Mixed type list
 BOOST_AUTO_TEST_CASE(test_mixed_type_list)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[1, \"hello\", true, null]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 4);
@@ -78,11 +91,14 @@ BOOST_AUTO_TEST_CASE(test_mixed_type_list)
 // Test: List with expressions
 BOOST_AUTO_TEST_CASE(test_list_with_expressions)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[1 + 2, 3 * 4, 10 - 5]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -94,6 +110,9 @@ BOOST_AUTO_TEST_CASE(test_list_with_expressions)
 // Test: List with variables
 BOOST_AUTO_TEST_CASE(test_list_with_variables)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[x, y, z]";
     json context = {
         {"x", 10},
@@ -102,7 +121,7 @@ BOOST_AUTO_TEST_CASE(test_list_with_variables)
     };
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -114,11 +133,14 @@ BOOST_AUTO_TEST_CASE(test_list_with_variables)
 // Test: Nested lists
 BOOST_AUTO_TEST_CASE(test_nested_lists)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[[1, 2], [3, 4], [5, 6]]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -135,11 +157,14 @@ BOOST_AUTO_TEST_CASE(test_nested_lists)
 // Test: List in function call
 BOOST_AUTO_TEST_CASE(test_list_in_function_call)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "all([true, true, true])";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result, true);
@@ -148,11 +173,14 @@ BOOST_AUTO_TEST_CASE(test_list_in_function_call)
 // Test: Single element list
 BOOST_AUTO_TEST_CASE(test_single_element_list)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[42]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 1);
@@ -162,11 +190,14 @@ BOOST_AUTO_TEST_CASE(test_single_element_list)
 // Test: List with decimal numbers
 BOOST_AUTO_TEST_CASE(test_decimal_list)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[1.5, 2.7, 3.14]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -178,11 +209,14 @@ BOOST_AUTO_TEST_CASE(test_decimal_list)
 // Test: List with negative numbers
 BOOST_AUTO_TEST_CASE(test_negative_number_list)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "[-1, -2, -3]";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -194,11 +228,14 @@ BOOST_AUTO_TEST_CASE(test_negative_number_list)
 // Test: List passed to any() function
 BOOST_AUTO_TEST_CASE(test_any_with_list_literal)
 {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     std::string expression = "any([false, false, true])";
     json context = json::object();
     
     orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = evaluator.evaluate(expression, context, eval_ctx);
     
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result, true);

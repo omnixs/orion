@@ -6,12 +6,17 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/function_registry.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 
 using namespace orion::bre::feel;
 
 BOOST_AUTO_TEST_SUITE(function_registry)
 
 BOOST_AUTO_TEST_CASE(test_singleton_instance) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto& registry1 = FunctionRegistry::instance();
     auto& registry2 = FunctionRegistry::instance();
     
@@ -20,6 +25,9 @@ BOOST_AUTO_TEST_CASE(test_singleton_instance) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_abs_function) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("abs");
     
     BOOST_TEST(sig.has_value());
@@ -31,6 +39,9 @@ BOOST_AUTO_TEST_CASE(test_get_abs_function) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_sqrt_function) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("sqrt");
     
     BOOST_TEST(sig.has_value());
@@ -39,6 +50,9 @@ BOOST_AUTO_TEST_CASE(test_get_sqrt_function) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_decimal_function) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("decimal");
     
     BOOST_TEST(sig.has_value());
@@ -50,6 +64,9 @@ BOOST_AUTO_TEST_CASE(test_get_decimal_function) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_modulo_function) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("modulo");
     
     BOOST_TEST(sig.has_value());
@@ -59,6 +76,9 @@ BOOST_AUTO_TEST_CASE(test_get_modulo_function) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_round_functions) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto round_sig = FunctionRegistry::instance().get_signature("round");
     BOOST_TEST(round_sig.has_value());
     BOOST_TEST(round_sig->parameters.size() == 2);
@@ -79,6 +99,9 @@ BOOST_AUTO_TEST_CASE(test_get_round_functions) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_substring_optional_parameter) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("substring");
     
     BOOST_TEST(sig.has_value());
@@ -92,6 +115,9 @@ BOOST_AUTO_TEST_CASE(test_get_substring_optional_parameter) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_variadic_append) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("append");
     
     BOOST_TEST(sig.has_value());
@@ -101,6 +127,9 @@ BOOST_AUTO_TEST_CASE(test_get_variadic_append) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_boolean_functions) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto not_sig = FunctionRegistry::instance().get_signature("not");
     BOOST_TEST(not_sig.has_value());
     BOOST_TEST(not_sig->parameters[0].name == "negand");
@@ -114,12 +143,18 @@ BOOST_AUTO_TEST_CASE(test_get_boolean_functions) {
 }
 
 BOOST_AUTO_TEST_CASE(test_get_unknown_function) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig = FunctionRegistry::instance().get_signature("unknown_function");
     
     BOOST_TEST(!sig.has_value());
 }
 
 BOOST_AUTO_TEST_CASE(test_case_sensitive_lookup) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig1 = FunctionRegistry::instance().get_signature("abs");
     auto sig2 = FunctionRegistry::instance().get_signature("ABS");
     
@@ -128,6 +163,9 @@ BOOST_AUTO_TEST_CASE(test_case_sensitive_lookup) {
 }
 
 BOOST_AUTO_TEST_CASE(test_multi_word_function_names) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     auto sig1 = FunctionRegistry::instance().get_signature("round up");
     BOOST_TEST(sig1.has_value());
     

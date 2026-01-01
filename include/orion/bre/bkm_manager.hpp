@@ -78,11 +78,13 @@ namespace orion::bre
          * @param bkm_name Name of the BKM to invoke
          * @param args Arguments to pass to the BKM
          * @param context Evaluation context (variable bindings)
+         * @param eval_ctx Evaluation context with regex cache
          * @return Result of BKM evaluation
          */
         [[nodiscard]] nlohmann::json invoke_bkm(std::string_view bkm_name,
                                  const std::vector<nlohmann::json>& args,
-                                 const nlohmann::json& context) const;
+                                 const nlohmann::json& context,
+                                 const orion::bre::feel::EvaluationContext& eval_ctx) const;
 
         /**
          * @brief Check if a BKM exists
@@ -143,9 +145,11 @@ namespace orion::bre
      * @param expression FEEL expression that may contain BKM calls
      * @param context Evaluation context
      * @param available_bkms Map of available BKMs
+     * @param eval_ctx Evaluation context with regex cache
      * @return Result of evaluation or error
      */
     nlohmann::json evaluate_bkm_expression(std::string_view expression,
                                          const nlohmann::json& context,
-                                         const std::map<std::string, BusinessKnowledgeModel>& available_bkms);
+                                         const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                         const orion::bre::feel::EvaluationContext& eval_ctx);
 } // namespace orion::bre

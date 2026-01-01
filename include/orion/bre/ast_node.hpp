@@ -77,6 +77,10 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 
+namespace orion::bre::feel {
+    struct EvaluationContext; // Forward declaration
+}
+
 namespace orion::bre
 {
     using json = nlohmann::json;
@@ -203,16 +207,18 @@ namespace orion::bre
          * Recursively evaluates the AST node and its children, returning the result.
          * 
          * @param context JSON object containing variable bindings for evaluation
+         * @param eval_ctx Evaluation context with engine resources (contains regex cache)
          * @return Evaluated result as JSON value (number, string, bool, null, etc.)
          * @throws std::runtime_error if evaluation fails (undefined variable, type error, etc.)
          * 
          * @example
          * ```cpp
          * json context = {{"age", 25}, {"priority", 8}};
-         * json result = ast->evaluate(context);
+         * EvaluationContext eval_ctx{&regex_cache};
+         * json result = ast->evaluate(context, eval_ctx);
          * ```
          */
-        [[nodiscard]] json evaluate(const json& context) const;
+        [[nodiscard]] json evaluate(const json& context, const orion::bre::feel::EvaluationContext& eval_ctx) const;
     };
 
     /**

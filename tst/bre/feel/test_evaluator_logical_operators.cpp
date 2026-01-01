@@ -6,6 +6,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -14,6 +15,9 @@ using namespace orion::bre;
 BOOST_AUTO_TEST_SUITE(test_logical_operators_debug)
 
 BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Evaluator evaluator;
     
     // Test context with string booleans (as seen in failing test output)
@@ -42,7 +46,7 @@ BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
     
     for (const auto& test_case : test_cases) {
         BOOST_TEST_MESSAGE("Testing: " << test_case.expression);
-        auto result = evaluator.evaluate(test_case.expression, context);
+        auto result = evaluator.evaluate(test_case.expression, context, eval_ctx);
         BOOST_TEST_MESSAGE("Result: " << result.dump());
         
         // Check that result is not null
@@ -63,6 +67,9 @@ BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
 }
 
 BOOST_AUTO_TEST_CASE(test_logical_not_with_string_booleans) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Evaluator evaluator;
     
     // Test context with string booleans
@@ -86,7 +93,7 @@ BOOST_AUTO_TEST_CASE(test_logical_not_with_string_booleans) {
     
     for (const auto& test_case : not_test_cases) {
         BOOST_TEST_MESSAGE("Testing: " << test_case.expression << " with context: " << test_case.context.dump());
-        auto result = evaluator.evaluate(test_case.expression, test_case.context);
+        auto result = evaluator.evaluate(test_case.expression, test_case.context, eval_ctx);
         BOOST_TEST_MESSAGE("Result: " << result.dump());
         
         // Check that result is not null

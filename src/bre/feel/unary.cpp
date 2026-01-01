@@ -18,7 +18,7 @@
 
 #include <orion/bre/feel/unary.hpp>
 #include <orion/bre/feel/types.hpp>
-#include <regex>
+#include <ctre.hpp>
 #include <charconv>
 #include <iostream>
 #include "common/util.hpp" // added for orion::common::trim, split
@@ -303,53 +303,46 @@ namespace orion::bre::feel {
     // Helper: Handle comparison operators (<, <=, >, >=, ==)
     static bool match_comparison(std::string_view test, std::string_view candidate)
     {
-        static const std::regex cmp_re(R"(^\s*([<>]=?|==)\s*(.+)\s*$)");
-        std::smatch match;
-        std::string test_str(test);  // regex requires std::string
-        if (!std::regex_match(test_str, match, cmp_re))
+        // CTRE compile-time regex for comparison pattern
+        if (auto match = ctre::match<R"(^\s*([<>]=?|==)\s*(.+)\s*$)">(test))
         {
-            return false;
+            std::string oper = match.get<1>().to_string();
+            std::string rhs = orion::common::trim(match.get<2>().to_string());
+            int cmp_result = cmp_values(candidate, rhs);
+
+            if (oper == "<") { return cmp_result < 0;
+}
+            if (oper == "<=") { return cmp_result <= 0;
+}
+            if (oper == ">") { return cmp_result > 0;
+}
+            if (oper == ">=") { return cmp_result >= 0;
+}
+            if (oper == "==") { return cmp_result == 0;
+}
         }
-
-        std::string oper = match[1];
-        std::string rhs = orion::common::trim(std::string(match[2]));
-        int cmp_result = cmp_values(candidate, rhs);
-
-        if (oper == "<") { return cmp_result < 0;
-}
-        if (oper == "<=") { return cmp_result <= 0;
-}
-        if (oper == ">") { return cmp_result > 0;
-}
-        if (oper == ">=") { return cmp_result >= 0;
-}
-        if (oper == "==") { return cmp_result == 0;
-}
         return false;
     }
 
     // Helper: Handle range test [a..b], (a..b), [a..b), (a..b]
     static bool match_range(std::string_view test, std::string_view candidate)
     {
-        static const std::regex range_re(R"(^\s*([\[(])\s*(.+)\s*\.\.\s*(.+)\s*([\])])\s*$)");
-        std::smatch match;
-        std::string test_str(test);
-        if (!std::regex_match(test_str, match, range_re))
+        // CTRE compile-time regex for range pattern
+        if (auto match = ctre::match<R"(^\s*([\[(])\s*(.+)\s*\.\.\s*(.+)\s*([\])])\s*$)">(test))
         {
-            return false;
+            bool inc_l = match.get<1>().to_view() == "[";
+            bool inc_r = match.get<4>().to_view() == "]";
+            std::string lower = orion::common::trim(match.get<2>().to_string());
+            std::string upper = orion::common::trim(match.get<3>().to_string());
+            
+            int cmp_lower = cmp_values(candidate, lower);
+            int cmp_upper = cmp_values(candidate, upper);
+            
+            bool left_ok = inc_l ? (cmp_lower >= 0) : (cmp_lower > 0);
+            bool right_ok = inc_r ? (cmp_upper <= 0) : (cmp_upper < 0);
+            return left_ok && right_ok;
         }
-
-        bool inc_l = match[1] == "[";
-        bool inc_r = match[4] == "]";
-        std::string lower = orion::common::trim(std::string(match[2]));
-        std::string upper = orion::common::trim(std::string(match[3]));
-        
-        int cmp_lower = cmp_values(candidate, lower);
-        int cmp_upper = cmp_values(candidate, upper);
-        
-        bool left_ok = inc_l ? (cmp_lower >= 0) : (cmp_lower > 0);
-        bool right_ok = inc_r ? (cmp_upper <= 0) : (cmp_upper < 0);
-        return left_ok && right_ok;
+        return false;
     }
 
     // Main dispatcher: Try each test type in order

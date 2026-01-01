@@ -6,6 +6,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -14,6 +15,9 @@ using namespace orion::bre;
 BOOST_AUTO_TEST_SUITE(math_edge_cases_debug)
 
 BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Evaluator evaluator;
     json context = json::object();
 
@@ -21,7 +25,7 @@ BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
     
     auto test_expr = [&](const std::string& expr, double expected, const std::string& description) {
         try {
-            json result = evaluator.evaluate(expr, context);
+            json result = evaluator.evaluate(expr, context, eval_ctx);
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
             BOOST_TEST_MESSAGE("Result: " << result.dump() << " (expected: " << expected << ")");
             if (result.is_number()) {
@@ -53,6 +57,9 @@ BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
 }
 
 BOOST_AUTO_TEST_CASE(test_null_arithmetic_edge_cases) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     orion::bre::feel::Evaluator evaluator;
     json context = json::object();
     
@@ -60,7 +67,7 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_edge_cases) {
     
     auto test_null_expr = [&](const std::string& expr, const std::string& description) {
         try {
-            json result = evaluator.evaluate(expr, context);
+            json result = evaluator.evaluate(expr, context, eval_ctx);
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
             BOOST_TEST_MESSAGE("Result: " << result.dump());
             if (result.is_null()) {

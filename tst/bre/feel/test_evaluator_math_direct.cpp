@@ -6,6 +6,7 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 namespace orion::bre::detail {
@@ -16,6 +17,9 @@ namespace orion::bre::detail {
 BOOST_AUTO_TEST_SUITE(test_math_evaluator_direct)
 
 BOOST_AUTO_TEST_CASE(test_negative_number_math_evaluator_direct) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     // Test the math evaluator directly to isolate parsing issues
     struct TestCase {
         std::string expression;
@@ -51,6 +55,9 @@ BOOST_AUTO_TEST_CASE(test_negative_number_math_evaluator_direct) {
 }
 
 BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
+    orion::bre::feel::RegexCache regex_cache;
+    orion::bre::feel::EvaluationContext eval_ctx;
+    eval_ctx.regex_cache = &regex_cache;
     using json = nlohmann::json;
     
     orion::bre::feel::Evaluator evaluator;
@@ -67,7 +74,7 @@ BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
         BOOST_TEST_MESSAGE("Comparing evaluators for: " << expr);
         
         // Test through orion::bre::feel::Evaluator
-        auto feel_result = evaluator.evaluate(expr, context);
+        auto feel_result = evaluator.evaluate(expr, context, eval_ctx);
         
         // Test through direct math evaluator (no context)
         auto math_result = orion::bre::detail::eval_math_expression(expr);
