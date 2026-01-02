@@ -76,6 +76,7 @@
 #include <vector>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre
 {
@@ -203,16 +204,18 @@ namespace orion::bre
          * Recursively evaluates the AST node and its children, returning the result.
          * 
          * @param context JSON object containing variable bindings for evaluation
+         * @param eval_ctx Evaluation context with engine resources (contains regex cache)
          * @return Evaluated result as JSON value (number, string, bool, null, etc.)
          * @throws std::runtime_error if evaluation fails (undefined variable, type error, etc.)
          * 
          * @example
          * ```cpp
-         * json context = {{"age", 25}, {"priority", 8}};
-         * json result = ast->evaluate(context);
+         * json input = {{"age", 25}, {"priority", 8}};
+         * EvaluationContext eval_ctx{regex_cache};
+         * json result = ast->evaluate(context, eval_ctx);
          * ```
          */
-        [[nodiscard]] json evaluate(const json& context) const;
+        [[nodiscard]] json evaluate(const json& input, const EvaluationContext& eval_ctx) const;
     };
 
     /**

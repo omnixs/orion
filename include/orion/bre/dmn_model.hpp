@@ -71,6 +71,7 @@
 #include <nlohmann/json.hpp>
 #include "ast_node.hpp"
 #include "feel/unary.hpp"
+#include "evaluation_context.hpp"
 
 namespace orion::bre
 {
@@ -263,13 +264,15 @@ namespace orion::bre
         DecisionTable(const DecisionTable&) = delete;
         DecisionTable& operator=(const DecisionTable&) = delete;
 
-        // Evaluate with given context
-        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& context) const;
+        // Evaluate with given input data
+        [[nodiscard]] nlohmann::json evaluate(
+            const nlohmann::json& input,
+            EvaluationContext& eval_ctx) const;
 
     private:
         // Helper functions for evaluate() - refactored from 507-line function
-        void validate_input_values(const nlohmann::json& context) const;
-        [[nodiscard]] std::vector<nlohmann::json> find_matching_rules(const nlohmann::json& context) const;
+        void validate_input_values(const nlohmann::json& input) const;
+        [[nodiscard]] std::vector<nlohmann::json> find_matching_rules(const nlohmann::json& input, EvaluationContext& eval_ctx) const;
         [[nodiscard]] nlohmann::json apply_collect_aggregation(const std::vector<nlohmann::json>& matching_outputs) const;
         [[nodiscard]] nlohmann::json apply_priority_policy(const std::vector<nlohmann::json>& matching_outputs) const;
     };
@@ -315,8 +318,10 @@ namespace orion::bre
         std::unique_ptr<ASTNode> expression_ast;
 
         // Evaluate with context
-        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& context,
-                                const std::map<std::string, BusinessKnowledgeModel>& available_bkms) const;
+        [[nodiscard]] nlohmann::json evaluate(
+            const nlohmann::json& input,
+            const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+            EvaluationContext& eval_ctx) const;
     };
 
     /**

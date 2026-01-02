@@ -182,7 +182,7 @@ namespace orion::bre
         }
     }
     
-    json ASTNode::evaluate(const json& context) const
+    json ASTNode::evaluate(const json& input, const EvaluationContext& eval_ctx) const
     {
         switch (type)
         {
@@ -230,14 +230,14 @@ namespace orion::bre
             json listArray = json::array();
             for (const auto& child : children)
             {
-                listArray.push_back(child->evaluate(context));
+                listArray.push_back(child->evaluate(input, eval_ctx));
             }
             return listArray;
         }
         
         case ASTNodeType::VARIABLE:
         {
-            return resolveVariable(value, context);
+            return resolveVariable(value, input);
         }           case ASTNodeType::UNARY_OP:
             {
                 if (children.size() != 1)
@@ -245,7 +245,7 @@ namespace orion::bre
                     throw std::runtime_error("Unary operator requires exactly one operand");
                 }
                 
-                json operand = children[0]->evaluate(context);
+                json operand = children[0]->evaluate(input, eval_ctx);
                 
                 if (value == "-")
                 {
@@ -268,8 +268,8 @@ namespace orion::bre
                     throw std::runtime_error("Binary operator requires exactly two operands");
                 }
                 
-                json left = children[0]->evaluate(context);
-                json right = children[1]->evaluate(context);
+                json left = children[0]->evaluate(input, eval_ctx);
+                json right = children[1]->evaluate(input, eval_ctx);
                 
                 // Arithmetic operators - DMN null propagation
                 if (value == "+")
@@ -449,7 +449,7 @@ namespace orion::bre
                 }
                 
                 // Evaluate the object expression
-                json obj = children[0]->evaluate(context);
+                json obj = children[0]->evaluate(input, eval_ctx);
                 
                 // Property name is stored in value
                 const std::string& propertyName = value;
@@ -530,12 +530,12 @@ namespace orion::bre
             }
             
             // Evaluate condition
-            json condition = children[0]->evaluate(context);
+            json condition = children[0]->evaluate(input, eval_ctx);
             
             // DMN spec: null condition → else branch
             if (condition.is_null())
             {
-                return children[2]->evaluate(context);
+                return children[2]->evaluate(input, eval_ctx);
             }
             
             // Type validation: condition should be boolean
@@ -549,12 +549,12 @@ namespace orion::bre
             if (condition.get<bool>())
             {
                 // Evaluate then branch
-                return children[1]->evaluate(context);
+                return children[1]->evaluate(input, eval_ctx);
             }
             else
             {
                 // Evaluate else branch
-                return children[2]->evaluate(context);
+                return children[2]->evaluate(input, eval_ctx);
             }
         }
             
@@ -567,7 +567,7 @@ namespace orion::bre
             // Parameter validation errors should return null per DMN spec
             std::vector<json> args;
             try {
-                args = feel::bind_parameters(funcName, parameters, context);
+                args = feel::bind_parameters(funcName, parameters, input, eval_ctx);
             } catch (const std::runtime_error&) {
                 // Parameter validation failed (wrong param names, wrong count, etc.)
                 // Return null as per DMN 1.5 spec
@@ -683,7 +683,7 @@ namespace orion::bre
             }
             else if (funcName == "matches")
             {
-                return feel::evaluate_matches_function(args);
+                return feel::evaluate_matches_function(args, eval_ctx);
             }
             else if (funcName == "split")
             {

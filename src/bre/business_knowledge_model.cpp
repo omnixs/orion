@@ -33,8 +33,9 @@ namespace orion::bre
     using orion::api::debug;
 
     nlohmann::json BusinessKnowledgeModel::invoke(const std::vector<nlohmann::json>& args,
-                                                  const nlohmann::json& context,
-                                                  const std::map<std::string, BusinessKnowledgeModel>& available_bkms)
+                                                  const nlohmann::json& input,
+                                                  const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                                  const EvaluationContext& eval_ctx)
     const
     {
         // Contract: BKM must have a name
@@ -60,7 +61,7 @@ namespace orion::bre
         }
 
         // Create parameter bindings for BKM evaluation
-        nlohmann::json bkm_context = context;
+        nlohmann::json bkm_context = input;
 
         // Bind arguments to parameters if parameters are defined
         if (!parameters.empty()) [[likely]]
@@ -72,6 +73,6 @@ namespace orion::bre
         }
 
         // Evaluate the BKM expression with the enhanced context
-        return evaluate_bkm_expression(expression_text, bkm_context, available_bkms);
+        return evaluate_bkm_expression(expression_text, bkm_context, available_bkms, eval_ctx);
     }
 } // namespace orion::bre

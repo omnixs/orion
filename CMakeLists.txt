@@ -200,6 +200,7 @@ set(ORION_SRC
   src/bre/feel/lexer.cpp
   src/bre/feel/parameter_binder.cpp
   src/bre/feel/parser.cpp
+  src/bre/feel/regex_cache.cpp
   src/bre/feel/types.cpp
   src/bre/feel/unary.cpp
   src/bre/feel/util.cpp
@@ -242,8 +243,12 @@ target_include_directories(orion_lib
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# Find PCRE2 library for regex support
+find_package(PCRE2 REQUIRED CONFIG)
+
 target_link_libraries(orion_lib PUBLIC
   nlohmann_json::nlohmann_json
+  PCRE2::8BIT
 )
 
 set_property(TARGET orion_lib PROPERTY VERSION ${PROJECT_VERSION})
@@ -299,6 +304,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_tck_named_params_quick.cpp
       tst/bre/feel/test_dmn_abs_named_params.cpp
       tst/bre/feel/test_tck_abs_debug.cpp
+      tst/bre/feel/test_feel_matches.cpp
       tst/common/test_xml2json.cpp
   )
 

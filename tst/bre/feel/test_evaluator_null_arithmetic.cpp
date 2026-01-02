@@ -6,15 +6,17 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include "../../../src/bre/feel/util_internal.hpp"
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(feel_null_arithmetic_debug)
 
 BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     orion::bre::feel::Evaluator evaluator;
-    json context = {};
     
     BOOST_TEST_MESSAGE("\n=== DEBUGGING NULL ARITHMETIC EVALUATION PATH ===");
     
@@ -37,7 +39,7 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     BOOST_TEST_MESSAGE("Testing through orion::bre::feel::Evaluator::evaluate():");
     for (const auto& test_case : null_cases) {
         BOOST_TEST_MESSAGE("Expression: " << test_case.expression);
-        json result = evaluator.evaluate(test_case.expression, context);
+        json result = evaluator.evaluate(test_case.expression, {}, get_test_eval_ctx());
         BOOST_TEST_MESSAGE("  Result: " << result);
         
         if (result.is_null()) {
@@ -50,8 +52,9 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     
     // Test direct math expression evaluation
     BOOST_TEST_MESSAGE("\nTesting through detail::eval_math_expression():");
-    context["testNull"] = nullptr;
-    orion::bre::detail::current_eval_context = &context;
+    json input;
+    input["testNull"] = nullptr;
+    orion::bre::detail::current_eval_context = &input;
     
     std::vector<std::string> direct_math_tests = {
         "10 - testNull",

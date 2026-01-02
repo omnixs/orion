@@ -6,14 +6,17 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(feel_negative_number_debug)
 
 BOOST_AUTO_TEST_CASE(test_negative_number_parsing_issue) {
     orion::bre::feel::Evaluator evaluator;
-    json context = {};
+    json input = {};
     
     // Test the exact failing expressions from 0105-feel-math
     BOOST_TEST_MESSAGE("\n=== DEBUGGING NEGATIVE NUMBER PARSING ===");
@@ -36,7 +39,7 @@ BOOST_AUTO_TEST_CASE(test_negative_number_parsing_issue) {
     
     for (const auto& test_case : test_cases) {
         BOOST_TEST_MESSAGE("Testing: " << test_case.expression);
-        json result = evaluator.evaluate(test_case.expression, context);
+        json result = evaluator.evaluate(test_case.expression, input, get_test_eval_ctx());
         
         BOOST_TEST_MESSAGE("  Result: " << result);
         BOOST_TEST_MESSAGE("  Expected: " << test_case.expected);

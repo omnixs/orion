@@ -18,7 +18,7 @@
 
 #include "util_internal.hpp"
 #include <orion/api/logger.hpp>
-#include <regex>
+#include <ctre.hpp>
 #include <algorithm>
 #include <cctype>
 #include <limits>
@@ -180,22 +180,19 @@ namespace orion::bre::detail
         // Handle expressions like "(loan.principal*loan.rate/MONTHS_PER_YEAR)/(1-(1+loan.rate/MONTHS_PER_YEAR)**-loan.termMonths)"
         try
         {
-            string expr(expression);  // regex requires std::string
+            string result;
 
-            // Replace property references with their values
-            std::regex prop_regex(R"([a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z][a-zA-Z0-9_]*)");
-            std::smatch match;
-
-        auto replacer = [&context](const string& prop_path) -> string
-        {
-            size_t dot_pos = prop_path.find('.');
-            if (dot_pos == string::npos)
+            auto replacer = [&context](std::string_view prop_path) -> string
             {
-                return prop_path;
-            }
+                size_t dot_pos = prop_path.find('.');
+                if (dot_pos == string::npos)
+                {
+                    return string(prop_path);
+                }
 
-            string obj_name = prop_path.substr(0, dot_pos);
-            string prop_name = prop_path.substr(dot_pos + 1);               if (context.contains(obj_name) && context[obj_name].is_object())
+                string obj_name(prop_path.substr(0, dot_pos));
+                string prop_name(prop_path.substr(dot_pos + 1));
+                if (context.contains(obj_name) && context[obj_name].is_object())
                 {
                     const auto& obj = context[obj_name];
                     if (obj.contains(prop_name) && obj[prop_name].is_number())
@@ -203,27 +200,27 @@ namespace orion::bre::detail
                         return std::to_string(obj[prop_name].get<double>());
                     }
                 }
-                return prop_path; // Return unchanged if not found
+                return string(prop_path); // Return unchanged if not found
             };
 
-            // Replace all property references
-            string::const_iterator start = expr.cbegin();
-            string result;
-            while (std::regex_search(start, expr.cend(), match, prop_regex))
+            // Replace all property references using CTRE
+            size_t pos = 0;
+            while (pos < expression.size())
             {
-                result.append(start, match[0].first);
-                result.append(replacer(match.str()));
-                start = match[0].second;
+                if (auto match = ctre::search<R"([a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z][a-zA-Z0-9_]*)">(expression.substr(pos)))
+                {
+                    size_t match_pos = match.get<0>().data() - expression.data();
+                    result.append(expression.substr(pos, match_pos - pos));
+                    result.append(replacer(match.get<0>().to_view()));
+                    pos = match_pos + match.get<0>().size();
+                } else {
+                    result.append(expression.substr(pos));
+                    break;
+                }
             }
-            result.append(start, expr.cend());
 
             // Now evaluate the numerical expression
             return eval_math_expression(result);
-        }
-        catch (const std::regex_error&)
-        {
-            // Regex compilation/matching failed
-            return json{};
         }
         catch (const std::runtime_error&)
         {

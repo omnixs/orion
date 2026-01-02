@@ -32,6 +32,15 @@ For production use, you would typically **enable** binary caching to speed up bu
   - Visual Studio 2022 17.0+ (Windows)
 - vcpkg package manager
 
+**Note**: When vcpkg builds the orion library, it will automatically install the following transitive dependencies:
+- **nlohmann-json** - JSON library (used by orion's public API)
+- **PCRE2** - Perl-compatible regular expressions (for FEEL `matches()` function)
+- **CTRE** - Compile-time regular expressions (internal implementation)
+- **spdlog** - Logging framework
+- **RapidXML** - XML parsing
+
+You don't need to manually install these - vcpkg handles them automatically through orion's dependency manifest.
+
 ## Setup
 
 1. Make sure you have vcpkg installed and the `VCPKG_ROOT` environment variable set:

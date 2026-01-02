@@ -20,7 +20,8 @@
 #include <string>
 #include <string_view>
 #include <nlohmann/json.hpp>
+#include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre::feel {
-    bool eval_feel_literal(std::string_view expr, const nlohmann::json& ctx, nlohmann::json& out, std::string& err);
+    bool eval_feel_literal(std::string_view expr, const nlohmann::json& input, nlohmann::json& out, std::string& err, const bre::EvaluationContext& eval_ctx);
 }

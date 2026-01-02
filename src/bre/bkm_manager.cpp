@@ -24,7 +24,7 @@
 #include <orion/bre/contract_violation.hpp>
 #include "../common/util.hpp"  // Reuse existing utility functions
 #include "feel/util_internal.hpp"
-#include <regex>     // For BKM function call parsing
+#include <ctre.hpp>
 #include <stdexcept>
 #include <algorithm>
 #include <set>       // For std::set
@@ -81,7 +81,8 @@ namespace orion::bre
 
     json BKMManager::invoke_bkm(std::string_view bkm_name,
                                const vector<json>& args,
-                               const json& context) const
+                                 const json& input,
+                                 const EvaluationContext& eval_ctx) const
     {
         if (bkm_name.empty()) [[unlikely]]
         {
@@ -97,7 +98,7 @@ namespace orion::bre
         // Create BKM map for recursive calls
         auto bkm_map = create_bkm_map();
 
-        return bkm_iterator->second->invoke(args, context, bkm_map);
+        return bkm_iterator->second->invoke(args, input, bkm_map, eval_ctx);
     }
 
     bool BKMManager::has_bkm(std::string_view bkm_name) const
@@ -178,7 +179,7 @@ namespace orion::bre
     // Helper function to handle arithmetic operations on BKM results
     static nlohmann::json handle_arithmetic_remainder(const nlohmann::json& bkm_result, 
                                                        const std::string& remainder,
-                                                       const nlohmann::json& context)
+                                                       const nlohmann::json& input)
     {
         if (remainder.starts_with('+') && remainder.length() > 1)
         {
@@ -189,10 +190,10 @@ namespace orion::bre
             
             debug("Extracted variable name: '{}'", add_var);
 
-            if (context.contains(add_var) && context[add_var].is_number() && bkm_result.is_number())
+            if (input.contains(add_var) && input[add_var].is_number() && bkm_result.is_number())
             {
                 double bkm_val = bkm_result.get<double>();
-                double add_val = context[add_var].get<double>();
+                double add_val = input[add_var].get<double>();
                 double sum = bkm_val + add_val;
                 nlohmann::json result = sum;  // Simplified construction
                 
@@ -205,14 +206,15 @@ namespace orion::bre
     // Helper function to process BKM function call
     static nlohmann::json process_bkm_call(std::string_view func_name,
                                             std::string_view args_str,
-                                            const nlohmann::json& context,
-                                            const std::map<std::string, BusinessKnowledgeModel>& available_bkms)
+                                            const nlohmann::json& input,
+                                            const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                            const EvaluationContext& eval_ctx)
     {
         // Check if this BKM exists
         auto bkm_it = available_bkms.find(std::string(func_name));
         if (bkm_it == available_bkms.end())
         {
-            return feel::Evaluator::evaluate(std::string(func_name) + "(" + std::string(args_str) + ")", context);
+            return feel::Evaluator::evaluate(std::string(func_name) + "(" + std::string(args_str) + ")", input, eval_ctx);
         }
 
         const BusinessKnowledgeModel& bkm = bkm_it->second;
@@ -230,57 +232,60 @@ namespace orion::bre
         std::vector<nlohmann::json> arg_values;
         for (const auto& arg : args)
         {
-            nlohmann::json arg_val = detail::resolve_argument(arg, context);
+            nlohmann::json arg_val = detail::resolve_argument(arg, input);
             arg_values.push_back(arg_val);
         }
 
         // Invoke BKM
-        return bkm.invoke(arg_values, context, available_bkms);
+        return bkm.invoke(arg_values, input, available_bkms, eval_ctx);
     }
 
     // BKM-specific expression evaluator  
     json evaluate_bkm_expression(std::string_view expression,
-                               const json& context,
-                               const map<string, BusinessKnowledgeModel>& available_bkms)
+                               const json& input,
+                               const map<string, BusinessKnowledgeModel>& available_bkms,
+                               const EvaluationContext& eval_ctx)
     {
         // Pattern: PMT(Loan.amount, Loan.rate, Loan.term)+fee
         // First, check if this contains a BKM function call
-        std::regex bkm_call_regex(R"(\b([A-Za-z][A-Za-z0-9_]*)\s*\(\s*([^)]*)\s*\))");
-        std::smatch match;
-        string expr_str(expression);  // regex_search requires std::string
-
-    if (std::regex_search(expr_str, match, bkm_call_regex))
-    {
-        std::string func_name = match[1].str();
-        std::string args_str = match[2].str();
-        
-        debug("Found function call: {} with args: {}", func_name, args_str);
-
-        // Check if this is a built-in function - if so, fall back to FEEL evaluation
-        const auto& builtin_functions = get_builtin_functions();
-        if (builtin_functions.find(func_name) != builtin_functions.end())
+        // CTRE compile-time regex for BKM call pattern
+        if (auto match = ctre::search<R"(\b([A-Za-z][A-Za-z0-9_]*)\s*\(\s*([^)]*)\s*\))">(expression))
         {
-            debug("Using FEEL evaluator for builtin function: {}", func_name);
-            return feel::Evaluator::evaluate(expression, context);
-        }           // Process BKM call
-            nlohmann::json bkm_result = process_bkm_call(func_name, args_str, context, available_bkms);
+            std::string func_name = match.get<1>().to_string();
+            std::string args_str = match.get<2>().to_string();
+        
+            debug("Found function call: {} with args: {}", func_name, args_str);
+
+            // Check if this is a built-in function - if so, fall back to FEEL evaluation
+            const auto& builtin_functions = get_builtin_functions();
+            if (builtin_functions.find(func_name) != builtin_functions.end())
+            {
+                debug("Using FEEL evaluator for builtin function: {}", func_name);
+                return feel::Evaluator::evaluate(expression, input, eval_ctx);
+            }
+            
+            // Process BKM call
+            nlohmann::json bkm_result = process_bkm_call(func_name, args_str, input, available_bkms, eval_ctx);
 
             // Check if there's additional arithmetic (e.g., +fee)
-            std::string full_match = match[0].str();
-            size_t match_end = expr_str.find(full_match) + full_match.length();
+            std::string_view full_match = match.get<0>().to_view();
+            size_t match_start = full_match.data() - expression.data();
+            size_t match_end = match_start + full_match.size();
 
-        if (match_end < expr_str.length())
-        {
-            std::string remainder = expr_str.substr(match_end);
-            debug("Processing arithmetic remainder: '{}'", remainder);
-            json final_result = handle_arithmetic_remainder(bkm_result, remainder, context);
-            debug("Final result after arithmetic: {}", final_result.dump());
-            return final_result;
-        }           return bkm_result;
+            if (match_end < expression.length())
+            {
+                std::string remainder(expression.substr(match_end));
+                debug("Processing arithmetic remainder: '{}'", remainder);
+                json final_result = handle_arithmetic_remainder(bkm_result, remainder, input);
+                debug("Final result after arithmetic: {}", final_result.dump());
+                return final_result;
+            }
+
+            return bkm_result;
         }
 
         // Use the full feel::Evaluator for logical and other complex expressions
-        nlohmann::json result = feel::Evaluator::evaluate(expression, context);
+        nlohmann::json result = feel::Evaluator::evaluate(expression, input, eval_ctx);
         if (!result.is_null())
         {
             return result;
@@ -288,7 +293,7 @@ namespace orion::bre
 
         // Fallback to basic FEEL evaluation for simple literals
         std::string error;
-        if (feel::eval_feel_literal(expression, context, result, error))
+        if (feel::eval_feel_literal(expression, input, result, error, eval_ctx))
         {
             return result;
         }

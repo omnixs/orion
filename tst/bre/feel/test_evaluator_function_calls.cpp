@@ -6,12 +6,16 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/ast_node.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
 using namespace orion::bre;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(test_function_calls_suite)
 
@@ -24,9 +28,7 @@ BOOST_AUTO_TEST_CASE(test_not_function_basic)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -40,9 +42,7 @@ BOOST_AUTO_TEST_CASE(test_not_function_false)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == true);
@@ -56,9 +56,7 @@ BOOST_AUTO_TEST_CASE(test_not_function_null_propagation)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_null());
 }
@@ -73,13 +71,13 @@ BOOST_AUTO_TEST_CASE(test_not_function_with_variable)
     auto ast = parser.parse(tokens);
     
     // Test with A = true
-    json context1 = {{"A", true}};
-    json result1 = ast->evaluate(context1);
+    json input1 = {{"A", true}};
+    json result1 = ast->evaluate(input1, get_test_eval_ctx());
     BOOST_TEST(result1 == false);
     
     // Test with A = false
-    json context2 = {{"A", false}};
-    json result2 = ast->evaluate(context2);
+    json input2 = {{"A", false}};
+    json result2 = ast->evaluate(input2, get_test_eval_ctx());
     BOOST_TEST(result2 == true);
 }
 
@@ -93,13 +91,13 @@ BOOST_AUTO_TEST_CASE(test_not_function_with_string_boolean)
     auto ast = parser.parse(tokens);
     
     // Test with A = "true" (as string)
-    json context1 = {{"A", "true"}};
-    json result1 = ast->evaluate(context1);
+    json input1 = {{"A", "true"}};
+    json result1 = ast->evaluate(input1, get_test_eval_ctx());
     BOOST_TEST(result1 == false);
     
     // Test with A = "false" (as string)
-    json context2 = {{"A", "false"}};
-    json result2 = ast->evaluate(context2);
+    json input2 = {{"A", "false"}};
+    json result2 = ast->evaluate(input2, get_test_eval_ctx());
     BOOST_TEST(result2 == true);
 }
 
@@ -112,9 +110,7 @@ BOOST_AUTO_TEST_CASE(test_contains_function_basic)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == true);
@@ -128,9 +124,7 @@ BOOST_AUTO_TEST_CASE(test_contains_function_not_found)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -144,9 +138,7 @@ BOOST_AUTO_TEST_CASE(test_contains_function_null_propagation)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_null());
 }
@@ -164,8 +156,8 @@ BOOST_AUTO_TEST_CASE(test_all_function_all_true)
     param.valueExpr = std::move(varNode);
     funcNode->parameters.push_back(std::move(param));
     
-    json context = {{"list", json::array({true, true, true})}};
-    json result = funcNode->evaluate(context);
+    json input = {{"list", json::array({true, true, true})}};
+    json result = funcNode->evaluate(input, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == true);
@@ -180,8 +172,8 @@ BOOST_AUTO_TEST_CASE(test_all_function_has_false)
     param.valueExpr = std::move(varNode);
     funcNode->parameters.push_back(std::move(param));
     
-    json context = {{"list", json::array({true, false, true})}};
-    json result = funcNode->evaluate(context);
+    json input = {{"list", json::array({true, false, true})}};
+    json result = funcNode->evaluate(input, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -197,8 +189,8 @@ BOOST_AUTO_TEST_CASE(test_all_function_empty_list)
     param.valueExpr = std::move(varNode);
     funcNode->parameters.push_back(std::move(param));
     
-    json context = {{"list", json::array()}};
-    json result = funcNode->evaluate(context);
+    json input = {{"list", json::array()}};
+    json result = funcNode->evaluate(input, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == true);
@@ -214,8 +206,8 @@ BOOST_AUTO_TEST_CASE(test_any_function_has_true)
     param.valueExpr = std::move(varNode);
     funcNode->parameters.push_back(std::move(param));
     
-    json context = {{"list", json::array({false, true, false})}};
-    json result = funcNode->evaluate(context);
+    json input = {{"list", json::array({false, true, false})}};
+    json result = funcNode->evaluate(input, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == true);
@@ -230,8 +222,8 @@ BOOST_AUTO_TEST_CASE(test_any_function_all_false)
     param.valueExpr = std::move(varNode);
     funcNode->parameters.push_back(std::move(param));
     
-    json context = {{"list", json::array({false, false, false})}};
-    json result = funcNode->evaluate(context);
+    json input = {{"list", json::array({false, false, false})}};
+    json result = funcNode->evaluate(input, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -247,8 +239,8 @@ BOOST_AUTO_TEST_CASE(test_any_function_empty_list)
     param.valueExpr = std::move(varNode);
     funcNode->parameters.push_back(std::move(param));
     
-    json context = {{"list", json::array()}};
-    json result = funcNode->evaluate(context);
+    json input = {{"list", json::array()}};
+    json result = funcNode->evaluate(input, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -258,10 +250,7 @@ BOOST_AUTO_TEST_CASE(test_any_function_empty_list)
 BOOST_AUTO_TEST_CASE(test_not_function_wrong_argument_count)
 {
     // not() with no arguments should return null (DMN spec: invalid args → null)
-    auto funcNode = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, "not");
-    json context = json::object();
-    
-    auto result = funcNode->evaluate(context);
+    auto funcNode = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, "not");    auto result = funcNode->evaluate({}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -274,20 +263,14 @@ BOOST_AUTO_TEST_CASE(test_contains_wrong_argument_count)
     FunctionParameter param;
     param.name = "";  // positional
     param.valueExpr = std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, "test");
-    funcNode->parameters.push_back(std::move(param));
-    
-    json context = json::object();
-    auto result = funcNode->evaluate(context);
+    funcNode->parameters.push_back(std::move(param));    auto result = funcNode->evaluate({}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_unknown_function)
 {
     // Unknown function should throw
-    auto funcNode = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, "unknownFunc");
-    json context = json::object();
-    
-    BOOST_CHECK_THROW((void)funcNode->evaluate(context), std::runtime_error);
+    auto funcNode = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, "unknownFunc");    BOOST_CHECK_THROW((void)funcNode->evaluate({}, get_test_eval_ctx()), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
