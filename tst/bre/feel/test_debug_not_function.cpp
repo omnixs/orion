@@ -11,33 +11,29 @@
 #include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(debug_not_function)
 
 BOOST_AUTO_TEST_CASE(test_not_with_evaluator)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test not() using Evaluator (should work)
     using orion::bre::feel::Evaluator;
     
-    json result1 = Evaluator::evaluate("not(true)", json::object(), eval_ctx);
+    json result1 = Evaluator::evaluate("not(true)", {}, get_test_eval_ctx());
     BOOST_TEST(result1.is_boolean());
     BOOST_TEST(result1 == false);
     
-    json result2 = Evaluator::evaluate("not(false)", json::object(), eval_ctx);
+    json result2 = Evaluator::evaluate("not(false)", {}, get_test_eval_ctx());
     BOOST_TEST(result2.is_boolean());
     BOOST_TEST(result2 == true);
 }
 
 BOOST_AUTO_TEST_CASE(test_not_with_parser_directly)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test not() using Parser directly (this is what the old tests do)
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("not(true)");
@@ -57,10 +53,7 @@ BOOST_AUTO_TEST_CASE(test_not_with_parser_directly)
         {
             BOOST_TEST_MESSAGE("  Parameter " << i << " has valueExpr");
         }
-    }
-    
-    json context = json::object();
-    json result = ast->evaluate(context, eval_ctx);
+    }    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -68,9 +61,6 @@ BOOST_AUTO_TEST_CASE(test_not_with_parser_directly)
 
 BOOST_AUTO_TEST_CASE(test_abs_with_parser_directly)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test abs() for comparison (this should work based on our unit tests)
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("abs(-42)");
@@ -85,10 +75,7 @@ BOOST_AUTO_TEST_CASE(test_abs_with_parser_directly)
     for (size_t i = 0; i < ast->parameters.size(); ++i)
     {
         BOOST_TEST_MESSAGE("  ABS Parameter " << i << " name: '" << ast->parameters[i].name << "'");
-    }
-    
-    json context = json::object();
-    json result = ast->evaluate(context, eval_ctx);
+    }    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result == 42);
 }

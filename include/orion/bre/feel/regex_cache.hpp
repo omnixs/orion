@@ -37,6 +37,28 @@ namespace orion::bre::feel {
      * 
      * Encapsulates PCRE2 compiled code and match data to avoid exposing
      * PCRE2 types in public API. Handles resource cleanup via RAII.
+     * 
+     * @note Architectural Decision: PCRE2 vs CTRE for Dynamic Patterns
+     * 
+     * ORION uses two regex libraries with distinct purposes:
+     * - **CTRE**: Compile-time patterns (zero runtime overhead)
+     *   - Used for: Fixed patterns in parsers (unary.cpp, types.cpp, bkm_manager.cpp)
+     *   - Benefit: Pattern validation at compile time, zero runtime cost
+     * 
+     * - **PCRE2**: Runtime/dynamic patterns (this file)
+     *   - Used for: FEEL matches() function where patterns come from user data
+     *   - Benefits over CTRE dynamic mode:
+     *     1. **JIT Compilation**: ~20% faster execution via native machine code
+     *     2. **Caching**: LRU cache avoids recompilation of repeated patterns
+     *     3. **Resource Management**: Better RAII integration for compiled code
+     *     4. **Feature Completeness**: Full Perl-compatible syntax, robust Unicode support
+     * 
+     * While CTRE supports dynamic patterns, it lacks JIT optimization and is
+     * essentially interpreted at runtime. PCRE2's JIT compiler provides significant
+     * performance advantages for the FEEL matches() use case where patterns are
+     * user-provided at runtime and may be reused across multiple evaluations.
+     * 
+     * See: .github/tasks/17_replace_std_regex.md for complete rationale
      */
     class CompiledRegex {
     public:

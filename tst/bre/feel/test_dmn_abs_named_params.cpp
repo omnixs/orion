@@ -10,16 +10,15 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <nlohmann/json.hpp>
 #include <string>
+#include "test_helpers.hpp"
 
 BOOST_AUTO_TEST_SUITE(test_dmn_abs_named_params, *boost::unit_test::disabled())
 
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 // Test the exact DMN structure from TCK test 0050-feel-abs-function
 BOOST_AUTO_TEST_CASE(test_abs_positional_basic) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">
   <decision name="decision001" id="_decision001">
@@ -48,9 +47,6 @@ BOOST_AUTO_TEST_CASE(test_abs_positional_basic) {
 }
 
 BOOST_AUTO_TEST_CASE(test_abs_positional_negative) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">
   <decision name="decision002" id="_decision002">
@@ -79,9 +75,6 @@ BOOST_AUTO_TEST_CASE(test_abs_positional_negative) {
 }
 
 BOOST_AUTO_TEST_CASE(test_abs_named_param_correct) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // TCK test decision006: abs(n:-1) should return 1
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">
@@ -119,9 +112,7 @@ BOOST_AUTO_TEST_CASE(test_abs_named_param_correct) {
 }
 
 BOOST_AUTO_TEST_CASE(test_abs_named_param_wrong_name) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
+
     // TCK test decision007: abs(number:-1) should return null (wrong param name)
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">
@@ -152,9 +143,6 @@ BOOST_AUTO_TEST_CASE(test_abs_named_param_wrong_name) {
 }
 
 BOOST_AUTO_TEST_CASE(test_abs_no_params) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // TCK test decision004: abs() should return null
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">
@@ -184,9 +172,6 @@ BOOST_AUTO_TEST_CASE(test_abs_no_params) {
 }
 
 BOOST_AUTO_TEST_CASE(test_abs_too_many_params) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // TCK test decision005: abs(1,1) should return null
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">

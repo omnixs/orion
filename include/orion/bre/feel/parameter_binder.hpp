@@ -80,7 +80,8 @@ namespace orion::bre::feel {
      * 
      * @param functionName Name of the function being called
      * @param parameters Actual parameters from AST (may be positional or named)
-     * @param context Evaluation context for evaluating parameter expressions
+     * @param input Input data/variable bindings for evaluating parameter expressions
+     * @param eval_ctx Evaluation context with regex cache
      * @return Vector of evaluated argument values in signature order
      * @throws std::runtime_error if:
      *   - Function not found in registry
@@ -97,16 +98,16 @@ namespace orion::bre::feel {
      * p.valueExpr = std::make_unique<ASTNode>(ASTNodeType::LITERAL_NUMBER, "-42");
      * params.push_back(std::move(p));
      * 
-     * json context = {};
+     * json input = {};
      * EvaluationContext eval_ctx{&regex_cache};
-     * std::vector<json> args = bind_parameters("abs", params, context, eval_ctx);
+     * std::vector<json> args = bind_parameters("abs", params, input, eval_ctx);
      * // args[0] = -42
      * ```
      */
     std::vector<json> bind_parameters(
         const std::string& functionName,
         const std::vector<FunctionParameter>& parameters,
-        const json& context,
+        const json& input,
         const EvaluationContext& eval_ctx
     );
 } // namespace orion::bre::feel

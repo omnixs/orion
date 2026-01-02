@@ -135,8 +135,7 @@ namespace orion
             json results = json::object();
 
             // Create evaluation context with engine's regex cache
-            bre::feel::EvaluationContext eval_ctx;
-            eval_ctx.regex_cache = &pimpl->regex_cache_;
+            bre::EvaluationContext eval_ctx(pimpl->regex_cache_);
 
             // Evaluate all decision tables
             for (const auto& [name, dt] : pimpl->decision_tables_)

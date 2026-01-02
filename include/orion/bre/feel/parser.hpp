@@ -107,12 +107,12 @@ namespace orion::bre::feel {
      * requiring separate AST construction and evaluation steps.
      * 
      * @param expression The FEEL expression to evaluate
-     * @param context The JSON context for variable resolution
+     * @param input Input data/variable bindings as JSON object
      * @param eval_ctx Evaluation context with regex cache
      * @return The result of evaluation as JSON
      * @throws std::runtime_error if parsing or evaluation fails
      */
-    static nlohmann::json eval_expression(std::string_view expression, const nlohmann::json& context, const EvaluationContext& eval_ctx);  private:
+    static nlohmann::json eval_expression(std::string_view expression, const nlohmann::json& input, const EvaluationContext& eval_ctx);  private:
         const std::vector<Token>* tokens_ = nullptr;  ///< Current token stream
         size_t position_ = 0;                         ///< Current position in token stream
         

@@ -29,7 +29,7 @@ std::vector<json> bind_positional_parameters(
     const std::string& functionName,
     const FunctionSignature& sig,
     const std::vector<FunctionParameter>& parameters,
-    const json& context,
+    const json& input,
     const EvaluationContext& eval_ctx)
 {
     const auto& formal_params = sig.parameters;
@@ -51,7 +51,7 @@ std::vector<json> bind_positional_parameters(
         if (i < parameters.size())
         {
             // Evaluate provided parameter
-            args.push_back(parameters[i].valueExpr->evaluate(context, eval_ctx));
+            args.push_back(parameters[i].valueExpr->evaluate(input, eval_ctx));
         }
         else if (formal_params[i].optional)
         {
@@ -73,7 +73,7 @@ std::vector<json> bind_positional_parameters(
     {
         for (size_t i = formal_params.size(); i < parameters.size(); ++i)
         {
-            args.push_back(parameters[i].valueExpr->evaluate(context, eval_ctx));
+            args.push_back(parameters[i].valueExpr->evaluate(input, eval_ctx));
         }
     }
     
@@ -85,7 +85,7 @@ std::vector<json> bind_named_parameters(
     const std::string& functionName,
     const FunctionSignature& sig,
     const std::vector<FunctionParameter>& parameters,
-    const json& context,
+    const json& input,
     const EvaluationContext& eval_ctx)
 {
     const auto& formal_params = sig.parameters;
@@ -105,7 +105,7 @@ std::vector<json> bind_named_parameters(
             if (formal_params[i].name == actual_param.name)
             {
                 // Evaluate and bind parameter
-                args[i] = actual_param.valueExpr->evaluate(context, eval_ctx);
+                args[i] = actual_param.valueExpr->evaluate(input, eval_ctx);
                 provided[i] = true;
                 found = true;
                 break;
@@ -119,7 +119,7 @@ std::vector<json> bind_named_parameters(
             if (sig.variadic)
             {
                 // Add to end of args vector
-                args.push_back(actual_param.valueExpr->evaluate(context, eval_ctx));
+                args.push_back(actual_param.valueExpr->evaluate(input, eval_ctx));
             }
             else
             {
@@ -158,7 +158,7 @@ bool has_named_parameters(const std::vector<FunctionParameter>& parameters)
     std::vector<json> bind_parameters(
         const std::string& functionName,
         const std::vector<FunctionParameter>& parameters,
-        const json& context,
+        const json& input,
         const EvaluationContext& eval_ctx
     )
     {
@@ -172,7 +172,7 @@ bool has_named_parameters(const std::vector<FunctionParameter>& parameters)
             args.reserve(parameters.size());
             for (const auto& param : parameters)
             {
-                args.push_back(param.valueExpr->evaluate(context, eval_ctx));
+                args.push_back(param.valueExpr->evaluate(input, eval_ctx));
             }
             return args;
         }
@@ -184,8 +184,8 @@ bool has_named_parameters(const std::vector<FunctionParameter>& parameters)
         
     if (using_named_params)
     {
-        return bind_named_parameters(functionName, sig, parameters, context, eval_ctx);
+        return bind_named_parameters(functionName, sig, parameters, input, eval_ctx);
     }
-    return bind_positional_parameters(functionName, sig, parameters, context, eval_ctx);
+    return bind_positional_parameters(functionName, sig, parameters, input, eval_ctx);
     }
 } // namespace orion::bre::feel

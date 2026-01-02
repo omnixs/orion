@@ -6,8 +6,6 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/api/engine.hpp>
-#include <orion/bre/feel/regex_cache.hpp>
-#include <orion/bre/feel/evaluator.hpp>
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <filesystem>
@@ -18,9 +16,6 @@ using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 BOOST_AUTO_TEST_CASE(test_abs_with_actual_tck_file) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Read the actual TCK DMN file
     fs::path dmn_path = "dat/dmn-tck/TestCases/compliance-level-3/0050-feel-abs-function/0050-feel-abs-function.dmn";
     

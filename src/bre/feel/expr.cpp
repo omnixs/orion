@@ -19,6 +19,7 @@
 #include <orion/bre/feel/expr.hpp>
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/evaluation_context.hpp>
 
 #include <nlohmann/json.hpp>
 #include <cctype>
@@ -1064,10 +1065,42 @@ static Value eval_range(const ERange* r, const json& ctx)
         {
             if (args.size() == 2 && args[0].is_str() && args[1].is_str())
             {
-                // NOTE: matches() in legacy eval_feel_literal() path is not supported
-                // The modern evaluation path (ast_node.cpp with EvaluationContext) should be used instead
-                // This legacy path is only for simple literals and doesn't have access to RegexCache
-                return make_null();  // Return null to indicate unsupported operation
+                // Legacy path: Create temporary RegexCache and EvaluationContext
+                // This provides regex caching even in the legacy eval_feel_literal() path
+                orion::bre::feel::RegexCache temp_cache;
+                orion::bre::EvaluationContext temp_ctx{temp_cache};
+                
+                std::string input_val = args[0].str();
+                std::string pattern_val = args[1].str();
+                
+                // DMN spec: empty pattern matches only empty input
+                if (pattern_val.empty()) {
+                    return Value(input_val.empty());
+                }
+                
+                // FEEL strings use double-backslash for literal backslash, PCRE2 expects single
+                // Unescape FEEL string escape sequences: double-backslash becomes single-backslash
+                std::string unescaped_pattern;
+                unescaped_pattern.reserve(pattern_val.size());
+                for (size_t i = 0; i < pattern_val.size(); ++i) {
+                    if (pattern_val[i] == '\\' && i + 1 < pattern_val.size() && pattern_val[i + 1] == '\\') {
+                        unescaped_pattern += '\\';
+                        ++i; // Skip next backslash
+                    } else {
+                        unescaped_pattern += pattern_val[i];
+                    }
+                }
+                
+                // Use temporary cache to compile and execute regex
+                auto compiled = temp_ctx.regex_cache.get_or_compile(unescaped_pattern, "");
+                
+                if (!compiled) {
+                    // Invalid regex pattern - DMN spec says return null
+                    return make_null();
+                }
+                
+                bool match_result = compiled->matches(input_val);
+                return Value(match_result);
             }
             return make_null();
         }
@@ -1296,11 +1329,11 @@ static Value eval_range(const ERange* r, const json& ctx)
 
 } // end anonymous namespace
 
-    bool eval_feel_literal(std::string_view expr, const json& ctx, json& out, std::string& err, const EvaluationContext& eval_ctx)
+    bool eval_feel_literal(std::string_view expr, const json& input, json& out, std::string& err, const EvaluationContext& eval_ctx)
     {
         try {
             // Use main parser for consistent parsing behavior
-            out = orion::bre::feel::Parser::eval_expression(expr, ctx, eval_ctx);
+            out = orion::bre::feel::Parser::eval_expression(expr, input, eval_ctx);
             return true;
         }
         catch (const std::exception& e) {

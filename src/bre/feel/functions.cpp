@@ -1119,7 +1119,7 @@ json evaluate_matches_function(const std::vector<json>& args, const EvaluationCo
     }
 
     // Use engine-scoped cache (required - no fallback)
-    auto compiled = eval_ctx.regex_cache->get_or_compile(unescaped_pattern, flags_val);
+    auto compiled = eval_ctx.regex_cache.get_or_compile(unescaped_pattern, flags_val);
     
     if (!compiled) {
         // Invalid regex pattern or invalid flags - DMN spec says return null

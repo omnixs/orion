@@ -8,6 +8,10 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
+
+using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 namespace orion::bre::detail {
     nlohmann::json eval_math_expression(std::string_view expr);
@@ -17,9 +21,6 @@ namespace orion::bre::detail {
 BOOST_AUTO_TEST_SUITE(test_math_evaluator_direct)
 
 BOOST_AUTO_TEST_CASE(test_negative_number_math_evaluator_direct) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test the math evaluator directly to isolate parsing issues
     struct TestCase {
         std::string expression;
@@ -55,15 +56,9 @@ BOOST_AUTO_TEST_CASE(test_negative_number_math_evaluator_direct) {
 }
 
 BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    using json = nlohmann::json;
+    json input = {};
     
-    orion::bre::feel::Evaluator evaluator;
-    json context = json::object();
-    
-    // Compare orion::bre::feel::Evaluator vs direct math evaluator for expressions that fail
+    orion::bre::feel::Evaluator evaluator;    // Compare orion::bre::feel::Evaluator vs direct math evaluator for expressions that fail
     std::vector<std::string> failing_expressions = {
         "20 / -5",
         "10 + 20/-5 - 3",
@@ -74,13 +69,13 @@ BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
         BOOST_TEST_MESSAGE("Comparing evaluators for: " << expr);
         
         // Test through orion::bre::feel::Evaluator
-        auto feel_result = evaluator.evaluate(expr, context, eval_ctx);
+        auto feel_result = evaluator.evaluate(expr, input, get_test_eval_ctx());
         
         // Test through direct math evaluator (no context)
         auto math_result = orion::bre::detail::eval_math_expression(expr);
         
         // Test through direct math evaluator WITH context setup (like orion::bre::feel::Evaluator does)
-        orion::bre::detail::current_eval_context = &context;
+        orion::bre::detail::current_eval_context = &input;
         auto math_result_with_context = orion::bre::detail::eval_math_expression(expr);
         orion::bre::detail::current_eval_context = nullptr;
         
@@ -106,6 +101,7 @@ BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
             BOOST_CHECK_CLOSE(feel_result.get<double>(), math_result.get<double>(), 0.01);
         } else {
             BOOST_TEST_MESSAGE("  Results differ in type - orion::bre::feel::Evaluator might be using fallback arithmetic");
+using orion::bre::feel::test::get_test_eval_ctx;
         }
     }
 }

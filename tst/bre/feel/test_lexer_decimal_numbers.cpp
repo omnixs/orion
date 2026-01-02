@@ -23,9 +23,11 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using namespace orion::bre;
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(test_decimal_number_parsing)
 
@@ -35,9 +37,6 @@ BOOST_AUTO_TEST_SUITE(test_decimal_number_parsing)
 
 BOOST_AUTO_TEST_CASE(test_lexer_decimal_with_leading_dot)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: .872 (leading dot - common in FEEL)
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize(".872");
@@ -49,9 +48,6 @@ BOOST_AUTO_TEST_CASE(test_lexer_decimal_with_leading_dot)
 
 BOOST_AUTO_TEST_CASE(test_lexer_negative_decimal_with_leading_dot)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: -.872 (negative with leading dot)
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("-.872");
@@ -63,9 +59,6 @@ BOOST_AUTO_TEST_CASE(test_lexer_negative_decimal_with_leading_dot)
 
 BOOST_AUTO_TEST_CASE(test_lexer_many_decimal_places)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: 125.4321987654 (many decimal places)
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("125.4321987654");
@@ -77,9 +70,6 @@ BOOST_AUTO_TEST_CASE(test_lexer_many_decimal_places)
 
 BOOST_AUTO_TEST_CASE(test_lexer_negative_many_decimal_places)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: -125.4321987654
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("-125.4321987654");
@@ -91,9 +81,6 @@ BOOST_AUTO_TEST_CASE(test_lexer_negative_many_decimal_places)
 
 BOOST_AUTO_TEST_CASE(test_lexer_standard_decimal)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: 3.14 (standard decimal)
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("3.14");
@@ -109,18 +96,13 @@ BOOST_AUTO_TEST_CASE(test_lexer_standard_decimal)
 
 BOOST_AUTO_TEST_CASE(test_parser_decimal_with_leading_dot)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: .872 should parse and evaluate correctly
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize(".872");
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context, eval_ctx);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 0.872, 0.0001);
@@ -128,18 +110,13 @@ BOOST_AUTO_TEST_CASE(test_parser_decimal_with_leading_dot)
 
 BOOST_AUTO_TEST_CASE(test_parser_negative_decimal_with_leading_dot)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: -.872
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("-.872");
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context, eval_ctx);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), -0.872, 0.0001);
@@ -147,18 +124,13 @@ BOOST_AUTO_TEST_CASE(test_parser_negative_decimal_with_leading_dot)
 
 BOOST_AUTO_TEST_CASE(test_parser_many_decimal_places)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: 125.4321987654
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("125.4321987654");
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context, eval_ctx);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 125.4321987654, 0.0001);
@@ -166,18 +138,13 @@ BOOST_AUTO_TEST_CASE(test_parser_many_decimal_places)
 
 BOOST_AUTO_TEST_CASE(test_parser_negative_many_decimal_places)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: -125.4321987654
     orion::bre::feel::Lexer lexer;
     auto tokens = lexer.tokenize("-125.4321987654");
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context, eval_ctx);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), -125.4321987654, 0.0001);
@@ -189,15 +156,10 @@ BOOST_AUTO_TEST_CASE(test_parser_negative_many_decimal_places)
 
 BOOST_AUTO_TEST_CASE(test_evaluator_decimal_in_arithmetic)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: Arithmetic with decimal numbers should use AST path
     // Expression: .872 + 3.14
     orion::bre::feel::Evaluator evaluator;
-    json context = json::object();
-    
-    auto result = evaluator.evaluate(".872 + 3.14", context, eval_ctx);
+    auto result = evaluator.evaluate(".872 + 3.14", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 4.012, 0.0001);
@@ -205,15 +167,10 @@ BOOST_AUTO_TEST_CASE(test_evaluator_decimal_in_arithmetic)
 
 BOOST_AUTO_TEST_CASE(test_evaluator_many_decimals_in_expression)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: Complex arithmetic with many decimal places
     // Expression: 125.4321987654 * 2.5
     orion::bre::feel::Evaluator evaluator;
-    json context = json::object();
-    
-    auto result = evaluator.evaluate("125.4321987654 * 2.5", context, eval_ctx);
+    auto result = evaluator.evaluate("125.4321987654 * 2.5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 313.58049691350, 0.0001);
@@ -221,15 +178,10 @@ BOOST_AUTO_TEST_CASE(test_evaluator_many_decimals_in_expression)
 
 BOOST_AUTO_TEST_CASE(test_evaluator_negative_decimals)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test case: Negative decimal arithmetic
     // Expression: -.872 + 1.0
     orion::bre::feel::Evaluator evaluator;
-    json context = json::object();
-    
-    auto result = evaluator.evaluate("-.872 + 1.0", context, eval_ctx);
+    auto result = evaluator.evaluate("-.872 + 1.0", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 0.128, 0.0001);
@@ -241,16 +193,10 @@ BOOST_AUTO_TEST_CASE(test_evaluator_negative_decimals)
 
 BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test that decimal numbers are NOT incorrectly detected as property access
     // These should all use AST path, not legacy
     
-    orion::bre::feel::Evaluator evaluator;
-    json context = json::object();
-    
-    // All of these should succeed with AST (not throw or return null)
+    orion::bre::feel::Evaluator evaluator;    // All of these should succeed with AST (not throw or return null)
     std::vector<std::string> decimal_expressions = {
         ".872",
         "-.872",
@@ -266,7 +212,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
     for (const auto& expr : decimal_expressions)
     {
         BOOST_TEST_MESSAGE("Testing decimal expression: " << expr);
-        auto result = evaluator.evaluate(expr, context, eval_ctx);
+        auto result = evaluator.evaluate(expr, {}, get_test_eval_ctx());
         BOOST_CHECK_MESSAGE(result.is_number(), 
             "Expression '" << expr << "' should evaluate to a number via AST");
     }
@@ -274,15 +220,12 @@ BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
 
 BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // Test that property access IS correctly detected
     // These should fail or use legacy path (we're not testing functionality,
     // just that they're recognized as needing special handling)
     
     orion::bre::feel::Evaluator evaluator;
-    json context = {
+    json input = {
         {"loan", {
             {"principal", 100000},
             {"rate", 0.05}
@@ -303,7 +246,7 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
         BOOST_TEST_MESSAGE("Testing property access expression: " << expr);
         // Just verify it doesn't crash - property access may or may not be supported
         try {
-            auto result = evaluator.evaluate(expr, context, eval_ctx);
+            auto result = evaluator.evaluate(expr, input, get_test_eval_ctx());
             BOOST_TEST_MESSAGE("  Result: " << result.dump());
         } catch (...) {
             BOOST_TEST_MESSAGE("  Expected: property access not yet fully supported");

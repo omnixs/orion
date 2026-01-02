@@ -28,9 +28,11 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
 using namespace orion::bre::feel;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(feel_duration_tests)
 
@@ -40,65 +42,40 @@ BOOST_AUTO_TEST_SUITE(feel_duration_tests)
 
 BOOST_AUTO_TEST_CASE(duration_parse_days_only)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // P5D = 5 days
-    json result = Evaluator::evaluate("duration(\"P5D\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P5D\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P5D");
 }
 
 BOOST_AUTO_TEST_CASE(duration_parse_hours_only)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // PT10H = 10 hours
-    json result = Evaluator::evaluate("duration(\"PT10H\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"PT10H\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "PT10H");
 }
 
 BOOST_AUTO_TEST_CASE(duration_parse_days_and_hours)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // P2DT6H = 2 days and 6 hours
-    json result = Evaluator::evaluate("duration(\"P2DT6H\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P2DT6H\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P2DT6H");
 }
 
 BOOST_AUTO_TEST_CASE(duration_parse_full_iso8601)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // P1Y2M3DT4H5M6S = 1 year, 2 months, 3 days, 4 hours, 5 minutes, 6 seconds
-    json result = Evaluator::evaluate("duration(\"P1Y2M3DT4H5M6S\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P1Y2M3DT4H5M6S\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P1Y2M3DT4H5M6S");
 }
 
 BOOST_AUTO_TEST_CASE(duration_parse_zero_duration)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // P0D = 0 days (edge case)
-    json result = Evaluator::evaluate("duration(\"P0D\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P0D\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P0D");
 }
@@ -109,37 +86,22 @@ BOOST_AUTO_TEST_CASE(duration_parse_zero_duration)
 
 BOOST_AUTO_TEST_CASE(duration_invalid_missing_p_prefix)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // Missing 'P' prefix - invalid
-    json result = Evaluator::evaluate("duration(\"5D\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"5D\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(duration_invalid_malformed)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // Truly malformed: number without unit after P
-    json result = Evaluator::evaluate("duration(\"P5\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P5\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());  // P followed by number but no unit
 }
 
 BOOST_AUTO_TEST_CASE(duration_invalid_empty_string)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // Empty string - invalid
-    json result = Evaluator::evaluate("duration(\"\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -149,13 +111,8 @@ BOOST_AUTO_TEST_CASE(duration_invalid_empty_string)
 
 BOOST_AUTO_TEST_CASE(duration_null_propagation)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // duration(null) → null (DMN null propagation)
-    json result = Evaluator::evaluate("duration(null)", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -172,9 +129,6 @@ BOOST_AUTO_TEST_CASE(duration_null_propagation)
 
 BOOST_AUTO_TEST_CASE(duration_comparison_note)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // This test documents that duration comparisons work differently
     // They are designed for DMN unary tests, not FEEL expression comparisons
     BOOST_TEST_MESSAGE("Duration comparisons tested in DMN decision table (see test case in tst/dmn/)");
@@ -190,9 +144,6 @@ BOOST_AUTO_TEST_CASE(duration_comparison_note)
 
 BOOST_AUTO_TEST_CASE(duration_between_note)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
     // This test documents that 'in' operator is not yet supported
     BOOST_TEST_MESSAGE("Range 'in' operator not yet implemented - use >= and <= instead");
     BOOST_CHECK(true);  // Placeholder
@@ -204,15 +155,12 @@ BOOST_AUTO_TEST_CASE(duration_between_note)
 
 BOOST_AUTO_TEST_CASE(duration_from_context_variable)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = {
+    json input = {
         {"waitTime", "P7D"}
     };
     
     // duration(waitTime) → parse from context
-    json result = Evaluator::evaluate("duration(waitTime)", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(waitTime)", input, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P7D");
 }
@@ -223,26 +171,16 @@ BOOST_AUTO_TEST_CASE(duration_from_context_variable)
 
 BOOST_AUTO_TEST_CASE(duration_large_values)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // P365D = 1 year in days (large value)
-    json result = Evaluator::evaluate("duration(\"P365D\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P365D\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P365D");
 }
 
 BOOST_AUTO_TEST_CASE(duration_mixed_units)
 {
-    orion::bre::feel::RegexCache regex_cache;
-    orion::bre::feel::EvaluationContext eval_ctx;
-    eval_ctx.regex_cache = &regex_cache;
-    json context = json::object();
-    
     // P1DT12H30M45S = 1 day, 12 hours, 30 minutes, 45 seconds
-    json result = Evaluator::evaluate("duration(\"P1DT12H30M45S\")", context, eval_ctx);
+    json result = Evaluator::evaluate("duration(\"P1DT12H30M45S\")", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_string());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "P1DT12H30M45S");
 }

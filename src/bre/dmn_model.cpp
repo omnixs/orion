@@ -88,7 +88,7 @@ namespace orion::bre
     }
 
     // Helper: Collect all matching rules based on input conditions
-    std::vector<json> DecisionTable::find_matching_rules(const json& context, orion::bre::feel::EvaluationContext& eval_ctx) const
+    std::vector<json> DecisionTable::find_matching_rules(const json& input, EvaluationContext& eval_ctx) const
     {
         vector<json> matching_outputs;
 
@@ -99,21 +99,21 @@ namespace orion::bre
             // Check if all input conditions match
             for (size_t i = 0; i < inputs.size() && i < rule.inputEntries.size(); i++)
             {
-                const auto& input = inputs[i];
+                const auto& input_clause = inputs[i];
                 const auto& entry = rule.inputEntries[i];
 
                 // Evaluate input expression if present, otherwise use label lookup
                 json input_value;
-                if (!input.inputExpression.empty())
+                if (!input_clause.inputExpression.empty())
                 {
                     // Input has an expression - evaluate it as FEEL
                     try
                     {
                         feel::Lexer lexer;
-                        auto tokens = lexer.tokenize(input.inputExpression);
+                        auto tokens = lexer.tokenize(input_clause.inputExpression);
                         feel::Parser parser;
                         auto ast = parser.parse(tokens);
-                        input_value = ast->evaluate(context, eval_ctx);
+                        input_value = ast->evaluate(input, eval_ctx);
                     }
                     catch (...)
                     {
@@ -124,7 +124,7 @@ namespace orion::bre
                 else
                 {
                     // No expression - use label lookup (legacy behavior)
-                    input_value = detail::get_value_from_label(context, input.label);
+                    input_value = detail::get_value_from_label(input, input_clause.label);
                 }
 
                 // Phase 3: Use cached AST if available, otherwise fall back to unary_test_matches
@@ -135,7 +135,7 @@ namespace orion::bre
                     // Use pre-parsed AST for complex FEEL expressions
                     try
                     {
-                        json ast_result = rule.inputEntries_ast[i]->evaluate(context, eval_ctx);
+                        json ast_result = rule.inputEntries_ast[i]->evaluate(input, eval_ctx);
                         
                         // Compare AST result with input value
                         entry_matches_result = (ast_result == input_value);
@@ -185,7 +185,7 @@ namespace orion::bre
                                 // Use pre-parsed AST to evaluate output expression
                                 try
                                 {
-                                    output_value = rule.outputEntries_ast[i]->evaluate(context, eval_ctx);
+                                    output_value = rule.outputEntries_ast[i]->evaluate(input, eval_ctx);
                                 }
                                 catch (const std::runtime_error&)
                                 {
@@ -241,7 +241,7 @@ namespace orion::bre
                         // Use pre-parsed AST to evaluate output expression
                         try
                         {
-                            output_value = rule.outputEntries_ast[0]->evaluate(context, eval_ctx);
+                            output_value = rule.outputEntries_ast[0]->evaluate(input, eval_ctx);
                         }
                         catch (const std::runtime_error&)
                         {
@@ -552,14 +552,14 @@ namespace orion::bre
     }
 
     // Implementation of DecisionTable::evaluate
-    json DecisionTable::evaluate(const json& context,
-                                 [[maybe_unused]] orion::bre::feel::EvaluationContext& eval_ctx) const
+    json DecisionTable::evaluate(const json& input,
+                                 [[maybe_unused]] EvaluationContext& eval_ctx) const
     {
         // Step 1: Validate input values against allowed values
-        validate_input_values(context);
+        validate_input_values(input);
 
         // Step 2: Find all matching rules based on input conditions
-        vector<json> matching_outputs = find_matching_rules(context, eval_ctx);
+        vector<json> matching_outputs = find_matching_rules(input, eval_ctx);
 
         // Step 3: If no matches, return empty result
         if (matching_outputs.empty())
@@ -635,9 +635,9 @@ namespace orion::bre
     }
 
     // Implementation of LiteralDecision::evaluate
-    json LiteralDecision::evaluate(const json& context,
+    json LiteralDecision::evaluate(const json& input,
                                    const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
-                                   orion::bre::feel::EvaluationContext& eval_ctx) const
+                                   EvaluationContext& eval_ctx) const
     {
         if (expression_text.empty())
         {
@@ -649,7 +649,7 @@ namespace orion::bre
         {
             try
             {
-                json ast_result = expression_ast->evaluate(context, eval_ctx);
+                json ast_result = expression_ast->evaluate(input, eval_ctx);
                 debug("LiteralDecision AST result for '{}': {}", expression_text, ast_result.dump());
                 return ast_result;
             }
@@ -665,7 +665,7 @@ namespace orion::bre
         }
 
         // Fallback: Use evaluate_bkm_expression which handles both BKM calls and regular FEEL expressions
-        json result = evaluate_bkm_expression(expression_text, context, available_bkms, eval_ctx);
+        json result = evaluate_bkm_expression(expression_text, input, available_bkms, eval_ctx);
         return result;
     }
 }

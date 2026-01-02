@@ -76,10 +76,7 @@
 #include <vector>
 #include <memory>
 #include <nlohmann/json.hpp>
-
-namespace orion::bre::feel {
-    struct EvaluationContext; // Forward declaration
-}
+#include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre
 {
@@ -213,12 +210,12 @@ namespace orion::bre
          * 
          * @example
          * ```cpp
-         * json context = {{"age", 25}, {"priority", 8}};
-         * EvaluationContext eval_ctx{&regex_cache};
+         * json input = {{"age", 25}, {"priority", 8}};
+         * EvaluationContext eval_ctx{regex_cache};
          * json result = ast->evaluate(context, eval_ctx);
          * ```
          */
-        [[nodiscard]] json evaluate(const json& context, const orion::bre::feel::EvaluationContext& eval_ctx) const;
+        [[nodiscard]] json evaluate(const json& input, const EvaluationContext& eval_ctx) const;
     };
 
     /**

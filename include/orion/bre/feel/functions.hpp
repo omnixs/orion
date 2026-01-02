@@ -33,12 +33,10 @@
 
 #include <vector>
 #include <nlohmann/json.hpp>
+#include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre::feel {
     using json = nlohmann::json;
-    
-    // Forward declaration
-    struct EvaluationContext;
 
     /**
      * @brief Boolean negation function

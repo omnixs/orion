@@ -37,7 +37,7 @@ namespace orion::bre::feel {
     using orion::api::warn;
     using orion::api::error;
 
-    json Evaluator::evaluate(std::string_view expression, const json& context, const EvaluationContext& eval_ctx)
+    json Evaluator::evaluate(std::string_view expression, const json& input, const EvaluationContext& eval_ctx)
     {
         // AST-based evaluation path (all FEEL features supported)
         
@@ -64,7 +64,7 @@ namespace orion::bre::feel {
                 Parser parser;
                 auto ast = parser.parse(tokens);
                 
-                auto result = ast->evaluate(context, eval_ctx);
+                auto result = ast->evaluate(input, eval_ctx);
                 debug("[AST-SUCCESS] AST evaluation succeeded: '{}'", expression);
                 return result;
             }

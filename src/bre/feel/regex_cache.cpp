@@ -25,6 +25,18 @@
 namespace orion::bre::feel {
 
     // CompiledRegex implementation
+    //
+    // PCRE2 is used for runtime/dynamic regex patterns in FEEL matches() function.
+    // Key advantages over CTRE dynamic mode:
+    // - JIT compilation to native machine code (~20% faster than std::regex)
+    // - LRU caching prevents recompilation of frequently used patterns
+    // - Better resource management for compiled code (explicit RAII handles)
+    // - Full Perl-compatible syntax and robust Unicode support
+    //
+    // For compile-time/fixed patterns, see CTRE usage in:
+    // - src/bre/feel/unary.cpp (comparison operators, range patterns)
+    // - src/bre/feel/types.cpp (date/time parsing)
+    // - src/bre/bkm_manager.cpp (BKM function call parsing)
     
     CompiledRegex::CompiledRegex(pcre2_real_code_8* code)
         : code_(code)
