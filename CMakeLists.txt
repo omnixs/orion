@@ -193,6 +193,7 @@ set(ORION_SRC
   src/bre/business_knowledge_model.cpp
   src/bre/dmn_model.cpp
   src/bre/dmn_parser.cpp
+  src/bre/type_validator.cpp
   src/bre/feel/evaluator.cpp
   src/bre/feel/expr.cpp
   src/bre/feel/function_registry.cpp
@@ -269,6 +270,7 @@ if(ORION_BUILD_TESTS)
   add_executable(tst_orion
       tst/bre/test_main.cpp
       tst/bre/test_hit_policy_debug.cpp
+      tst/bre/test_item_definition.cpp
       tst/bre/test_airline_ticketing.cpp
       tst/bre/test_namespace_support.cpp
       # TCK-specific tests

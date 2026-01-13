@@ -405,11 +405,84 @@ namespace orion::bre
             model.namespace_uri = std::string(namespace_attr->value());
         }
         // If no namespace attribute, namespace_uri remains empty (default behavior)
+        
+        // Helper lambda to match element names with or without namespace prefix
+        auto matches_element = [](rapidxml::xml_node<>* node, const char* element_name) -> bool {
+            if (node == nullptr || node->name() == nullptr) return false;
+            std::string_view name = node->name();
+            // Match exact name or with any namespace prefix (e.g., "dmn:itemDefinition")
+            return name == element_name || 
+                   (name.find(':') != std::string_view::npos && 
+                    name.substr(name.find(':') + 1) == element_name);
+        };
+        
+        // Parse ItemDefinitions (custom data types)
+        for (auto* item_def_node = root->first_node(); 
+             item_def_node != nullptr; 
+             item_def_node = item_def_node->next_sibling())
+        {
+            if (!matches_element(item_def_node, "itemDefinition")) continue;
+            ItemDefinition item_def;
+            
+            // Parse attributes
+            if (auto* attr = item_def_node->first_attribute("name"))
+            {
+                item_def.name = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("id"))
+            {
+                item_def.id = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("label"))
+            {
+                item_def.label = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("isCollection"))
+            {
+                std::string val = attr->value();
+                item_def.isCollection = (val == "true" || val == "1");
+            }
+            
+            // Parse typeRef element
+            for (auto* child = item_def_node->first_node(); child != nullptr; child = child->next_sibling())
+            {
+                if (matches_element(child, "typeRef"))
+                {
+                    if (child->value() != nullptr)
+                    {
+                        item_def.typeRef = child->value();
+                    }
+                }
+                else if (matches_element(child, "allowedValues"))
+                {
+                    // Parse text element within allowedValues
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                    {
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                item_def.allowedValues = text_child->value();
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Store ItemDefinition by name
+            if (!item_def.name.empty())
+            {
+                model.item_definitions[item_def.name] = std::move(item_def);
+            }
+        }
 
         // Parse all decisions in the model
-        for (auto* decision_node = root->first_node("decision"); decision_node != nullptr; decision_node = decision_node->
-             next_sibling("decision"))
+        for (auto* decision_node = root->first_node(); 
+             decision_node != nullptr; 
+             decision_node = decision_node->next_sibling())
         {
+            if (!matches_element(decision_node, "decision")) continue;
+            
             Decision decision;
             decision.id = (decision_node->first_attribute("id") != nullptr) ? decision_node->first_attribute("id")->value() : "";
             decision.name = (decision_node->first_attribute("name") != nullptr)
@@ -417,19 +490,24 @@ namespace orion::bre
                                 : "";
 
             // Parse decision table if present
-            if (auto* decision_table = decision_node->first_node("decisionTable"))
+            for (auto* child = decision_node->first_node(); child != nullptr; child = child->next_sibling())
             {
-                decision.decisionTable = parse_decision_table_from_node(decision_table, decision_node);
-            }
-
-            // Parse literal expression if present
-            if (auto* literal_expr = decision_node->first_node("literalExpression"))
-            {
-                if (auto* text = literal_expr->first_node("text"))
+                if (matches_element(child, "decisionTable"))
                 {
-                    if (text->value() != nullptr)
+                    decision.decisionTable = parse_decision_table_from_node(child, decision_node);
+                }
+                else if (matches_element(child, "literalExpression"))
+                {
+                    // Parse text element within literalExpression
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
                     {
-                        decision.expression = std::string(text->value());
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                decision.expression = std::string(text_child->value());
+                            }
+                        }
                     }
                 }
             }

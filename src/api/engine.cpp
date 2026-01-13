@@ -48,6 +48,7 @@ namespace orion
             std::map<std::string, std::unique_ptr<DecisionTable>> decision_tables_;
             BKMManager bkm_manager_; // Use BKMManager instead of raw map
             std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
+            std::map<std::string, bre::ItemDefinition> item_definitions_; // Custom data types
             std::string namespace_uri_; // Stored DMN namespace from definitions element
             bre::feel::RegexCache regex_cache_; // Instance-scoped regex cache
 
@@ -90,6 +91,9 @@ namespace orion
                 
                 // Store namespace information from parsed model
                 pimpl->namespace_uri_ = model.namespace_uri;
+                
+                // Store ItemDefinitions (custom data types)
+                pimpl->item_definitions_ = std::move(model.item_definitions);
                 
                 // Process all decisions in the model
                 for (auto& decision : model.decisions)
@@ -212,6 +216,7 @@ namespace orion
             pimpl->decision_tables_.clear();
             pimpl->bkm_manager_.clear();
             pimpl->literal_decisions_.clear();
+            pimpl->item_definitions_.clear();
             pimpl->namespace_uri_.clear();
         }
 

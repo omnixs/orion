@@ -135,15 +135,41 @@ namespace orion::bre
      * Defines reusable data types that can be used in decision variables.
      * Supports both simple types and complex structures with collection attribute.
      * 
-     * @see DMN 1.5 Specification Section 7.3.2 "ItemDefinition metamodel"
+     * @see DMN 1.5 Specification Section 7.3.3 "ItemDefinition metamodel"
      */
     struct ItemDefinition
     {
-        std::string name; // Type name (e.g., "tApproval_1")
+        std::string name; // Type name (e.g., "tStatus")
+        std::string id; // Unique identifier
         std::string label; // Human-readable label
         std::string typeRef; // Base type reference (e.g., "string")
+        std::string allowedValues; // Enumeration constraint (e.g., "\"Active\", \"Disabled\"")
         bool isCollection = false; // Whether this is a collection type
         std::vector<ItemDefinition> itemComponents; // For complex types
+        
+        /**
+         * @brief Check if this ItemDefinition has value constraints
+         */
+        [[nodiscard]] bool has_constraints() const noexcept
+        {
+            return !allowedValues.empty();
+        }
+        
+        /**
+         * @brief Check if this is a simple type (typeRef only)
+         */
+        [[nodiscard]] bool is_simple_type() const noexcept
+        {
+            return !typeRef.empty() && itemComponents.empty();
+        }
+        
+        /**
+         * @brief Check if this is a structured type (has components)
+         */
+        [[nodiscard]] bool is_structured_type() const noexcept
+        {
+            return !itemComponents.empty();
+        }
     };
 
     /**

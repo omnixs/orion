@@ -41,6 +41,7 @@ namespace orion::bre
     struct DmnModel
     {
         std::string namespace_uri;  // DMN 1.5 namespace from definitions element
+        std::map<std::string, ItemDefinition> item_definitions; // Custom data types
         std::vector<Decision> decisions;
     };
 
