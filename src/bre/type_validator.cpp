@@ -19,6 +19,7 @@
 #include <orion/bre/type_validator.hpp>
 #include <algorithm>
 #include <sstream>
+#include <format>
 
 namespace orion::bre
 {
@@ -112,6 +113,132 @@ namespace orion::bre
         
         std::string value_str = value.get<std::string>();
         return std::find(allowed.begin(), allowed.end(), value_str) != allowed.end();
+    }
+
+    void validate_component(
+        const nlohmann::json& comp_value,
+        const ItemComponent& component,
+        const std::map<std::string, ItemDefinition>& all_definitions
+    )
+    {
+        // Check component-level constraints
+        if (component.has_constraints())
+        {
+            auto allowed = parse_allowed_values(component.allowedValues);
+            
+            if (!allowed.empty())
+            {
+                if (!comp_value.is_string())
+                {
+                    throw std::runtime_error(
+                        std::format("Component '{}' expected string value", component.name)
+                    );
+                }
+                
+                std::string value_str = comp_value.get<std::string>();
+                bool valid = std::find(allowed.begin(), allowed.end(), value_str) != allowed.end();
+                
+                if (!valid)
+                {
+                    throw std::runtime_error(
+                        std::format("Component '{}' value '{}' not in allowed values", 
+                                   component.name, value_str)
+                    );
+                }
+            }
+        }
+        
+        // Check if typeRef points to another ItemDefinition (complex type)
+        auto it = all_definitions.find(component.typeRef);
+        if (it != all_definitions.end())
+        {
+            const auto& nested_def = it->second;
+            
+            if (nested_def.is_structured_type())
+            {
+                // Recursive validation for nested complex type
+                validate_complex_type(comp_value, nested_def, all_definitions);
+            }
+            else if (nested_def.has_constraints())
+            {
+                // Validate against simple type constraints
+                if (!validate_type_constraint(comp_value, nested_def))
+                {
+                    throw std::runtime_error(
+                        std::format("Component '{}' failed type constraint validation", 
+                                   component.name)
+                    );
+                }
+            }
+        }
+        
+        // Basic type validation could be added here
+        // For now, accept any value if no constraints are violated
+    }
+
+    void validate_complex_type(
+        const nlohmann::json& value,
+        const ItemDefinition& item_def,
+        const std::map<std::string, ItemDefinition>& all_definitions
+    )
+    {
+        // Complex types must be JSON objects
+        if (!value.is_object())
+        {
+            throw std::runtime_error(
+                std::format("Expected object for structured type '{}', got {}", 
+                           item_def.name, 
+                           value.type_name())
+            );
+        }
+        
+        // Validate each component
+        for (const auto& component : item_def.itemComponents)
+        {
+            // Check if component is present in value
+            if (!value.contains(component.name))
+            {
+                throw std::runtime_error(
+                    std::format("Missing required component '{}' in structured type '{}'",
+                               component.name, item_def.name)
+                );
+            }
+            
+            const auto& comp_value = value[component.name];
+            
+            // Handle collections (arrays)
+            if (component.isCollection)
+            {
+                if (!comp_value.is_array())
+                {
+                    throw std::runtime_error(
+                        std::format("Component '{}' must be an array (isCollection=true)", 
+                                   component.name)
+                    );
+                }
+                
+                // Validate each element in collection
+                for (size_t i = 0; i < comp_value.size(); ++i)
+                {
+                    try
+                    {
+                        validate_component(comp_value[i], component, all_definitions);
+                    }
+                    catch (const std::runtime_error& e)
+                    {
+                        throw std::runtime_error(
+                            std::format("Component '{}[{}]': {}", 
+                                       component.name, i, e.what())
+                        );
+                    }
+                }
+            }
+            else
+            {
+                // Validate single value
+                validate_component(comp_value, component, all_definitions);
+            }
+        }
     }
 
 } // namespace orion::bre

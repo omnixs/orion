@@ -61,4 +61,58 @@ namespace orion::bre
      */
     [[nodiscard]] std::vector<std::string> parse_allowed_values(std::string_view allowed_values);
 
+    /**
+     * @brief Validates a complex/structured type against ItemDefinition
+     * 
+     * Recursively validates JSON objects with nested structures against ItemDefinition.
+     * Checks that all required components are present and validates each component value.
+     * 
+     * @param value JSON object to validate
+     * @param item_def ItemDefinition with itemComponents (structured type)
+     * @param all_definitions Map of all ItemDefinitions for recursive type resolution
+     * @throws std::runtime_error if validation fails with detailed error message
+     * 
+     * @example
+     * ```cpp
+     * nlohmann::json customer = {
+     *     {"name", "John Doe"},
+     *     {"address", {
+     *         {"street", "123 Main St"},
+     *         {"city", "Boston"}
+     *     }}
+     * };
+     * 
+     * try {
+     *     validate_complex_type(customer, customer_def, all_defs);
+     *     // Validation succeeded
+     * } catch (const std::runtime_error& e) {
+     *     std::cerr << "Validation failed: " << e.what() << std::endl;
+     * }
+     * ```
+     * 
+     * @see DMN 1.5 Specification Section 7.3.3.1 "ItemDefinition components"
+     */
+    void validate_complex_type(
+        const nlohmann::json& value,
+        const ItemDefinition& item_def,
+        const std::map<std::string, ItemDefinition>& all_definitions
+    );
+
+    /**
+     * @brief Validates a single component value
+     * 
+     * Internal helper for validating individual component values against their constraints.
+     * Handles both simple types and nested complex types.
+     * 
+     * @param comp_value Value of the component
+     * @param component ItemComponent definition
+     * @param all_definitions Map of all ItemDefinitions for type resolution
+     * @throws std::runtime_error if validation fails with detailed error message
+     */
+    void validate_component(
+        const nlohmann::json& comp_value,
+        const ItemComponent& component,
+        const std::map<std::string, ItemDefinition>& all_definitions
+    );
+
 } // namespace orion::bre

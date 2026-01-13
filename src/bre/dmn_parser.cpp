@@ -467,6 +467,54 @@ namespace orion::bre
                         }
                     }
                 }
+                else if (matches_element(child, "itemComponent"))
+                {
+                    // Parse itemComponent for structured types
+                    ItemComponent component;
+                    
+                    // Parse component attributes
+                    if (auto* name_attr = child->first_attribute("name"))
+                    {
+                        component.name = name_attr->value();
+                    }
+                    if (auto* coll_attr = child->first_attribute("isCollection"))
+                    {
+                        std::string val = coll_attr->value();
+                        component.isCollection = (val == "true" || val == "1");
+                    }
+                    
+                    // Parse component child elements
+                    for (auto* comp_child = child->first_node(); comp_child != nullptr; comp_child = comp_child->next_sibling())
+                    {
+                        if (matches_element(comp_child, "typeRef"))
+                        {
+                            if (comp_child->value() != nullptr)
+                            {
+                                component.typeRef = comp_child->value();
+                            }
+                        }
+                        else if (matches_element(comp_child, "allowedValues"))
+                        {
+                            // Component-level constraints
+                            for (auto* text_child = comp_child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                            {
+                                if (matches_element(text_child, "text"))
+                                {
+                                    if (text_child->value() != nullptr)
+                                    {
+                                        component.allowedValues = text_child->value();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Add component to ItemDefinition
+                    if (!component.name.empty())
+                    {
+                        item_def.itemComponents.push_back(std::move(component));
+                    }
+                }
             }
             
             // Store ItemDefinition by name
