@@ -73,6 +73,35 @@ docs/                → Documentation
 tools/scripts/       → Utility tools and CLIs
 ```
 
+### 4.1 Core Components (`src/bre/`)
+- **`engine.hpp/cpp`** - Main `BusinessRulesEngine` with stateful model management
+- **`dmn_parser.hpp/cpp`** - DMN XML parsing (rapidxml)
+- **`feel_evaluator.hpp/cpp`** - FEEL expression evaluation
+- **`dmn_model.hpp`** - Data structures: `DecisionTable`, `LiteralDecision`
+- **`hit_policy.hpp/cpp`** - FIRST, UNIQUE, COLLECT with aggregations
+- **`bkm_manager.hpp/cpp`** - Business Knowledge Model management
+
+### 4.2Key Usage Pattern
+
+```cpp
+// ✅ CORRECT: Load once, evaluate many (9-45 μs/eval)
+orion::bre::BusinessRulesEngine engine;
+auto result = engine.load_dmn_model(dmn_xml);  // One-time: 100-200μs
+if (!result) {
+    std::cerr << "Error: " << result.error() << std::endl;
+    return 1;
+}
+
+for (auto& request : requests) {
+    std::string result = engine.evaluate(request_json);  // 9-45μs each
+}
+
+// ❌ WRONG: Re-parse every time (100-150 μs/eval - 10x slower!)
+for (auto& request : requests) {
+    std::string result = evaluate(dmn_xml, request_json);  // DEPRECATED
+}
+```
+
 ---
 
 ## 5. Build & Runtime

@@ -386,7 +386,7 @@ namespace orion::bre
                     }
                     return json(min_val);
                 }
-                return matching_outputs[0]; // Fallback
+                return matching_outputs.empty() ? json{} : matching_outputs[0]; // Fallback
             }
         case CollectAggregation::MAX:
             {
@@ -436,7 +436,7 @@ namespace orion::bre
                     }
                     return json(max_val);
                 }
-                return matching_outputs[0]; // Fallback
+                return matching_outputs.empty() ? json{} : matching_outputs[0]; // Fallback
             }
         case CollectAggregation::NONE:
         default:
@@ -535,10 +535,19 @@ namespace orion::bre
         // Step 2: Find all matching rules based on input conditions
         vector<json> matching_outputs = find_matching_rules(context);
 
-        // Step 3: If no matches, return empty result
+        // Step 3: If no matches, return result based on policy
         if (matching_outputs.empty())
         {
-            return json::object();
+            if (hitPolicy == HitPolicy::COLLECT)
+            {
+                return apply_collect_aggregation(matching_outputs);
+            }
+            if (hitPolicy == HitPolicy::RULE_ORDER || hitPolicy == HitPolicy::OUTPUT_ORDER)
+            {
+                return json::array();
+            }
+            // For FIRST, UNIQUE, PRIORITY, ANY -> null
+            return json{};
         }
 
         // Step 4: Handle early exit for FIRST/UNIQUE/ANY policies

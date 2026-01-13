@@ -268,6 +268,7 @@ if(ORION_BUILD_TESTS)
   # Add test executable - only include files that exist
   add_executable(tst_orion
       tst/bre/test_main.cpp
+      tst/bre/test_native_api.cpp
       tst/bre/test_hit_policy_debug.cpp
       tst/bre/test_airline_ticketing.cpp
       tst/bre/test_namespace_support.cpp
@@ -346,6 +347,13 @@ if(ORION_BUILD_TESTS)
     target_link_libraries(orion-bench PRIVATE orion_lib benchmark::benchmark spdlog::spdlog)
     set_property(TARGET orion-bench PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
     source_group(TREE ${CMAKE_SOURCE_DIR} FILES src/bench/orion_bench.cpp)
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/bench/orion_bench_bundle.cpp")
+      add_executable(orion-bench-bundle src/bench/orion_bench_bundle.cpp src/api/spdlog_logger.cpp src/common/log.cpp)
+      target_link_libraries(orion-bench-bundle PRIVATE orion_lib benchmark::benchmark spdlog::spdlog)
+      set_property(TARGET orion-bench-bundle PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
+      source_group(TREE ${CMAKE_SOURCE_DIR} FILES src/bench/orion_bench_bundle.cpp)
+    endif()
   endif()
 endif()
 
@@ -375,6 +383,9 @@ endforeach()
 # Handle benchmark target separately since it's conditional
 if(TARGET orion-bench)
   set_property(TARGET orion-bench PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
+endif()
+if(TARGET orion-bench-bundle)
+  set_property(TARGET orion-bench-bundle PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
 endif()
 
 include(GNUInstallDirs)

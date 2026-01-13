@@ -87,10 +87,10 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     // Test case 1: Age = 19 (should match both >=18 and >=12 rules)
     BOOST_TEST_MESSAGE("\n--- Test Case 1: Age = 19 ---");
     json input1 = {{"Age", 19}};
-    auto result1 = engine.evaluate(input1.dump());
+    auto result1 = engine.evaluate(input1);
     
     BOOST_TEST_MESSAGE("Input: " + input1.dump());
-    BOOST_TEST_MESSAGE("Output: " + result1);
+    BOOST_TEST_MESSAGE("Output: " + result1.dump());
     
     // Expected: ["Best", "Standard"] in rule order
     BOOST_TEST_MESSAGE("Expected: [\"Best\", \"Standard\"] as collection");
@@ -98,10 +98,10 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     // Test case 2: Age = 13 (should match only >=12 rule)
     BOOST_TEST_MESSAGE("\n--- Test Case 2: Age = 13 ---");
     json input2 = {{"Age", 13}};
-    auto result2 = engine.evaluate(input2.dump());
+    auto result2 = engine.evaluate(input2);
     
     BOOST_TEST_MESSAGE("Input: " + input2.dump());
-    BOOST_TEST_MESSAGE("Output: " + result2);
+    BOOST_TEST_MESSAGE("Output: " + result2.dump());
     
     // Expected: ["Standard"]
     BOOST_TEST_MESSAGE("Expected: [\"Standard\"] as collection");
@@ -109,10 +109,10 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     // Test case 3: Age = 10 (should match only <12 rule)  
     BOOST_TEST_MESSAGE("\n--- Test Case 3: Age = 10 ---");
     json input3 = {{"Age", 10}};
-    auto result3 = engine.evaluate(input3.dump());
+    auto result3 = engine.evaluate(input3);
     
     BOOST_TEST_MESSAGE("Input: " + input3.dump());
-    BOOST_TEST_MESSAGE("Output: " + result3);
+    BOOST_TEST_MESSAGE("Output: " + result3.dump());
     
     // Expected: ["Standard"]
     BOOST_TEST_MESSAGE("Expected: [\"Standard\"] as collection");

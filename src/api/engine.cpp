@@ -129,9 +129,13 @@ namespace orion
             }
         }
 
-        string BusinessRulesEngine::evaluate(string_view data_json) const
+        nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& ctxt) const
         {
-            json data = json::parse(data_json);
+            // Use const reference to avoid copy if possible, but APIs expect copy
+            // The parameter is named 'ctxt' to avoid conflict with 'context' 
+            // used in other places, though shadowing is not an issue here.
+            // Using 'context' to match the argument name.
+            const json& data = ctxt; 
             json results = json::object();
 
             // Create evaluation context with engine's regex cache
@@ -165,7 +169,7 @@ namespace orion
 
             // Always return results as object with decision names as keys
             // This ensures compatibility with TCK test expectations
-            return results.dump();
+            return results;
         }
 
         vector<string> BusinessRulesEngine::get_decision_table_names() const

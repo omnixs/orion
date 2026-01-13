@@ -92,8 +92,8 @@ static bool execute_single_test_case(
             throw std::runtime_error("Failed to load DMN model: " + load_result.error());
         }
         
-        result = engine.evaluate(input_json);
-        actual = json::parse(result);
+        actual = engine.evaluate(test_case.input);
+        result = actual.dump();
     } catch (const std::exception& ex) {
         evalOk = false;
         errMsg = ex.what();
@@ -490,7 +490,7 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
         if (!load_result) {
             BOOST_FAIL("Failed to load DMN model: " + load_result.error());
         }
-        std::string result = engine.evaluate(input.dump());
+        [[maybe_unused]] json result_json = engine.evaluate(input);
         
         // String concatenation with literal expressions not yet supported
         // Current engine focuses on decision tables and basic expressions
@@ -521,7 +521,7 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
         if (!load_result) {
             BOOST_FAIL("Failed to load DMN model: " + load_result.error());
         }
-        std::string result = engine.evaluate(input.dump());
+        [[maybe_unused]] json result_json = engine.evaluate(input);
         
         // Arithmetic with literal expressions not yet supported
         // Current engine focuses on decision tables and function expressions

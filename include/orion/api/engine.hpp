@@ -22,6 +22,7 @@
 #include <vector>
 #include <memory>
 #include <expected>
+#include <nlohmann/json.hpp>
 
 namespace orion::api
 {
@@ -51,8 +52,8 @@ namespace orion::api
         [[nodiscard]] bool remove_business_knowledge_model(std::string_view name);
         [[nodiscard]] bool remove_literal_decision(std::string_view name);
 
-        // Evaluate with loaded models
-        [[nodiscard]] std::string evaluate(std::string_view data_json) const;
+        // Evaluate with native JSON object (Zero-copy API)
+        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& context) const;
 
         // Introspection
         [[nodiscard]] std::vector<std::string> get_decision_table_names() const;

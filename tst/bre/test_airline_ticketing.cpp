@@ -101,8 +101,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_adult_economy, AirlineTicketingFixture) {
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Input: " << input.dump());
     BOOST_TEST_MESSAGE("Result: " << result_json.dump(2));
@@ -118,8 +117,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_adult_business, AirlineTicketingFixture) 
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 500);
@@ -132,8 +130,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_adult_first, AirlineTicketingFixture) {
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 1000);
@@ -146,8 +143,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_child_economy, AirlineTicketingFixture) {
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 100);
@@ -160,8 +156,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_child_business, AirlineTicketingFixture) 
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 250);
@@ -174,8 +169,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_child_first, AirlineTicketingFixture) {
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 500);
@@ -188,8 +182,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_senior_economy, AirlineTicketingFixture) 
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 160);
@@ -202,8 +195,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_senior_business, AirlineTicketingFixture)
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 400);
@@ -216,8 +208,7 @@ BOOST_FIXTURE_TEST_CASE(test_base_fare_senior_first, AirlineTicketingFixture) {
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_REQUIRE(result_json.contains("BaseFare"));
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 800);
@@ -232,8 +223,7 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_zero_bags, AirlineTicketingFixture) {
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Baggage count 0: " << result_json.dump(2));
     BOOST_REQUIRE(result_json.contains("BaggageFee"));
@@ -247,8 +237,7 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_one_bag, AirlineTicketingFixture) {
         {"BaggageCount", 1}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Baggage count 1: " << result_json.dump(2));
     BOOST_REQUIRE(result_json.contains("BaggageFee"));
@@ -262,8 +251,7 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_two_bags, AirlineTicketingFixture) {
         {"BaggageCount", 2}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Baggage count 2: " << result_json.dump(2));
     BOOST_REQUIRE(result_json.contains("BaggageFee"));
@@ -277,8 +265,7 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_three_bags, AirlineTicketingFixture) {
         {"BaggageCount", 3}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Baggage count 3: " << result_json.dump(2));
     BOOST_REQUIRE(result_json.contains("BaggageFee"));
@@ -292,8 +279,7 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_four_bags, AirlineTicketingFixture) {
         {"BaggageCount", 4}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Baggage count 4: " << result_json.dump(2));
     BOOST_REQUIRE(result_json.contains("BaggageFee"));
@@ -307,8 +293,7 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_five_bags, AirlineTicketingFixture) {
         {"BaggageCount", 5}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Baggage count 5: " << result_json.dump(2));
     BOOST_REQUIRE(result_json.contains("BaggageFee"));
@@ -332,8 +317,7 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_adult_economy_no_bags, AirlineTicketing
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Adult Economy, 0 bags: " << result_json.dump(2));
     
@@ -357,8 +341,7 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_adult_business_two_bags, AirlineTicketi
         {"BaggageCount", 2}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Adult Business, 2 bags: " << result_json.dump(2));
     
@@ -379,8 +362,7 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_child_first_three_bags, AirlineTicketin
         {"BaggageCount", 3}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Child First, 3 bags: " << result_json.dump(2));
     
@@ -401,8 +383,7 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_senior_economy_one_bag, AirlineTicketin
         {"BaggageCount", 1}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Senior Economy, 1 bag: " << result_json.dump(2));
     
@@ -423,8 +404,7 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_senior_business_four_bags, AirlineTicke
         {"BaggageCount", 4}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Senior Business, 4 bags: " << result_json.dump(2));
     
@@ -445,8 +425,7 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_adult_first_five_bags, AirlineTicketing
         {"BaggageCount", 5}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Adult First, 5 bags: " << result_json.dump(2));
     
@@ -469,8 +448,7 @@ BOOST_FIXTURE_TEST_CASE(test_edge_case_large_baggage_count, AirlineTicketingFixt
         {"BaggageCount", 10}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Edge case - 10 bags: " << result_json.dump(2));
     
@@ -490,8 +468,7 @@ BOOST_FIXTURE_TEST_CASE(test_edge_case_child_first_no_bags, AirlineTicketingFixt
         {"BaggageCount", 0}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Child First, 0 bags: " << result_json.dump(2));
     

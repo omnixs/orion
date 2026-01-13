@@ -78,7 +78,7 @@ BOOST_AUTO_TEST_CASE(test_engine_namespace_api)
     BOOST_CHECK_EQUAL(engine.get_namespace(), "http://test.example/namespace");
     
     // Verify engine still works normally
-    auto evaluation_result = engine.evaluate("{}");
+    auto evaluation_result = engine.evaluate(nlohmann::json::object());
     BOOST_CHECK(!evaluation_result.empty());
     
     // Clear should reset namespace
@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE(test_airline_namespace_integration)
     
     // Verify engine still works for evaluation
     const std::string test_data = R"({"input1": "test"})";
-    auto evaluation_result = engine.evaluate(test_data);
+    auto evaluation_result = engine.evaluate(nlohmann::json::parse(test_data));
     BOOST_CHECK(!evaluation_result.empty());
 }
 

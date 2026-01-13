@@ -41,11 +41,12 @@ BOOST_AUTO_TEST_CASE(test_0112_collection_direct_comparison) {
     BOOST_TEST_MESSAGE("Input: " + input_str);
     
     // Get engine result
-    std::string result = engine.evaluate(input_str);
+    json result_json = engine.evaluate(input);
+    std::string result = result_json.dump();
     BOOST_TEST_MESSAGE("Engine Result: " + result);
     
     // Parse result and analyze structure
-    json result_json = json::parse(result);
+    // // json result_json = json::parse(result);
     BOOST_TEST_MESSAGE("Parsed Result Type: " + std::string(result_json.type_name()));
     
     if (result_json.is_array()) {
