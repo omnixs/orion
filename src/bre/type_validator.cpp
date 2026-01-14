@@ -122,16 +122,6 @@ namespace orion::bre
         int depth
     )
     {
-        // Circular reference protection
-        static constexpr int MAX_RECURSION_DEPTH = 10;
-        if (depth > MAX_RECURSION_DEPTH)
-        {
-            throw std::runtime_error(
-                std::format("Maximum recursion depth ({}) exceeded for component '{}' - possible circular reference",
-                           MAX_RECURSION_DEPTH, component.name)
-            );
-        }
-        
         // Check component-level constraints
         if (component.has_constraints())
         {
@@ -194,16 +184,6 @@ namespace orion::bre
         int depth
     )
     {
-        // Circular reference protection
-        static constexpr int MAX_RECURSION_DEPTH = 10;
-        if (depth > MAX_RECURSION_DEPTH)
-        {
-            throw std::runtime_error(
-                std::format("Maximum recursion depth ({}) exceeded for type '{}' - possible circular reference",
-                           MAX_RECURSION_DEPTH, item_def.name)
-            );
-        }
-        
         // Complex types must be JSON objects
         if (!value.is_object())
         {
@@ -214,16 +194,13 @@ namespace orion::bre
             );
         }
         
-        // Validate each component
+        // Validate each component that is present (DMN fields are optional by default)
         for (const auto& component : item_def.itemComponents)
         {
-            // Check if component is present in value
+            // Only validate components that are actually present in the input
             if (!value.contains(component.name))
             {
-                throw std::runtime_error(
-                    std::format("Missing required component '{}' in structured type '{}'",
-                               component.name, item_def.name)
-                );
+                continue; // Skip missing fields - they are optional
             }
             
             const auto& comp_value = value[component.name];
