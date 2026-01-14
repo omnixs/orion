@@ -1067,10 +1067,14 @@ static Value eval_range(const ERange* r, const json& ctx)
                 // Use PCRE2 via cache for runtime pattern compilation
                 // Pattern syntax is PCRE2 (documented behavior)
                 // Note: Using deprecated global cache as fallback when EvaluationContext unavailable
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
                 auto& cache = orion::bre::feel::get_regex_cache();
-#pragma GCC diagnostic pop
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
                 auto compiled = cache.get_or_compile(args[1].str());
                 
                 if (!compiled) {

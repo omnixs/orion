@@ -1116,10 +1116,14 @@ json evaluate_matches_function(const std::vector<json>& args, EvaluationContext*
     }
 
     // Use engine-scoped cache if available, otherwise fallback to global cache
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
     RegexCache* cache_ptr = (eval_ctx && eval_ctx->regex_cache) ? eval_ctx->regex_cache : &get_regex_cache();
-#pragma GCC diagnostic pop
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
     auto compiled = cache_ptr->get_or_compile(unescaped_pattern, flags_val);
     
     if (!compiled) {
