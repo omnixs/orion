@@ -271,7 +271,14 @@ namespace orion::bre::feel {
         // Use std::call_once to ensure warmup happens exactly once, even with multiple callers
         static std::once_flag warmup_flag;
         std::call_once(warmup_flag, []() {
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
             get_regex_cache().warmup();
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
         });
     }
 
