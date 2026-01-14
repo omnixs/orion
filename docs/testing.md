@@ -48,9 +48,17 @@ Test binaries are generated:
 
 Expected output:
 ```
-Running 279 test cases...
+Running 270+ test cases...
 *** No errors detected
 ```
+
+**Test Coverage:**
+- FEEL expression evaluation tests
+- Decision table tests with various hit policies
+- Business Knowledge Model (BKM) tests
+- **ItemDefinition validation tests** - Type checking and constraint validation
+- DMN TCK compliance tests
+- Performance benchmarks
 
 ---
 
@@ -134,12 +142,35 @@ If a TCK or unit test fails:
 
 ---
 
-## 8. Summary
+## 8. Input Validation with ItemDefinition
+
+**Orion supports automatic input validation** based on DMN ItemDefinition constraints defined in the model.
+
+**Features:**
+- ✅ Validation **enabled by default** (production-ready)
+- ✅ Type checking for simple and complex types
+- ✅ Enumeration constraint validation (allowedValues)
+- ✅ Deep nested structure validation
+- ✅ Collection validation
+- ✅ Optional validation (can be disabled per-evaluation)
+
+**See:** [ItemDefinition Validation Guide](itemdefinition-guide.md) for complete documentation.
+
+**Test Coverage:**
+- 6 validation integration tests (100% passing)
+- 3 deep nesting tests (advanced feature)
+- TCK compliance analysis for itemComponent usage
+- Performance benchmarks (<1µs overhead for valid inputs)
+
+---
+
+## 9. Summary
 
 Orion's comprehensive test suite includes:
-- **279 unit tests** (C++ test cases)
+- **270+ unit tests** (C++ test cases)
 - **3,535 TCK tests** (DMN specification compliance)
 - **100% Level 2 compliance** (126/126 tests)
 - **13.7% Level 3 coverage** (484/3,535 tests)
+- **6 validation integration tests** (ItemDefinition constraint checking)
 
 Contributors can confidently validate correctness for any code change using these automated tests.

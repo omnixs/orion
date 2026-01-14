@@ -50,6 +50,7 @@ Each release includes:
 
 - Decision Table evaluation compatible with DMN L1/L2 (hit policies, FEEL expressions)
 - Business Knowledge Models (BKM) support
+- **Input validation with ItemDefinition constraints** - Automatic type checking and enumeration validation ([Guide](docs/itemdefinition-guide.md))
 - Portable C++ API under `orion::api` namespace
 - FEEL (Friendly Enough Expression Language) expression evaluator
 - Pluggable logger interface (optional spdlog integration)

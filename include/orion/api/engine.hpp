@@ -67,6 +67,10 @@ namespace orion::api
 
         // Validation
         [[nodiscard]] std::vector<std::string> validate_models() const;
+        
+        // Input validation control
+        void set_validation_enabled(bool enabled);
+        [[nodiscard]] bool is_validation_enabled() const;
     };
 
 } // namespace orion::api

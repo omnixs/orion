@@ -309,6 +309,8 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_tck_abs_debug.cpp
       tst/bre/feel/test_feel_matches.cpp
       tst/bre/test_seat_bundle_integration.cpp
+      tst/bre/test_validation_integration.cpp
+      tst/bre/test_deep_nesting.cpp
       tst/common/test_xml2json.cpp
   )
 

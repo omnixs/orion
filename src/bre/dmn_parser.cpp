@@ -437,6 +437,10 @@ namespace orion::bre
             {
                 item_def.label = attr->value();
             }
+            if (auto* attr = item_def_node->first_attribute("typeLanguage"))
+            {
+                item_def.typeLanguage = attr->value();
+            }
             if (auto* attr = item_def_node->first_attribute("isCollection"))
             {
                 std::string val = attr->value();
@@ -451,6 +455,34 @@ namespace orion::bre
                     if (child->value() != nullptr)
                     {
                         item_def.typeRef = child->value();
+                    }
+                }
+                else if (matches_element(child, "label"))
+                {
+                    // Parse label element (DMN 1.5 optional)
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                    {
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                item_def.label = text_child->value();
+                            }
+                        }
+                    }
+                }
+                else if (matches_element(child, "description"))
+                {
+                    // Parse description element (DMN 1.5 optional)
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                    {
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                item_def.description = text_child->value();
+                            }
+                        }
                     }
                 }
                 else if (matches_element(child, "allowedValues"))

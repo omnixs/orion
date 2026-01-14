@@ -19,6 +19,7 @@
 #include <orion/api/engine.hpp>
 #include <orion/bre/dmn_model.hpp>
 #include <orion/bre/dmn_parser.hpp>
+#include <orion/bre/type_validator.hpp>
 #include <expected>
 #include <stdexcept>
 #include <orion/bre/bkm_manager.hpp>
@@ -51,6 +52,7 @@ namespace orion
             std::map<std::string, bre::ItemDefinition> item_definitions_; // Custom data types
             std::string namespace_uri_; // Stored DMN namespace from definitions element
             bre::feel::RegexCache regex_cache_; // Instance-scoped regex cache
+            bool validation_enabled_ = true; // Input validation enabled by default (production-ready)
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
@@ -136,6 +138,46 @@ namespace orion
         string BusinessRulesEngine::evaluate(string_view data_json) const
         {
             json data = json::parse(data_json);
+            
+            // Validate inputs against ItemDefinitions if validation enabled
+            if (pimpl->validation_enabled_)
+            {
+                for (const auto& [type_name, item_def] : pimpl->item_definitions_)
+                {
+                    // Check if input contains a field matching this ItemDefinition
+                    if (data.contains(type_name))
+                    {
+                        const auto& value = data[type_name];
+                        
+                        if (item_def.is_structured_type())
+                        {
+                            // Validate complex type
+                            try
+                            {
+                                bre::validate_complex_type(value, item_def, pimpl->item_definitions_);
+                            }
+                            catch (const std::runtime_error& e)
+                            {
+                                throw std::runtime_error(
+                                    std::format("Input validation failed for '{}': {}", type_name, e.what())
+                                );
+                            }
+                        }
+                        else if (item_def.has_constraints())
+                        {
+                            // Validate simple type with constraints
+                            if (!bre::validate_type_constraint(value, item_def))
+                            {
+                                throw std::runtime_error(
+                                    std::format("Input validation failed for '{}': value does not match allowed values",
+                                               type_name)
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            
             json results = json::object();
 
             // Create evaluation context with engine's regex cache
@@ -230,6 +272,16 @@ namespace orion
             // Future enhancement: Implement DMN model validation
             // Could validate: decision table structure, hit policies, expression syntax, etc.
             return {}; // No validation errors
+        }
+        
+        void BusinessRulesEngine::set_validation_enabled(bool enabled)
+        {
+            pimpl->validation_enabled_ = enabled;
+        }
+        
+        bool BusinessRulesEngine::is_validation_enabled() const
+        {
+            return pimpl->validation_enabled_;
         }
 
         // Impl helper methods implementation

@@ -184,7 +184,9 @@ namespace orion::bre
     {
         std::string name; // Type name (e.g., "tStatus")
         std::string id; // Unique identifier
-        std::string label; // Human-readable label
+        std::string label; // Human-readable label (DMN 1.5 optional)
+        std::string description; // Documentation text (DMN 1.5 optional)
+        std::string typeLanguage; // Type system language (DMN 1.5 optional, defaults to "FEEL")
         std::string typeRef; // Base type reference (e.g., "string") - for simple types
         std::string allowedValues; // Enumeration constraint (e.g., "\"Active\", \"Disabled\"")
         bool isCollection = false; // Whether this is a collection type

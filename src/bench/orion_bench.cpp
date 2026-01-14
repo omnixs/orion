@@ -410,6 +410,221 @@ static void BM_OrderDiscount_Largest(benchmark::State& state) {
 }
 
 // ============================================================================
+// ItemDefinition Validation Benchmarks (v1.2.0+)
+// ============================================================================
+
+static const char* kValidationSimple_DMN = R"(<?xml version="1.0"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/DMN15.xsd">
+  <itemDefinition name="tStatus">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"Active", "Disabled", "Pending"</text>
+    </allowedValues>
+  </itemDefinition>
+  <decision name="TestDecision">
+    <decisionTable hitPolicy="UNIQUE">
+      <input>
+        <inputExpression><text>tStatus</text></inputExpression>
+      </input>
+      <output name="result"/>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"OK"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>)";
+
+static const char* kValidationComplex_DMN = R"(<?xml version="1.0"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/DMN15.xsd">
+  <itemDefinition name="tAddress">
+    <itemComponent name="street">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent name="city">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent name="zipCode">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition name="tPerson">
+    <itemComponent name="name">
+      <typeRef>string</typeRef>
+    </itemComponent>
+    <itemComponent name="age">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent name="address">
+      <typeRef>tAddress</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <decision name="TestDecision">
+    <decisionTable hitPolicy="UNIQUE">
+      <input>
+        <inputExpression><text>tPerson</text></inputExpression>
+      </input>
+      <output name="result"/>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"OK"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>)";
+
+static const char* kValidationDeep_DMN = R"(<?xml version="1.0"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/DMN15.xsd">
+  <itemDefinition name="tAddress">
+    <itemComponent name="street"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="city"><typeRef>string</typeRef></itemComponent>
+  </itemDefinition>
+  <itemDefinition name="tMember">
+    <itemComponent name="name"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="address"><typeRef>tAddress</typeRef></itemComponent>
+  </itemDefinition>
+  <itemDefinition name="tTeam">
+    <itemComponent name="teamName"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="members">
+      <typeRef>tMember</typeRef>
+      <isCollection>true</isCollection>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition name="tDepartment">
+    <itemComponent name="deptName"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="teams">
+      <typeRef>tTeam</typeRef>
+      <isCollection>true</isCollection>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition name="tOrganization">
+    <itemComponent name="orgName"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="departments">
+      <typeRef>tDepartment</typeRef>
+      <isCollection>true</isCollection>
+    </itemComponent>
+  </itemDefinition>
+  <decision name="TestDecision">
+    <decisionTable hitPolicy="UNIQUE">
+      <input>
+        <inputExpression><text>tOrganization</text></inputExpression>
+      </input>
+      <output name="result"/>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"OK"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>)";
+
+// Benchmark: No validation (baseline)
+static void BM_Validation_Baseline_NoValidation(benchmark::State& state) {
+    BusinessRulesEngine engine;
+    engine.load_dmn_model(kValidationSimple_DMN);
+    engine.set_validation_enabled(false);
+    std::string_view input = R"({"tStatus": "Active"})";
+    for (auto _ : state) {
+        std::string result = engine.evaluate(input);
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+// Benchmark: Simple type validation (enum check)
+static void BM_Validation_SimpleType_Valid(benchmark::State& state) {
+    BusinessRulesEngine engine;
+    engine.load_dmn_model(kValidationSimple_DMN);
+    engine.set_validation_enabled(true);
+    std::string_view input = R"({"tStatus": "Active"})";
+    for (auto _ : state) {
+        std::string result = engine.evaluate(input);
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+// Benchmark: Complex type validation (2 levels)
+static void BM_Validation_ComplexType_Valid(benchmark::State& state) {
+    BusinessRulesEngine engine;
+    engine.load_dmn_model(kValidationComplex_DMN);
+    engine.set_validation_enabled(true);
+    std::string_view input = R"({
+        "tPerson": {
+            "name": "Alice",
+            "age": 30,
+            "address": {
+                "street": "123 Main St",
+                "city": "Seattle",
+                "zipCode": "98101"
+            }
+        }
+    })";
+    for (auto _ : state) {
+        std::string result = engine.evaluate(input);
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+// Benchmark: Deep nesting validation (5 levels)
+static void BM_Validation_DeepNesting_Valid(benchmark::State& state) {
+    BusinessRulesEngine engine;
+    engine.load_dmn_model(kValidationDeep_DMN);
+    engine.set_validation_enabled(true);
+    std::string_view input = R"({
+        "tOrganization": {
+            "orgName": "Acme Corp",
+            "departments": [{
+                "deptName": "Engineering",
+                "teams": [{
+                    "teamName": "Backend",
+                    "members": [{
+                        "name": "Alice",
+                        "address": {"street": "123 Main", "city": "Seattle"}
+                    }]
+                }]
+            }]
+        }
+    })";
+    for (auto _ : state) {
+        std::string result = engine.evaluate(input);
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+// Benchmark: Collection validation (10 items)
+static void BM_Validation_Collection_10Items(benchmark::State& state) {
+    BusinessRulesEngine engine;
+    engine.load_dmn_model(kValidationDeep_DMN);
+    engine.set_validation_enabled(true);
+    std::string_view input = R"({
+        "tOrganization": {
+            "orgName": "Acme",
+            "departments": [{
+                "deptName": "Eng",
+                "teams": [{
+                    "teamName": "Backend",
+                    "members": [
+                        {"name":"Alice","address":{"street":"1","city":"S"}},
+                        {"name":"Bob","address":{"street":"2","city":"S"}},
+                        {"name":"Charlie","address":{"street":"3","city":"S"}},
+                        {"name":"Diana","address":{"street":"4","city":"S"}},
+                        {"name":"Eve","address":{"street":"5","city":"S"}},
+                        {"name":"Frank","address":{"street":"6","city":"S"}},
+                        {"name":"Grace","address":{"street":"7","city":"S"}},
+                        {"name":"Hank","address":{"street":"8","city":"S"}},
+                        {"name":"Ivy","address":{"street":"9","city":"S"}},
+                        {"name":"Jack","address":{"street":"10","city":"S"}}
+                    ]
+                }]
+            }]
+        }
+    })";
+    for (auto _ : state) {
+        std::string result = engine.evaluate(input);
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+// ============================================================================
 // Register Benchmarks
 // ============================================================================
 
@@ -430,6 +645,13 @@ BENCHMARK(BM_OrderDiscount_Medium);
 BENCHMARK(BM_OrderDiscount_Large);
 BENCHMARK(BM_OrderDiscount_Larger);
 BENCHMARK(BM_OrderDiscount_Largest);
+
+// validation benchmarks (v1.2.0+)
+BENCHMARK(BM_Validation_Baseline_NoValidation);
+BENCHMARK(BM_Validation_SimpleType_Valid);
+BENCHMARK(BM_Validation_ComplexType_Valid);
+BENCHMARK(BM_Validation_DeepNesting_Valid);
+BENCHMARK(BM_Validation_Collection_10Items);
 
 int main(int argc, char** argv) {
     // Initialize logger for benchmarks (use null logger to avoid overhead)
