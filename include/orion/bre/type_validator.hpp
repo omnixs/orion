@@ -70,7 +70,9 @@ namespace orion::bre
      * @param value JSON object to validate
      * @param item_def ItemDefinition with itemComponents (structured type)
      * @param all_definitions Map of all ItemDefinitions for recursive type resolution
+     * @param depth Current recursion depth (default 0, max 10 for circular protection)
      * @throws std::runtime_error if validation fails with detailed error message
+     * @throws std::runtime_error if max recursion depth exceeded (circular reference detected)
      * 
      * @example
      * ```cpp
@@ -95,7 +97,8 @@ namespace orion::bre
     void validate_complex_type(
         const nlohmann::json& value,
         const ItemDefinition& item_def,
-        const std::map<std::string, ItemDefinition>& all_definitions
+        const std::map<std::string, ItemDefinition>& all_definitions,
+        int depth = 0
     );
 
     /**
@@ -107,12 +110,15 @@ namespace orion::bre
      * @param comp_value Value of the component
      * @param component ItemComponent definition
      * @param all_definitions Map of all ItemDefinitions for type resolution
+     * @param depth Current recursion depth for circular reference protection
      * @throws std::runtime_error if validation fails with detailed error message
+     * @throws std::runtime_error if max recursion depth exceeded (circular reference detected)
      */
     void validate_component(
         const nlohmann::json& comp_value,
         const ItemComponent& component,
-        const std::map<std::string, ItemDefinition>& all_definitions
+        const std::map<std::string, ItemDefinition>& all_definitions,
+        int depth = 0
     );
 
 } // namespace orion::bre

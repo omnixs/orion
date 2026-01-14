@@ -459,4 +459,48 @@ BOOST_AUTO_TEST_CASE(validate_not_an_object)
     );
 }
 
+// Test 16: Circular reference detection (max depth exceeded)
+BOOST_AUTO_TEST_CASE(validate_circular_reference_protection)
+{
+    // Create ItemDefinitions with circular reference: tNode -> tNode
+    std::string_view dmn_xml = R"(<?xml version="1.0"?>
+<dmn:definitions xmlns:dmn="http://www.omg.org/spec/DMN/20180521/MODEL/">
+  <dmn:itemDefinition name="tNode">
+    <dmn:itemComponent name="value">
+      <dmn:typeRef>string</dmn:typeRef>
+    </dmn:itemComponent>
+    <dmn:itemComponent name="children" isCollection="true">
+      <dmn:typeRef>tNode</dmn:typeRef>
+    </dmn:itemComponent>
+  </dmn:itemDefinition>
+</dmn:definitions>)";
+    
+    auto model = DmnParser().parse(dmn_xml);
+    BOOST_REQUIRE(model.item_definitions.count("tNode") > 0);
+    
+    // Create deeply nested structure that exceeds max depth (10)
+    nlohmann::json deep_node = {{"value", "leaf"}, {"children", nlohmann::json::array()}};
+    nlohmann::json* current = &deep_node;
+    
+    // Build 12 levels of nesting (exceeds MAX_RECURSION_DEPTH of 10)
+    for (int i = 0; i < 12; ++i)
+    {
+        nlohmann::json child = {{"value", "node" + std::to_string(i)}, {"children", nlohmann::json::array()}};
+        (*current)["children"].push_back(child);
+        current = &(*current)["children"][0];
+    }
+    
+    // Validation should throw due to max depth exceeded
+    BOOST_CHECK_EXCEPTION(
+        validate_complex_type(deep_node, model.item_definitions["tNode"], model.item_definitions),
+        std::runtime_error,
+        [](const std::runtime_error& e) {
+            std::string msg(e.what());
+            return msg.find("Maximum recursion depth") != std::string::npos &&
+                   msg.find("circular reference") != std::string::npos;
+        }
+    );
+}
+
 BOOST_AUTO_TEST_SUITE_END()
+

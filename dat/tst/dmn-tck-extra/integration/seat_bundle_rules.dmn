@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmn:definitions xmlns:dmn="http://www.omg.org/spec/DMN/20180521/MODEL/" xmlns="http://example.com/dmn" xmlns:feel="http://www.omg.org/spec/DMN/20180521/FEEL/" xmlns:kie="http://www.drools.org/kie/dmn/1.2" xmlns:dmndi="http://www.omg.org/spec/DMN/20180521/DMNDI/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" id="Definitions_1" name="Sample" typeLanguage="http://www.omg.org/spec/DMN/20180521/FEEL/" namespace="http://example.com/dmn">
+  <dmn:extensionElements/>
+  <dmn:itemDefinition id="_11015BBD-86AE-4DD2-A44C-ED163D1CC993" name="tStatus" isCollection="false">
+    <dmn:typeRef>string</dmn:typeRef>
+    <dmn:allowedValues kie:constraintType="enumeration" id="_8736916F-19D9-4EE1-A36A-F5913E94A3D6">
+      <dmn:text>"Active", "Disabled"</dmn:text>
+    </dmn:allowedValues>
+  </dmn:itemDefinition>
+  <dmn:itemDefinition id="_761B5902-0DA5-423B-AA46-5EB88FE98943" name="tSeatCode" isCollection="false">
+    <dmn:typeRef>string</dmn:typeRef>
+    <dmn:allowedValues kie:constraintType="enumeration" id="_8C2C76D2-2DD8-46D4-874C-C2F0B79223BA">
+      <dmn:text>"CH_EK", "CH_L", "CH_O", "CH_Q", "CH"</dmn:text>
+    </dmn:allowedValues>
+  </dmn:itemDefinition>
+  <dmn:itemDefinition id="_5F9C6634-05BB-49E0-8027-DAD30C7263EF" name="tChangeOfferDetailsOnly" isCollection="false">
+    <dmn:typeRef>string</dmn:typeRef>
+    <dmn:allowedValues kie:constraintType="enumeration" id="_6DB82BEA-4A16-439B-9F6C-39D204E6EADE">
+      <dmn:text>"removeOffer"</dmn:text>
+    </dmn:allowedValues>
+  </dmn:itemDefinition>
+  <dmn:decision id="_E7D93B89-7627-48F8-8F42-F8060102F59B" name="seatRules">
+    <dmn:extensionElements/>
+    <dmn:variable id="_9E4BE59C-D449-4221-A42D-90E5D59369F2" name="seatRules" typeRef="Any"/>
+    <dmn:decisionTable id="_F6F514C9-E94C-40C3-BC4B-FB6FFEAFF411" hitPolicy="FIRST" preferredOrientation="Rule-as-Row">
+      <dmn:input id="_09BE845D-AF1D-4CDC-AF46-5570149A229C">
+        <dmn:inputExpression id="_63063B58-0660-43D1-89F3-7036BCEE0F1C" typeRef="tStatus">
+          <dmn:text>status</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="_BEBE24B6-55BD-4BBC-9119-16D6371C96F9">
+        <dmn:inputExpression id="_68569AD3-BEBD-451F-A959-C11B9809FFF4" typeRef="tSeatCode">
+          <dmn:text>seatCode</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="_F8785601-8662-4135-B71E-4AC5BCDA486D">
+        <dmn:inputExpression id="_35C45350-1BE3-414C-837A-ADAB8DB84EFC" typeRef="days and time duration">
+          <dmn:text>advancePurchase</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="_6C0F46F4-9487-4BAE-9312-10CD90AE52C0">
+        <dmn:inputExpression id="_7552AB6D-308F-452F-9C77-4827E8BE6944" typeRef="string">
+          <dmn:text>testVariant</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:output id="_5805D5A2-4101-41B9-AE61-46B14BB22F10" name="id" typeRef="number"/>
+      <dmn:output id="_AFA882C9-DD15-49A7-A44B-BE3CA789EBCA" name="key" typeRef="string"/>
+      <dmn:output id="_921F4E46-B4BC-45BF-B77D-C805CC362EC7" name="label" typeRef="string"/>
+      <dmn:output id="_AAE27E7B-C442-4AFB-A599-26D0A2CD52EF" name="changeOfferDetailsOnly" typeRef="tChangeOfferDetailsOnly"/>
+      <dmn:annotation name="annotation-1"/>
+      <dmn:rule id="_A95568D0-0909-4CD3-868E-585F3A650350">
+        <dmn:inputEntry id="_D7AA16FC-EEF9-4D66-97B1-1622405E0A33">
+          <dmn:text>-</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_170957AA-A23D-4272-A015-83C380F56D86">
+          <dmn:text>-</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_3F53FCC9-7275-4109-BA32-64597CDBD58F">
+          <dmn:text>&lt;= duration("PT31H")</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="_32E681BC-A21F-4F6B-9D39-F47CE21CDD06">
+          <dmn:text>-</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="_B3D29309-3E10-4C72-98FB-A84BDF7BCCE9">
+          <dmn:text>100</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="_9D0BD09F-7241-4490-A72F-E1879AE4662A">
+          <dmn:text>"RMV_AP_31h"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="_8D857479-DCD3-4FF3-99BD-3D2ABD2917FD">
+          <dmn:text>"Change Offer Details Only Remove Seat AP 31h"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="_86B32968-679B-474A-AD63-94AB3A14A1BB">
+          <dmn:text>"removeOffer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:annotationEntry>
+          <dmn:text/>
+        </dmn:annotationEntry>
+      </dmn:rule>
+    </dmn:decisionTable>
+  </dmn:decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="_6202672E-CCD4-43E8-A546-7F7C35AD94A5" name="DRG">
+      <di:extension>
+        <kie:ComponentsWidthsExtension>
+          <kie:ComponentWidths dmnElementRef="_F6F514C9-E94C-40C3-BC4B-FB6FFEAFF411">
+            <kie:width>50</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>189</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>100</kie:width>
+            <kie:width>238</kie:width>
+            <kie:width>100</kie:width>
+          </kie:ComponentWidths>
+        </kie:ComponentsWidthsExtension>
+      </di:extension>
+      <dmndi:DMNShape id="dmnshape-drg-_E7D93B89-7627-48F8-8F42-F8060102F59B" dmnElementRef="_E7D93B89-7627-48F8-8F42-F8060102F59B" isCollapsed="false">
+        <dmndi:DMNStyle>
+          <dmndi:FillColor red="255" green="255" blue="255"/>
+          <dmndi:StrokeColor red="0" green="0" blue="0"/>
+          <dmndi:FontColor red="0" green="0" blue="0"/>
+        </dmndi:DMNStyle>
+        <dc:Bounds x="551" y="301" width="210" height="106"/>
+        <dmndi:DMNLabel/>
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</dmn:definitions>

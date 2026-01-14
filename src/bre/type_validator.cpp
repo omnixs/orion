@@ -118,9 +118,20 @@ namespace orion::bre
     void validate_component(
         const nlohmann::json& comp_value,
         const ItemComponent& component,
-        const std::map<std::string, ItemDefinition>& all_definitions
+        const std::map<std::string, ItemDefinition>& all_definitions,
+        int depth
     )
     {
+        // Circular reference protection
+        static constexpr int MAX_RECURSION_DEPTH = 10;
+        if (depth > MAX_RECURSION_DEPTH)
+        {
+            throw std::runtime_error(
+                std::format("Maximum recursion depth ({}) exceeded for component '{}' - possible circular reference",
+                           MAX_RECURSION_DEPTH, component.name)
+            );
+        }
+        
         // Check component-level constraints
         if (component.has_constraints())
         {
@@ -157,7 +168,7 @@ namespace orion::bre
             if (nested_def.is_structured_type())
             {
                 // Recursive validation for nested complex type
-                validate_complex_type(comp_value, nested_def, all_definitions);
+                validate_complex_type(comp_value, nested_def, all_definitions, depth + 1);
             }
             else if (nested_def.has_constraints())
             {
@@ -179,9 +190,20 @@ namespace orion::bre
     void validate_complex_type(
         const nlohmann::json& value,
         const ItemDefinition& item_def,
-        const std::map<std::string, ItemDefinition>& all_definitions
+        const std::map<std::string, ItemDefinition>& all_definitions,
+        int depth
     )
     {
+        // Circular reference protection
+        static constexpr int MAX_RECURSION_DEPTH = 10;
+        if (depth > MAX_RECURSION_DEPTH)
+        {
+            throw std::runtime_error(
+                std::format("Maximum recursion depth ({}) exceeded for type '{}' - possible circular reference",
+                           MAX_RECURSION_DEPTH, item_def.name)
+            );
+        }
+        
         // Complex types must be JSON objects
         if (!value.is_object())
         {
@@ -222,7 +244,7 @@ namespace orion::bre
                 {
                     try
                     {
-                        validate_component(comp_value[i], component, all_definitions);
+                        validate_component(comp_value[i], component, all_definitions, depth + 1);
                     }
                     catch (const std::runtime_error& e)
                     {
@@ -236,7 +258,7 @@ namespace orion::bre
             else
             {
                 // Validate single value
-                validate_component(comp_value, component, all_definitions);
+                validate_component(comp_value, component, all_definitions, depth + 1);
             }
         }
     }
