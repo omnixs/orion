@@ -42,6 +42,9 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
         json result = evaluator.evaluate(test_case.expression, {}, get_test_eval_ctx());
         BOOST_TEST_MESSAGE("  Result: " << result);
         
+        // Add assertions for proper test validation
+        BOOST_CHECK(result.is_null());
+        
         if (result.is_null()) {
             BOOST_TEST_MESSAGE("  ✅ Correctly returns null");
         } else {
@@ -67,6 +70,9 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
         BOOST_TEST_MESSAGE("Expression: " << expr);
         json math_result = orion::bre::detail::eval_math_expression(expr);
         BOOST_TEST_MESSAGE("  Math Result: " << math_result);
+        
+        // Add assertions for proper test validation
+        BOOST_CHECK(math_result.is_null());
         
         if (math_result.is_null()) {
             BOOST_TEST_MESSAGE("  ✅ Math evaluator correctly returns null");
