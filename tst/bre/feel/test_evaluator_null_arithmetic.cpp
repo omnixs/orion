@@ -34,8 +34,10 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
         {"10 / null", "null", "Division by null"}
     };
     
+    int evaluator_tested = 0;
     BOOST_TEST_MESSAGE("Testing through orion::bre::feel::Evaluator::evaluate():");
     for (const auto& test_case : null_cases) {
+        evaluator_tested++;
         BOOST_TEST_MESSAGE("Expression: " << test_case.expression);
         json result = evaluator.evaluate(test_case.expression, context);
         BOOST_TEST_MESSAGE("  Result: " << result);
@@ -60,7 +62,9 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
         "testNull * 10"
     };
     
+    int math_tested = 0;
     for (const auto& expr : direct_math_tests) {
+        math_tested++;
         BOOST_TEST_MESSAGE("Expression: " << expr);
         json math_result = orion::bre::detail::eval_math_expression(expr);
         BOOST_TEST_MESSAGE("  Math Result: " << math_result);
@@ -74,6 +78,10 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     }
     
     orion::bre::detail::current_eval_context = nullptr;
+    
+    // Verify we actually tested something
+    BOOST_CHECK_EQUAL(evaluator_tested, 6);
+    BOOST_CHECK_EQUAL(math_tested, 4);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

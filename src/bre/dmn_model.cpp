@@ -527,7 +527,7 @@ namespace orion::bre
 
     // Implementation of DecisionTable::evaluate
     json DecisionTable::evaluate(const json& context,
-                                 orion::bre::feel::EvaluationContext* eval_ctx) const
+                                 [[maybe_unused]] orion::bre::feel::EvaluationContext* eval_ctx) const
     {
         // Step 1: Validate input values against allowed values
         validate_input_values(context);

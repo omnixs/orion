@@ -255,9 +255,11 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
     
     // We just verify these are recognized as different from decimal numbers
     // The actual evaluation behavior is tested elsewhere
+    int tested_count = 0;
     for (const auto& expr : property_expressions)
     {
         BOOST_TEST_MESSAGE("Testing property access expression: " << expr);
+        tested_count++;
         // Just verify it doesn't crash - property access may or may not be supported
         try {
             auto result = evaluator.evaluate(expr, context);
@@ -266,6 +268,9 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
             BOOST_TEST_MESSAGE("  Expected: property access not yet fully supported");
         }
     }
+    
+    // Verify we actually tested the expressions
+    BOOST_CHECK_EQUAL(tested_count, property_expressions.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

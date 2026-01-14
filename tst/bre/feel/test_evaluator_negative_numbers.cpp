@@ -55,6 +55,9 @@ BOOST_AUTO_TEST_CASE(test_negative_number_parsing_issue) {
         }
         BOOST_TEST_MESSAGE("---");
     }
+    
+    // Verify we tested all cases
+    BOOST_CHECK_EQUAL(test_cases.size(), 7);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

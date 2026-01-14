@@ -135,6 +135,11 @@ BOOST_AUTO_TEST_CASE(test_0112_exact_tck_comparison) {
                 }
             }
         }
+        
+        // Assert that the results match
+        BOOST_CHECK_EQUAL(got, expected.dump());
+    } else {
+        BOOST_FAIL("Failed to extract result from engine output");
     }
 }
 

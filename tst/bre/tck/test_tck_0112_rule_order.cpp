@@ -93,7 +93,8 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     BOOST_TEST_MESSAGE("Output: " + result1.dump());
     
     // Expected: ["Best", "Standard"] in rule order
-    BOOST_TEST_MESSAGE("Expected: [\"Best\", \"Standard\"] as collection");
+    json expected1 = {{"Approval", json::array({"Best", "Standard"})}};
+    BOOST_CHECK_EQUAL(result1, expected1);
     
     // Test case 2: Age = 13 (should match only >=12 rule)
     BOOST_TEST_MESSAGE("\n--- Test Case 2: Age = 13 ---");
@@ -104,7 +105,8 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     BOOST_TEST_MESSAGE("Output: " + result2.dump());
     
     // Expected: ["Standard"]
-    BOOST_TEST_MESSAGE("Expected: [\"Standard\"] as collection");
+    json expected2 = {{"Approval", json::array({"Standard"})}};
+    BOOST_CHECK_EQUAL(result2, expected2);
     
     // Test case 3: Age = 10 (should match only <12 rule)  
     BOOST_TEST_MESSAGE("\n--- Test Case 3: Age = 10 ---");
@@ -115,7 +117,8 @@ BOOST_AUTO_TEST_CASE(test_0112_rule_order_single_column_exact_output) {
     BOOST_TEST_MESSAGE("Output: " + result3.dump());
     
     // Expected: ["Standard"]
-    BOOST_TEST_MESSAGE("Expected: [\"Standard\"] as collection");
+    json expected3 = {{"Approval", json::array({"Standard"})}};
+    BOOST_CHECK_EQUAL(result3, expected3);
     
     BOOST_TEST_MESSAGE("=== Analysis complete - check output format ===");
 }
