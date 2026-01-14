@@ -268,18 +268,15 @@ namespace orion::bre::feel {
     // Global warmup function (deprecated - use RegexCache::warmup() instead)
     void warmup_regex_cache()
     {
-        // Use std::call_once to ensure warmup happens exactly once, even with multiple callers
-        static std::once_flag warmup_flag;
-        std::call_once(warmup_flag, []() {
+        // Simple wrapper - multiple calls are safe (warmup is idempotent)
 #if defined(__GNUC__) || defined(__clang__)
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-            get_regex_cache().warmup();
+        get_regex_cache().warmup();
 #if defined(__GNUC__) || defined(__clang__)
     #pragma GCC diagnostic pop
 #endif
-        });
     }
 
 } // namespace orion::bre::feel
