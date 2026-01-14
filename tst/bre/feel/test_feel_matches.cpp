@@ -101,24 +101,59 @@ BOOST_AUTO_TEST_CASE(test_cache_behavior)
     nlohmann::json context = nlohmann::json::object();
     
     // Clear cache to start fresh
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     get_regex_cache().clear();
     BOOST_CHECK_EQUAL(get_regex_cache().size(), 0);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     // First use - should compile and cache
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("test", "t.*t"))", context), true);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), 1);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     // Second use of same pattern - should use cache (size stays at 1)
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("text", "t.*t"))", context), true);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), 1);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     // Different pattern - should compile and cache
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("abc", "a.*c"))", context), true);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), 2);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     // Use first pattern again - should still be cached
     BOOST_CHECK_EQUAL(Evaluator::evaluate(R"(matches("toast", "t.*t"))", context), true);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), 2);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
 }
 
 /**
@@ -129,8 +164,15 @@ BOOST_AUTO_TEST_CASE(test_cache_eviction)
     nlohmann::json context = nlohmann::json::object();
     
     // Clear cache and get max size
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     get_regex_cache().clear();
     size_t max_size = get_regex_cache().max_size();
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     // Fill cache to capacity
     for (size_t i = 0; i < max_size; ++i) {
@@ -140,13 +182,27 @@ BOOST_AUTO_TEST_CASE(test_cache_eviction)
         (void)result; // Intentionally unused - just filling cache
     }
     
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), max_size);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     // Add one more - should evict LRU and stay at max_size
     // Use pattern that actually matches "text" to verify cache works after eviction
     auto overflow_result = Evaluator::evaluate(R"(matches("text", ".*"))", context);
     BOOST_CHECK_EQUAL(overflow_result, true);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), max_size);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
 }
 
 /**
@@ -170,7 +226,14 @@ BOOST_AUTO_TEST_CASE(test_concurrent_matches)
     nlohmann::json context = nlohmann::json::object();
     
     // Clear cache
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     get_regex_cache().clear();
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
     
     auto match_func = [&context]([[maybe_unused]] int thread_id) {
         for (int i = 0; i < 100; ++i) {
@@ -195,7 +258,14 @@ BOOST_AUTO_TEST_CASE(test_concurrent_matches)
     }
     
     // Cache should contain the 3 unique patterns used
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     BOOST_CHECK_EQUAL(get_regex_cache().size(), 3);
+#if defined(__GNUC__) || defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
 }
 
 /**
