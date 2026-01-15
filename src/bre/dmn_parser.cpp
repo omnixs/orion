@@ -525,6 +525,14 @@ namespace orion::bre
                                 component.typeRef = comp_child->value();
                             }
                         }
+                        else if (matches_element(comp_child, "isCollection"))
+                        {
+                            if (comp_child->value() != nullptr)
+                            {
+                                std::string val = comp_child->value();
+                                component.isCollection = (val == "true" || val == "1");
+                            }
+                        }
                         else if (matches_element(comp_child, "allowedValues"))
                         {
                             // Component-level constraints
