@@ -1071,7 +1071,14 @@ static Value eval_range(const ERange* r, const json& ctx)
 #pragma warning(push)
 #pragma warning(disable: 4996)
 #endif
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
                 auto& cache = orion::bre::feel::get_regex_cache();
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
