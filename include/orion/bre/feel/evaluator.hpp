@@ -48,10 +48,10 @@ namespace orion::bre::feel {
          * @brief Evaluate a FEEL expression
          * @param expression The FEEL expression to evaluate
          * @param context The evaluation context with variable bindings
-         * @param eval_ctx Evaluation context with engine resources (optional, uses global cache if null)
+         * @param eval_ctx Evaluation context with engine resources (required for proper resource management)
          * @return The result of evaluation as JSON
          * @throws std::runtime_error if evaluation fails
          */
-        [[nodiscard]] static json evaluate(std::string_view expression, const json& context = json::object(), EvaluationContext* eval_ctx = nullptr);
+        [[nodiscard]] static json evaluate(std::string_view expression, const json& context, EvaluationContext& eval_ctx);
     };
 }

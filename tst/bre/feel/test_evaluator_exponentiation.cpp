@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -17,11 +17,24 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 #include <cmath>
 
+using json = nlohmann::json;
 using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(test_exponentiation_suite)
 
@@ -100,7 +113,7 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_exponentiation) {
     // 10**5 = 100000
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("10**5", input);
+    auto result = eval_feel("10**5", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 100000.0);
 }
@@ -109,7 +122,7 @@ BOOST_AUTO_TEST_CASE(test_eval_negative_exponent) {
     // 10**-5 = 0.00001
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("10**-5", input);
+    auto result = eval_feel("10**-5", input);
     
     BOOST_CHECK_CLOSE(result.get<double>(), 0.00001, 0.0001);
 }
@@ -118,7 +131,7 @@ BOOST_AUTO_TEST_CASE(test_eval_exponentiation_with_parentheses) {
     // (5+2)**5 = 7**5 = 16807
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("(5+2)**5", input);
+    auto result = eval_feel("(5+2)**5", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 16807.0);
 }
@@ -127,7 +140,7 @@ BOOST_AUTO_TEST_CASE(test_eval_exponentiation_precedence_over_addition) {
     // 5+2**5 should be 5+(2**5) = 5+32 = 37, not (5+2)**5 = 16807
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("5+2**5", input);
+    auto result = eval_feel("5+2**5", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 37.0);
 }
@@ -136,7 +149,7 @@ BOOST_AUTO_TEST_CASE(test_eval_exponentiation_precedence_complex) {
     // 5+2**5+3 should be 5+(2**5)+3 = 5+32+3 = 40
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("5+2**5+3", input);
+    auto result = eval_feel("5+2**5+3", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 40.0);
 }
@@ -145,7 +158,7 @@ BOOST_AUTO_TEST_CASE(test_eval_exponentiation_with_parentheses_in_exponent) {
     // 5+2**(5+3) = 5+(2**8) = 5+256 = 261
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("5+2**(5+3)", input);
+    auto result = eval_feel("5+2**(5+3)", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 261.0);
 }
@@ -155,7 +168,7 @@ BOOST_AUTO_TEST_CASE(test_eval_chained_exponentiation_right_associative) {
     // NOT (2**3)**2 = 8**2 = 64 (left-associative)
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("2**3**2", input);
+    auto result = eval_feel("2**3**2", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 512.0);
 }
@@ -164,7 +177,7 @@ BOOST_AUTO_TEST_CASE(test_eval_exponentiation_with_multiplication) {
     // 1.2*10**3 = 1.2*1000 = 1200
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("1.2*10**3", input);
+    auto result = eval_feel("1.2*10**3", input);
     
     BOOST_CHECK_CLOSE(result.get<double>(), 1200.0, 0.001);
 }
@@ -173,7 +186,7 @@ BOOST_AUTO_TEST_CASE(test_eval_zero_exponent) {
     // 10**0 = 1
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("10**0", input);
+    auto result = eval_feel("10**0", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 1.0);
 }
@@ -182,7 +195,7 @@ BOOST_AUTO_TEST_CASE(test_eval_one_exponent) {
     // 10**1 = 10
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("10**1", input);
+    auto result = eval_feel("10**1", input);
     
     BOOST_CHECK_EQUAL(result.get<double>(), 10.0);
 }
@@ -191,7 +204,7 @@ BOOST_AUTO_TEST_CASE(test_eval_fractional_base) {
     // 0.5**2 = 0.25
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("0.5**2", input);
+    auto result = eval_feel("0.5**2", input);
     
     BOOST_CHECK_CLOSE(result.get<double>(), 0.25, 0.001);
 }
@@ -200,7 +213,7 @@ BOOST_AUTO_TEST_CASE(test_eval_division_by_zero_returns_null) {
     // (10+20)/0 should return null, not throw exception
     using orion::bre::feel::Evaluator;
     nlohmann::json input = nlohmann::json::object();
-    auto result = Evaluator::evaluate("(10+20)/0", input);
+    auto result = eval_feel("(10+20)/0", input);
     
     BOOST_CHECK(result.is_null());
 }

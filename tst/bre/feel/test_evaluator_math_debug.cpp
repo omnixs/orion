@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -6,10 +6,21 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(math_debug_tests)
 
@@ -21,7 +32,7 @@ BOOST_AUTO_TEST_CASE(test_basic_math_expressions) {
     
     auto test_expr = [&](const std::string& expr, double expected) {
         try {
-            json result = orion::bre::feel::Evaluator::evaluate(expr, context);
+            json result = eval_feel(expr, context);
             BOOST_TEST_MESSAGE("Expression: " << expr << " -> " << result.dump());
             if (result.is_number()) {
                 BOOST_CHECK_CLOSE(result.get<double>(), expected, 0.01);
@@ -36,7 +47,7 @@ BOOST_AUTO_TEST_CASE(test_basic_math_expressions) {
 
     auto test_null_expr = [&](const std::string& expr) {
         try {
-            json result = orion::bre::feel::Evaluator::evaluate(expr, context);
+            json result = eval_feel(expr, context);
             BOOST_TEST_MESSAGE("Expression: " << expr << " -> " << result.dump());
             BOOST_CHECK(result.is_null());
         } catch (const std::exception& e) {
@@ -67,19 +78,19 @@ BOOST_AUTO_TEST_CASE(test_not_function) {
     
     // Test with boolean input
     context["A"] = true;
-    json result = orion::bre::feel::Evaluator::evaluate("not(A)", context);
+    json result = eval_feel("not(A)", context);
     BOOST_TEST_MESSAGE("not(true) -> " << result.dump());
     BOOST_CHECK(result.is_boolean() && !result.get<bool>());
     
     // Test with false
     context["A"] = false;
-    result = orion::bre::feel::Evaluator::evaluate("not(A)", context);
+    result = eval_feel("not(A)", context);
     BOOST_TEST_MESSAGE("not(false) -> " << result.dump());
     BOOST_CHECK(result.is_boolean() && result.get<bool>());
     
     // Test with null
     context["A"] = nullptr;
-    result = orion::bre::feel::Evaluator::evaluate("not(A)", context);
+    result = eval_feel("not(A)", context);
     BOOST_TEST_MESSAGE("not(null) -> " << result.dump());
     BOOST_CHECK(result.is_null());
 }

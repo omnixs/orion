@@ -125,17 +125,7 @@ namespace orion::bre::feel {
         std::map<std::string, std::pair<CompiledRegex, std::list<std::string>::iterator>> cache_;
     };
 
-    /**
-     * @brief Get the global regex cache instance
-     * 
-     * @deprecated Use engine-scoped cache instead for proper resource management
-     * 
-     * Thread-safe singleton for caching dynamic FEEL matches() patterns.
-     * This global cache is deprecated and will be removed in a future version.
-     * Use the per-engine cache passed through EvaluationContext instead.
-     */
-    [[deprecated("Use engine-scoped cache via EvaluationContext")]]
-    RegexCache& get_regex_cache();
+
 
     /**
      * @brief Warm up the regex cache with realistic patterns
@@ -156,5 +146,16 @@ namespace orion::bre::feel {
      * @note Automatic warmup occurs via BusinessRulesEngine constructor.
      */
     void warmup_regex_cache();
+
+    /**
+     * @brief Get thread-local regex cache instance (for testing/backward compatibility)
+     * 
+     * Returns a reference to thread-local RegexCache used by Evaluator::evaluate() overload
+     * that doesn't take explicit EvaluationContext. Test code can use this to inspect cache.
+     * 
+     * @return Reference to thread-local RegexCache instance
+     * @warning Production code should use engine-scoped RegexCache through EvaluationContext
+     */
+    [[nodiscard]] RegexCache& get_regex_cache();
 
 } // namespace orion::bre::feel

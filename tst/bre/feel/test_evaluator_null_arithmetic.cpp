@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -6,14 +6,26 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <nlohmann/json.hpp>
 #include "../../../src/bre/feel/util_internal.hpp"
 
 using json = nlohmann::json;
+using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(feel_null_arithmetic_debug)
 
 BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
-    orion::bre::feel::Evaluator evaluator;
     json context = {};
     
     BOOST_TEST_MESSAGE("\n=== DEBUGGING NULL ARITHMETIC EVALUATION PATH ===");
@@ -35,17 +47,17 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     };
     
     int evaluator_tested = 0;
-    BOOST_TEST_MESSAGE("Testing through orion::bre::feel::Evaluator::evaluate():");
+    BOOST_TEST_MESSAGE("Testing through orion::bre::feel::eval_feel():");
     for (const auto& test_case : null_cases) {
         evaluator_tested++;
         BOOST_TEST_MESSAGE("Expression: " << test_case.expression);
-        json result = evaluator.evaluate(test_case.expression, context);
+        json result = eval_feel(test_case.expression, context);
         BOOST_TEST_MESSAGE("  Result: " << result);
         
         if (result.is_null()) {
-            BOOST_TEST_MESSAGE("  ✅ Correctly returns null");
+            BOOST_TEST_MESSAGE("  âœ… Correctly returns null");
         } else {
-            BOOST_TEST_MESSAGE("  ❌ ISSUE: Should return null but got: " << result);
+            BOOST_TEST_MESSAGE("  âŒ ISSUE: Should return null but got: " << result);
         }
         BOOST_TEST_MESSAGE("---");
     }
@@ -70,9 +82,9 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
         BOOST_TEST_MESSAGE("  Math Result: " << math_result);
         
         if (math_result.is_null()) {
-            BOOST_TEST_MESSAGE("  ✅ Math evaluator correctly returns null");
+            BOOST_TEST_MESSAGE("  âœ… Math evaluator correctly returns null");
         } else {
-            BOOST_TEST_MESSAGE("  ❌ ISSUE: Math evaluator should return null but got: " << math_result);
+            BOOST_TEST_MESSAGE("  âŒ ISSUE: Math evaluator should return null but got: " << math_result);
         }
         BOOST_TEST_MESSAGE("---");
     }

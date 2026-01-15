@@ -1115,23 +1115,11 @@ json evaluate_matches_function(const std::vector<json>& args, EvaluationContext*
         }
     }
 
-    // Use engine-scoped cache if available, otherwise fallback to global cache
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4996)
-#endif
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-    RegexCache* cache_ptr = (eval_ctx && eval_ctx->regex_cache) ? eval_ctx->regex_cache : &get_regex_cache();
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-    auto compiled = cache_ptr->get_or_compile(unescaped_pattern, flags_val);
+    // Use engine-scoped cache for proper resource management
+    if (!eval_ctx || !eval_ctx->regex_cache) {
+        throw std::runtime_error("matches() requires EvaluationContext with regex_cache");
+    }
+    auto compiled = eval_ctx->regex_cache->get_or_compile(unescaped_pattern, flags_val);
     
     if (!compiled) {
         // Invalid regex pattern or invalid flags - DMN spec says return null

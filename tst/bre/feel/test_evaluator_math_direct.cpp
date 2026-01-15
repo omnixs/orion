@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -6,7 +6,21 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 namespace orion::bre::detail {
     nlohmann::json eval_math_expression(std::string_view expr);
@@ -53,7 +67,6 @@ BOOST_AUTO_TEST_CASE(test_negative_number_math_evaluator_direct) {
 BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
     using json = nlohmann::json;
     
-    orion::bre::feel::Evaluator evaluator;
     json context = json::object();
     
     // Compare orion::bre::feel::Evaluator vs direct math evaluator for expressions that fail
@@ -67,7 +80,7 @@ BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
         BOOST_TEST_MESSAGE("Comparing evaluators for: " << expr);
         
         // Test through orion::bre::feel::Evaluator
-        auto feel_result = evaluator.evaluate(expr, context);
+        auto feel_result = eval_feel(expr, context);
         
         // Test through direct math evaluator (no context)
         auto math_result = orion::bre::detail::eval_math_expression(expr);

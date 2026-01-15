@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -6,16 +6,25 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 using namespace orion::bre;
 
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE(test_logical_operators_debug)
 
 BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
-    orion::bre::feel::Evaluator evaluator;
-    
     // Test context with string booleans (as seen in failing test output)
     json context = {
         {"VarA", "true"},
@@ -42,7 +51,7 @@ BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
     
     for (const auto& test_case : test_cases) {
         BOOST_TEST_MESSAGE("Testing: " << test_case.expression);
-        auto result = evaluator.evaluate(test_case.expression, context);
+        auto result = eval_feel(test_case.expression, context);
         BOOST_TEST_MESSAGE("Result: " << result.dump());
         
         // Check that result is not null
@@ -63,8 +72,6 @@ BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
 }
 
 BOOST_AUTO_TEST_CASE(test_logical_not_with_string_booleans) {
-    orion::bre::feel::Evaluator evaluator;
-    
     // Test context with string booleans
     json context_true = {{"A", "true"}, {"VarA", "true"}};
     json context_false = {{"A", "false"}, {"VarA", "false"}};
@@ -86,7 +93,7 @@ BOOST_AUTO_TEST_CASE(test_logical_not_with_string_booleans) {
     
     for (const auto& test_case : not_test_cases) {
         BOOST_TEST_MESSAGE("Testing: " << test_case.expression << " with context: " << test_case.context.dump());
-        auto result = evaluator.evaluate(test_case.expression, test_case.context);
+        auto result = eval_feel(test_case.expression, test_case.context);
         BOOST_TEST_MESSAGE("Result: " << result.dump());
         
         // Check that result is not null

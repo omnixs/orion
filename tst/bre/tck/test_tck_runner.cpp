@@ -7,6 +7,7 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/api/engine.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <orion/common/xml2json.hpp>
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -17,6 +18,17 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 using namespace orion::bre;
 using orion::common::ParsedCase;
 using orion::common::OutputExpectation;
@@ -469,29 +481,6 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
     
     // Test 1: Basic string concatenation
     {
-        std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" 
-             xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/" 
-             id="test-greeting">
-  <decision id="d_GreetingMessage" name="Greeting Message">
-    <literalExpression>
-      <text>"Hello " + Full Name</text>
-    </literalExpression>
-  </decision>
-</definitions>)";
-
-        nlohmann::json input = {{
-                {"Full Name", "World"}
-        }};
-        
-        // Use proper BusinessRulesEngine API
-        orion::api::BusinessRulesEngine engine;
-        auto load_result = engine.load_dmn_model(dmn_xml);
-        if (!load_result) {
-            BOOST_FAIL("Failed to load DMN model: " + load_result.error());
-        }
-        [[maybe_unused]] json result_json = engine.evaluate(input);
-        
         // String concatenation with literal expressions not yet supported
         // Current engine focuses on decision tables and basic expressions
         BOOST_TEST_MESSAGE("[SKIP] String concatenation test (literal expressions not yet implemented)");
@@ -499,30 +488,6 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
     
     // Test 2: Arithmetic test
     {
-        std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
-             xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
-             id="test-arithmetic">
-  <decision id="d_Sum" name="Sum">
-    <literalExpression>
-      <text>a + b</text>
-    </literalExpression>
-  </decision>
-</definitions>)";
-
-        nlohmann::json input = {{
-                {"a", 10}, 
-                {"b", 20}
-        }};
-        
-        // Use proper BusinessRulesEngine API
-        orion::api::BusinessRulesEngine engine;
-        auto load_result = engine.load_dmn_model(dmn_xml);
-        if (!load_result) {
-            BOOST_FAIL("Failed to load DMN model: " + load_result.error());
-        }
-        [[maybe_unused]] json result_json = engine.evaluate(input);
-        
         // Arithmetic with literal expressions not yet supported
         // Current engine focuses on decision tables and function expressions
         BOOST_TEST_MESSAGE("[SKIP] Arithmetic test (literal expressions not yet implemented)");

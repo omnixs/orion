@@ -21,10 +21,21 @@
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using namespace orion::bre;
 using json = nlohmann::json;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(test_decimal_number_parsing)
 
@@ -163,10 +174,9 @@ BOOST_AUTO_TEST_CASE(test_evaluator_decimal_in_arithmetic)
 {
     // Test case: Arithmetic with decimal numbers should use AST path
     // Expression: .872 + 3.14
-    orion::bre::feel::Evaluator evaluator;
     json context = json::object();
     
-    auto result = evaluator.evaluate(".872 + 3.14", context);
+    auto result = eval_feel(".872 + 3.14", context);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 4.012, 0.0001);
@@ -176,10 +186,9 @@ BOOST_AUTO_TEST_CASE(test_evaluator_many_decimals_in_expression)
 {
     // Test case: Complex arithmetic with many decimal places
     // Expression: 125.4321987654 * 2.5
-    orion::bre::feel::Evaluator evaluator;
     json context = json::object();
     
-    auto result = evaluator.evaluate("125.4321987654 * 2.5", context);
+    auto result = eval_feel("125.4321987654 * 2.5", context);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 313.58049691350, 0.0001);
@@ -189,10 +198,9 @@ BOOST_AUTO_TEST_CASE(test_evaluator_negative_decimals)
 {
     // Test case: Negative decimal arithmetic
     // Expression: -.872 + 1.0
-    orion::bre::feel::Evaluator evaluator;
     json context = json::object();
     
-    auto result = evaluator.evaluate("-.872 + 1.0", context);
+    auto result = eval_feel("-.872 + 1.0", context);
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 0.128, 0.0001);
@@ -226,7 +234,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
     for (const auto& expr : decimal_expressions)
     {
         BOOST_TEST_MESSAGE("Testing decimal expression: " << expr);
-        auto result = evaluator.evaluate(expr, context);
+        auto result = eval_feel(expr, context);
         BOOST_CHECK_MESSAGE(result.is_number(), 
             "Expression '" << expr << "' should evaluate to a number via AST");
     }
@@ -238,7 +246,6 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
     // These should fail or use legacy path (we're not testing functionality,
     // just that they're recognized as needing special handling)
     
-    orion::bre::feel::Evaluator evaluator;
     json context = {
         {"loan", {
             {"principal", 100000},
@@ -262,7 +269,7 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
         tested_count++;
         // Just verify it doesn't crash - property access may or may not be supported
         try {
-            auto result = evaluator.evaluate(expr, context);
+            auto result = eval_feel(expr, context);
             BOOST_TEST_MESSAGE("  Result: " << result.dump());
         } catch (...) {
             BOOST_TEST_MESSAGE("  Expected: property access not yet fully supported");

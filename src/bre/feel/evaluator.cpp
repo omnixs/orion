@@ -17,6 +17,7 @@
  */
 
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <orion/api/logger.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
@@ -36,7 +37,7 @@ namespace orion::bre::feel {
     using orion::api::warn;
     using orion::api::error;
 
-    json Evaluator::evaluate(std::string_view expression, const json& context, EvaluationContext* eval_ctx)
+    json Evaluator::evaluate(std::string_view expression, const json& context, EvaluationContext& eval_ctx)
     {
         // AST-based evaluation path (all FEEL features supported)
         
@@ -63,7 +64,7 @@ namespace orion::bre::feel {
                 Parser parser;
                 auto ast = parser.parse(tokens);
                 
-                auto result = ast->evaluate(context, eval_ctx);
+                auto result = ast->evaluate(context, &eval_ctx);
                 debug("[AST-SUCCESS] AST evaluation succeeded: '{}'", expression);
                 return result;
             }
@@ -80,3 +81,4 @@ namespace orion::bre::feel {
         throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression));
     }
 }
+

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -6,10 +6,21 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(test_list_operations_suite)
 
@@ -18,9 +29,7 @@ BOOST_AUTO_TEST_CASE(test_empty_list_literal)
 {
     std::string expression = "[]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 0);
@@ -31,9 +40,7 @@ BOOST_AUTO_TEST_CASE(test_number_list_literal)
 {
     std::string expression = "[1, 2, 3]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -47,9 +54,7 @@ BOOST_AUTO_TEST_CASE(test_string_list_literal)
 {
     std::string expression = "[\"apple\", \"banana\", \"cherry\"]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -63,9 +68,7 @@ BOOST_AUTO_TEST_CASE(test_mixed_type_list)
 {
     std::string expression = "[1, \"hello\", true, null]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 4);
@@ -80,9 +83,7 @@ BOOST_AUTO_TEST_CASE(test_list_with_expressions)
 {
     std::string expression = "[1 + 2, 3 * 4, 10 - 5]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -100,9 +101,7 @@ BOOST_AUTO_TEST_CASE(test_list_with_variables)
         {"y", 20},
         {"z", 30}
     };
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -116,9 +115,7 @@ BOOST_AUTO_TEST_CASE(test_nested_lists)
 {
     std::string expression = "[[1, 2], [3, 4], [5, 6]]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -137,9 +134,7 @@ BOOST_AUTO_TEST_CASE(test_list_in_function_call)
 {
     std::string expression = "all([true, true, true])";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result, true);
@@ -150,9 +145,7 @@ BOOST_AUTO_TEST_CASE(test_single_element_list)
 {
     std::string expression = "[42]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 1);
@@ -164,9 +157,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_list)
 {
     std::string expression = "[1.5, 2.7, 3.14]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -180,9 +171,7 @@ BOOST_AUTO_TEST_CASE(test_negative_number_list)
 {
     std::string expression = "[-1, -2, -3]";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_array());
     BOOST_CHECK_EQUAL(result.size(), 3);
@@ -196,9 +185,7 @@ BOOST_AUTO_TEST_CASE(test_any_with_list_literal)
 {
     std::string expression = "any([false, false, true])";
     json context = json::object();
-    
-    orion::bre::feel::Evaluator evaluator;
-    json result = evaluator.evaluate(expression, context);
+    json result = eval_feel(expression, context);
     
     BOOST_CHECK(result.is_boolean());
     BOOST_CHECK_EQUAL(result, true);

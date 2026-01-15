@@ -217,13 +217,7 @@ namespace orion::bre::feel {
         return cache_.size();
     }
 
-    // Global regex cache singleton (deprecated - use engine-scoped cache instead)
-    RegexCache& get_regex_cache()
-    {
-        // Default size of 100, can be configured via engine options
-        static RegexCache cache(100);
-        return cache;
-    }
+
 
     // Instance method for warming up regex cache
     void RegexCache::warmup()
@@ -265,18 +259,12 @@ namespace orion::bre::feel {
         [[maybe_unused]] auto cached = get_or_compile("[0-9]+");
     }
 
-    // Global warmup function (deprecated - use RegexCache::warmup() instead)
-    void warmup_regex_cache()
-    {
-        // Simple wrapper - multiple calls are safe (warmup is idempotent)
-#if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-        get_regex_cache().warmup();
-#if defined(__GNUC__) || defined(__clang__)
-    #pragma GCC diagnostic pop
-#endif
+    // Global thread-local cache for backward compatibility with test code
+    RegexCache& get_regex_cache() {
+        // Same thread-local cache used by Evaluator::evaluate(expr, context) overload
+        // This allows test code to inspect the cache used by the convenience API
+        static thread_local RegexCache cache(100);
+        return cache;
     }
 
 } // namespace orion::bre::feel

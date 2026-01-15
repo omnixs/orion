@@ -17,6 +17,7 @@
  */
 
 #include <orion/bre/feel/expr.hpp>
+#include <orion/bre/feel/evaluator.hpp>  // For EvaluationContext
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 
@@ -842,12 +843,12 @@ enum class TokKind : std::uint8_t
         return make_null();
     }
 
-    static Value eval_expr(const Expr* e, const json& ctx);
+    static Value eval_expr(const Expr* e, const json& ctx, feel::EvaluationContext* eval_ctx);
     static Value eval_single_arg_math(std::string_view func_name, const std::vector<Value>& args);
     static Value eval_two_arg_math(std::string_view func_name, const std::vector<Value>& args);
     static Value eval_all_function(const std::vector<Value>& values);
     static Value eval_any_function(const std::vector<Value>& values);
-    static Value eval_boolean_string_functions(std::string_view func_name, const std::vector<Value>& args);
+    static Value eval_boolean_string_functions(std::string_view func_name, const std::vector<Value>& args, feel::EvaluationContext* eval_ctx);
 
     // Helper: Trim leading and trailing whitespace from string
     static std::string trim_whitespace(std::string_view str)
@@ -924,25 +925,25 @@ enum class TokKind : std::uint8_t
         return make_null();
     }
 
-static Value eval_range(const ERange* r, const json& ctx)
+static Value eval_range(const ERange* r, const json& ctx, feel::EvaluationContext* eval_ctx)
 {
-    Value a = eval_expr(r->a.get(), ctx);
-    Value b = eval_expr(r->b.get(), ctx);
+    Value a = eval_expr(r->a.get(), ctx, eval_ctx);
+    Value b = eval_expr(r->b.get(), ctx, eval_ctx);
     if (a.is_num() && b.is_num())
     {
         Range rng{a.num(), b.num(), r->incA, r->incB};
         return Value(rng);
     }
     return make_null();
-}   static Value eval_in(const EIn* in, const json& ctx)
+}   static Value eval_in(const EIn* in, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
-        Value item = eval_expr(in->item.get(), ctx);
+        Value item = eval_expr(in->item.get(), ctx, eval_ctx);
         if (item.is_null()) { return make_null();
 }
         bool any = false;
         for (auto& ep : in->list)
         {
-            Value v = eval_expr(ep.get(), ctx);
+            Value v = eval_expr(ep.get(), ctx, eval_ctx);
             if (item.is_num() && v.is_num())
             {
                 if (item.num() == v.num())
@@ -974,29 +975,29 @@ static Value eval_range(const ERange* r, const json& ctx)
         return Value(any);
     }
 
-    static Value eval_between(const EBetween* be, const json& ctx)
+    static Value eval_between(const EBetween* be, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
-        Value val = eval_expr(be->val.get(), ctx);
-        Value lo = eval_expr(be->lo.get(), ctx);
-        Value hi = eval_expr(be->hi.get(), ctx);
+        Value val = eval_expr(be->val.get(), ctx, eval_ctx);
+        Value lo = eval_expr(be->lo.get(), ctx, eval_ctx);
+        Value hi = eval_expr(be->hi.get(), ctx, eval_ctx);
         if (val.is_num() && lo.is_num() && hi.is_num()) { return Value(val.num() >= lo.num() && val.num() <= hi.num());
 }
         return make_null();
     }
 
-    static Value eval_call(const ECall* call, const json& ctx)
+    static Value eval_call(const ECall* call, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
         std::string low;
         for (char c : call->name) { low.push_back((char)std::tolower((unsigned char)c));
 }
         std::vector<Value> args;
         args.reserve(call->args.size());
-        for (auto& a : call->args) { args.push_back(eval_expr(a.get(), ctx));
+        for (auto& a : call->args) { args.push_back(eval_expr(a.get(), ctx, eval_ctx));
 }
         // Boolean/string functions (matches, all, any)
         if (low == "matches" || low == "all" || low == "any")
         {
-            return eval_boolean_string_functions(low, args);
+            return eval_boolean_string_functions(low, args, eval_ctx);
         }
         
         // Math functions (single-argument)
@@ -1058,31 +1059,18 @@ static Value eval_range(const ERange* r, const json& ctx)
     }
 
     // Helper: Evaluate boolean/string functions (matches, all, any)
-    static Value eval_boolean_string_functions(std::string_view func_name, const std::vector<Value>& args)
+    static Value eval_boolean_string_functions(std::string_view func_name, const std::vector<Value>& args, feel::EvaluationContext* eval_ctx)
     {
         if (func_name == "matches")
         {
             if (args.size() == 2 && args[0].is_str() && args[1].is_str())
             {
-                // Use PCRE2 via cache for runtime pattern compilation
+                // Use PCRE2 via engine-scoped cache for runtime pattern compilation
                 // Pattern syntax is PCRE2 (documented behavior)
-                // Note: Using deprecated global cache as fallback when EvaluationContext unavailable
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4996)
-#endif
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-                auto& cache = orion::bre::feel::get_regex_cache();
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-                auto compiled = cache.get_or_compile(args[1].str());
+                if (!eval_ctx || !eval_ctx->regex_cache) {
+                    throw std::runtime_error("matches() requires EvaluationContext with regex_cache");
+                }
+                auto compiled = eval_ctx->regex_cache->get_or_compile(args[1].str());
                 
                 if (!compiled) {
                     // Invalid regex pattern - DMN spec says return null
@@ -1205,9 +1193,9 @@ static Value eval_range(const ERange* r, const json& ctx)
     }
 
     // Helper: Evaluate unary expression (negation, logical not)
-    static Value eval_unary_expr(const EUnary* unary, const json& ctx)
+    static Value eval_unary_expr(const EUnary* unary, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
-        Value result = eval_expr(unary->rhs.get(), ctx);
+        Value result = eval_expr(unary->rhs.get(), ctx, eval_ctx);
         
         if (unary->op == "neg")
         {
@@ -1225,10 +1213,10 @@ static Value eval_range(const ERange* r, const json& ctx)
     }
 
     // Helper: Evaluate binary expression (arithmetic, logical, comparison)
-    static Value eval_binary_expr(const EBinary* binary, const json& ctx)
+    static Value eval_binary_expr(const EBinary* binary, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
-        Value left = eval_expr(binary->lhs.get(), ctx);
-        Value right = eval_expr(binary->rhs.get(), ctx);
+        Value left = eval_expr(binary->lhs.get(), ctx, eval_ctx);
+        Value right = eval_expr(binary->rhs.get(), ctx, eval_ctx);
         
         // Arithmetic operators
         if (binary->op == "+") { return add_num(left, right); }
@@ -1246,17 +1234,17 @@ static Value eval_range(const ERange* r, const json& ctx)
     }
 
     // Helper: Evaluate list expression
-    static Value eval_list_expr(const EList* list, const json& ctx)
+    static Value eval_list_expr(const EList* list, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
         Value::List result;
         for (const auto& item : list->items) {
-            result.push_back(eval_expr(item.get(), ctx));
+            result.push_back(eval_expr(item.get(), ctx, eval_ctx));
         }
         return Value(std::move(result));
     }
 
     // Main expression evaluator (dispatcher to type-specific handlers)
-    static Value eval_expr(const Expr* e, const json& ctx)
+    static Value eval_expr(const Expr* e, const json& ctx, feel::EvaluationContext* eval_ctx)
     {
         // Null literal
         if (dynamic_cast<const ENull*>(e) != nullptr) {  // Explicit pointer comparison
@@ -1283,37 +1271,37 @@ static Value eval_range(const ERange* r, const json& ctx)
     
     // Unary expression
     if (const auto* expr = dynamic_cast<const EUnary*>(e)) {  // Add const auto* for pointer type
-        return eval_unary_expr(expr, ctx);
+        return eval_unary_expr(expr, ctx, eval_ctx);
     }
     
     // Binary expression
     if (const auto* expr = dynamic_cast<const EBinary*>(e)) {  // Add const auto* for pointer type
-        return eval_binary_expr(expr, ctx);
+        return eval_binary_expr(expr, ctx, eval_ctx);
     }
     
     // In expression
     if (const auto* expr = dynamic_cast<const EIn*>(e)) {  // Add const auto* for pointer type
-        return eval_in(expr, ctx);
+        return eval_in(expr, ctx, eval_ctx);
     }
     
     // Range expression
     if (const auto* expr = dynamic_cast<const ERange*>(e)) {  // Add const auto* for pointer type
-        return eval_range(expr, ctx);
+        return eval_range(expr, ctx, eval_ctx);
     }
     
     // Between expression
     if (const auto* expr = dynamic_cast<const EBetween*>(e)) {  // Add const auto* for pointer type
-        return eval_between(expr, ctx);
+        return eval_between(expr, ctx, eval_ctx);
     }
     
     // List expression
     if (const auto* expr = dynamic_cast<const EList*>(e)) {  // Add const auto* for pointer type
-        return eval_list_expr(expr, ctx);
+        return eval_list_expr(expr, ctx, eval_ctx);
     }
     
     // Function call
     if (const auto* expr = dynamic_cast<const ECall*>(e)) {  // Add const auto* for pointer type
-        return eval_call(expr, ctx);
+        return eval_call(expr, ctx, eval_ctx);
     }       return make_null();
     }
 

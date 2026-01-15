@@ -21,6 +21,7 @@
 #include <orion/bre/dmn_parser.hpp>
 #include <orion/bre/feel/expr.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/contract_violation.hpp>
 #include "../common/util.hpp"  // Reuse existing utility functions
 #include "feel/util_internal.hpp"
@@ -212,7 +213,11 @@ namespace orion::bre
         auto bkm_it = available_bkms.find(std::string(func_name));
         if (bkm_it == available_bkms.end())
         {
-            return feel::Evaluator::evaluate(std::string(func_name) + "(" + std::string(args_str) + ")", context);
+            // Create temporary EvaluationContext for backward compatibility
+            static thread_local feel::RegexCache default_cache(100);
+            feel::EvaluationContext eval_ctx;
+            eval_ctx.regex_cache = &default_cache;
+            return feel::Evaluator::evaluate(std::string(func_name) + "(" + std::string(args_str) + ")", context, eval_ctx);
         }
 
         const BusinessKnowledgeModel& bkm = bkm_it->second;
@@ -258,7 +263,10 @@ namespace orion::bre
             if (builtin_functions.find(func_name) != builtin_functions.end())
             {
                 debug("Using FEEL evaluator for builtin function: {}", func_name);
-                return feel::Evaluator::evaluate(expression, context);
+                static thread_local feel::RegexCache default_cache(100);
+                feel::EvaluationContext eval_ctx;
+                eval_ctx.regex_cache = &default_cache;
+                return feel::Evaluator::evaluate(expression, context, eval_ctx);
             }
             
             // Process BKM call
@@ -282,7 +290,10 @@ namespace orion::bre
         }
 
         // Use the full feel::Evaluator for logical and other complex expressions
-        nlohmann::json result = feel::Evaluator::evaluate(expression, context);
+        static thread_local feel::RegexCache default_cache(100);
+        feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &default_cache;
+        nlohmann::json result = feel::Evaluator::evaluate(expression, context, eval_ctx);
         if (!result.is_null())
         {
             return result;

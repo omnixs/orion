@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -6,7 +6,21 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+using namespace orion::bre;
+
+// Test helper: evaluate with proper EvaluationContext
+namespace {
+    json eval_feel(std::string_view expression, const json& context = json::object()) {
+        static thread_local orion::bre::feel::RegexCache cache(100);
+        orion::bre::feel::EvaluationContext eval_ctx;
+        eval_ctx.regex_cache = &cache;
+        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
+    }
+}
 
 using json = nlohmann::json;
 using namespace orion::bre;
@@ -14,7 +28,6 @@ using namespace orion::bre;
 BOOST_AUTO_TEST_SUITE(math_edge_cases_debug)
 
 BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
-    orion::bre::feel::Evaluator evaluator;
     json context = json::object();
 
     BOOST_TEST_MESSAGE("Testing complex math expressions from 0105-feel-math that likely fail:");
@@ -24,24 +37,24 @@ BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
     auto test_expr = [&](const std::string& expr, double expected, const std::string& description) {
         total++;
         try {
-            json result = evaluator.evaluate(expr, context);
+            json result = eval_feel(expr, context);
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
             BOOST_TEST_MESSAGE("Result: " << result.dump() << " (expected: " << expected << ")");
             if (result.is_number()) {
                 double actual = result.get<double>();
                 if (std::abs(actual - expected) < 0.01) {
-                    BOOST_TEST_MESSAGE("✅ PASS");
+                    BOOST_TEST_MESSAGE("âœ… PASS");
                     passed++;
                 } else {
-                    BOOST_TEST_MESSAGE("❌ FAIL - got " << actual << ", expected " << expected);
+                    BOOST_TEST_MESSAGE("âŒ FAIL - got " << actual << ", expected " << expected);
                 }
             } else {
-                BOOST_TEST_MESSAGE("❌ FAIL - not a number");
+                BOOST_TEST_MESSAGE("âŒ FAIL - not a number");
             }
             BOOST_TEST_MESSAGE("---");
         } catch (const std::exception& e) {
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
-            BOOST_TEST_MESSAGE("❌ ERROR: " << e.what());
+            BOOST_TEST_MESSAGE("âŒ ERROR: " << e.what());
             BOOST_TEST_MESSAGE("---");
         }
     };
@@ -60,7 +73,6 @@ BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
 }
 
 BOOST_AUTO_TEST_CASE(test_null_arithmetic_edge_cases) {
-    orion::bre::feel::Evaluator evaluator;
     json context = json::object();
     
     BOOST_TEST_MESSAGE("Testing null arithmetic edge cases:");
@@ -69,18 +81,18 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_edge_cases) {
     auto test_null_expr = [&](const std::string& expr, const std::string& description) {
         tested++;
         try {
-            json result = evaluator.evaluate(expr, context);
+            json result = eval_feel(expr, context);
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
             BOOST_TEST_MESSAGE("Result: " << result.dump());
             if (result.is_null()) {
-                BOOST_TEST_MESSAGE("✅ PASS - correctly returns null");
+                BOOST_TEST_MESSAGE("âœ… PASS - correctly returns null");
             } else {
-                BOOST_TEST_MESSAGE("❌ FAIL - should return null");
+                BOOST_TEST_MESSAGE("âŒ FAIL - should return null");
             }
             BOOST_TEST_MESSAGE("---");
         } catch (const std::exception& e) {
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
-            BOOST_TEST_MESSAGE("❌ ERROR: " << e.what());
+            BOOST_TEST_MESSAGE("âŒ ERROR: " << e.what());
             BOOST_TEST_MESSAGE("---");
         }
     };
