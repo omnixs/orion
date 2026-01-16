@@ -19,17 +19,6 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 using namespace orion::bre;
-
-// Test helper: evaluate with proper EvaluationContext
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local orion::bre::feel::RegexCache cache(100);
-        orion::bre::feel::EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
-using namespace orion::bre;
 using orion::common::ParsedCase;
 using orion::common::OutputExpectation;
 
