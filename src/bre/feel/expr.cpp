@@ -523,24 +523,37 @@ enum class TokKind : std::uint8_t
             if (cur.k == TokKind::IN)
             {
                 cur = lex.next();
-                if (!expect(TokKind::LPAREN)) { return e;
-}
-                std::vector<ExprPtr> items;
-                if (cur.k != TokKind::RPAREN)
+                
+                // Check if this is function-like syntax: in(...) or infix: x in y
+                if (cur.k == TokKind::LPAREN)
                 {
-                    for (;;)
+                    // Function-like: in(item1, item2, ...)
+                    cur = lex.next();
+                    std::vector<ExprPtr> items;
+                    if (cur.k != TokKind::RPAREN)
                     {
-                        items.push_back(parse_or());
-                        if (cur.k == TokKind::COMMA)
+                        for (;;)
                         {
-                            cur = lex.next();
-                            continue;
+                            items.push_back(parse_or());
+                            if (cur.k == TokKind::COMMA)
+                            {
+                                cur = lex.next();
+                                continue;
+                            }
+                            break;
                         }
-                        break;
                     }
+                    expect(TokKind::RPAREN);
+                    return std::make_unique<EIn>(std::move(e), std::move(items));
                 }
-                expect(TokKind::RPAREN);
-                return std::make_unique<EIn>(std::move(e), std::move(items));
+                else
+                {
+                    // Infix: x in y (where y is a single expression like a list, range, or unary test)
+                    auto rhs = parse_add();  // Parse the RHS expression
+                    std::vector<ExprPtr> items;
+                    items.push_back(std::move(rhs));
+                    return std::make_unique<EIn>(std::move(e), std::move(items));
+                }
             }
             if (cur.k == TokKind::EQ || cur.k == TokKind::NEQ || cur.k == TokKind::LT || cur.k == TokKind::LE || cur.k
                 == TokKind::GT || cur.k == TokKind::GE)

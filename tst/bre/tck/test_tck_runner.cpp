@@ -226,7 +226,7 @@ static bool should_run_all_tests() {
 // Helper function to find baseline CSV for current version
 static fs::path find_baseline_for_version() {
     // Try to find the version from CMakeLists.txt or use default
-    std::string version = "1.0.0"; // Default to current version
+    std::string version = "1.2.0"; // Default to current version
     
     // Look for baseline in dat/tck-baselines/{version}/tck_results.csv
     fs::path baseline = fs::path("dat") / "tck-baselines" / version / "tck_results.csv";
