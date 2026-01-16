@@ -35,6 +35,9 @@ dat/tst/dmn-tck-extra/bundle-discount-*/
 *.backup
 temp/
 
+# CI log downloads (local scratch)
+.github/temp/
+
 # Compiled binaries
 *.o
 *.a
