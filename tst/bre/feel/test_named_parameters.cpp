@@ -9,18 +9,10 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
+#include "test_helpers.hpp"
 
 using namespace orion::bre::feel;
-
-// Test helper: evaluate with proper EvaluationContext
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local RegexCache cache(100);
-        EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(named_parameters)
 
@@ -31,21 +23,24 @@ BOOST_AUTO_TEST_SUITE(named_parameters)
 BOOST_AUTO_TEST_CASE(test_positional_single_param)
 {
     BOOST_TEST_MESSAGE("Testing positional parameter with single argument");
-    auto result = eval_feel("abs(-42)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(-42)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 42);
 }
 
 BOOST_AUTO_TEST_CASE(test_positional_two_params)
 {
     BOOST_TEST_MESSAGE("Testing positional parameters with two arguments");
-    auto result = eval_feel("modulo(10, 3)");
+    Evaluator eval;
+    auto result = eval.evaluate("modulo(10, 3)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(test_positional_decimal)
 {
     BOOST_TEST_MESSAGE("Testing positional parameters with decimal()");
-    auto result = eval_feel("decimal(3.14159, 2)");
+    Evaluator eval;
+    auto result = eval.evaluate("decimal(3.14159, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result.get<double>(), 3.14, 0.01);
 }
 
@@ -56,14 +51,16 @@ BOOST_AUTO_TEST_CASE(test_positional_decimal)
 BOOST_AUTO_TEST_CASE(test_named_single_param)
 {
     BOOST_TEST_MESSAGE("Testing named parameter: abs(n: -42)");
-    auto result = eval_feel("abs(n: -42)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(n: -42)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 42);
 }
 
 BOOST_AUTO_TEST_CASE(test_named_sqrt)
 {
     BOOST_TEST_MESSAGE("Testing named parameter: sqrt(number: 16)");
-    auto result = eval_feel("sqrt(number: 16)");
+    Evaluator eval;
+    auto result = eval.evaluate("sqrt(number: 16)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 4);
 }
 
@@ -74,28 +71,32 @@ BOOST_AUTO_TEST_CASE(test_named_sqrt)
 BOOST_AUTO_TEST_CASE(test_named_two_params_in_order)
 {
     BOOST_TEST_MESSAGE("Testing named parameters in order: modulo(dividend: 10, divisor: 3)");
-    auto result = eval_feel("modulo(dividend: 10, divisor: 3)");
+    Evaluator eval;
+    auto result = eval.evaluate("modulo(dividend: 10, divisor: 3)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(test_named_two_params_out_of_order)
 {
     BOOST_TEST_MESSAGE("Testing named parameters out of order: modulo(divisor: 3, dividend: 10)");
-    auto result = eval_feel("modulo(divisor: 3, dividend: 10)");
+    Evaluator eval;
+    auto result = eval.evaluate("modulo(divisor: 3, dividend: 10)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(test_named_decimal_in_order)
 {
     BOOST_TEST_MESSAGE("Testing named decimal in order: decimal(n: 3.14159, scale: 2)");
-    auto result = eval_feel("decimal(n: 3.14159, scale: 2)");
+    Evaluator eval;
+    auto result = eval.evaluate("decimal(n: 3.14159, scale: 2)", {}, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result.get<double>(), 3.14, 0.01);
 }
 
 BOOST_AUTO_TEST_CASE(test_named_decimal_out_of_order)
 {
     BOOST_TEST_MESSAGE("Testing named decimal out of order: decimal(scale: 2, n: 3.14159)");
-    auto result = eval_feel("decimal(scale: 2, n: 3.14159)");
+    Evaluator eval;
+    auto result = eval.evaluate("decimal(scale: 2, n: 3.14159)", {}, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result.get<double>(), 3.14, 0.01);
 }
 
@@ -103,12 +104,14 @@ BOOST_AUTO_TEST_CASE(test_named_round_functions)
 {
     BOOST_TEST_MESSAGE("Testing named parameters with multi-word function names");
     
+    Evaluator eval;
+    
     // round up
-    auto result1 = eval_feel("round up(n: 5.25, scale: 1)");
+    auto result1 = eval.evaluate("round up(n: 5.25, scale: 1)", {}, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result1.get<double>(), 5.3, 0.01);
     
     // round down (out of order)
-    auto result2 = eval_feel("round down(scale: 1, n: 5.25)");
+    auto result2 = eval.evaluate("round down(scale: 1, n: 5.25)", {}, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result2.get<double>(), 5.2, 0.01);
 }
 
@@ -119,7 +122,8 @@ BOOST_AUTO_TEST_CASE(test_named_round_functions)
 BOOST_AUTO_TEST_CASE(test_named_with_literal)
 {
     BOOST_TEST_MESSAGE("Testing named parameter with literal: abs(n: -30)");
-    auto result = eval_feel("abs(n: -30)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(n: -30)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 30);
 }
 
@@ -130,33 +134,38 @@ BOOST_AUTO_TEST_CASE(test_named_with_literal)
 BOOST_AUTO_TEST_CASE(test_mixed_params_positional_then_named)
 {
     BOOST_TEST_MESSAGE("Testing mixed parameters (positional then named) - should throw");
-    BOOST_CHECK_THROW((void)eval_feel("modulo(10, divisor: 3)"), std::runtime_error);
+    Evaluator eval;
+    BOOST_CHECK_THROW((void)eval.evaluate("modulo(10, divisor: 3)", {}, get_test_eval_ctx()), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_mixed_params_named_then_positional)
 {
     BOOST_TEST_MESSAGE("Testing mixed parameters (named then positional) - should throw");
-    BOOST_CHECK_THROW((void)eval_feel("modulo(dividend: 10, 3)"), std::runtime_error);
+    Evaluator eval;
+    BOOST_CHECK_THROW((void)eval.evaluate("modulo(dividend: 10, 3)", {}, get_test_eval_ctx()), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_unknown_parameter_name)
 {
     BOOST_TEST_MESSAGE("Testing unknown parameter name - should return null per DMN spec");
-    auto result = eval_feel("abs(unknown_param: 42)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(unknown_param: 42)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_missing_required_parameter)
 {
     BOOST_TEST_MESSAGE("Testing missing required parameter - should return null per DMN spec");
-    auto result = eval_feel("modulo(dividend: 10)");
+    Evaluator eval;
+    auto result = eval.evaluate("modulo(dividend: 10)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_too_many_positional_params)
 {
     BOOST_TEST_MESSAGE("Testing too many positional parameters - should return null per DMN spec");
-    auto result = eval_feel("abs(42, 99)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(42, 99)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -167,21 +176,24 @@ BOOST_AUTO_TEST_CASE(test_too_many_positional_params)
 BOOST_AUTO_TEST_CASE(test_named_params_in_arithmetic)
 {
     BOOST_TEST_MESSAGE("Testing named parameters in arithmetic expression");
-    auto result = eval_feel("abs(n: -5) + sqrt(number: 16)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(n: -5) + sqrt(number: 16)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 9);  // 5 + 4
 }
 
 BOOST_AUTO_TEST_CASE(test_multiple_named_function_calls)
 {
     BOOST_TEST_MESSAGE("Testing multiple named function calls");
-    auto result = eval_feel("modulo(dividend: 10, divisor: 3) + decimal(n: 2.5, scale: 0)");
+    Evaluator eval;
+    auto result = eval.evaluate("modulo(dividend: 10, divisor: 3) + decimal(n: 2.5, scale: 0)", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<double>(), 3);  // 1 + 2
 }
 
 BOOST_AUTO_TEST_CASE(test_named_params_with_null)
 {
     BOOST_TEST_MESSAGE("Testing named parameters with null value");
-    auto result = eval_feel("abs(n: null)");
+    Evaluator eval;
+    auto result = eval.evaluate("abs(n: null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -192,6 +204,8 @@ BOOST_AUTO_TEST_CASE(test_named_params_with_null)
 BOOST_AUTO_TEST_CASE(test_tck_style_abs_named)
 {
     BOOST_TEST_MESSAGE("Testing TCK-style abs with named parameter");
+    Evaluator eval;
+    nlohmann::json input;
     
     struct TestCase {
         const char* expr;
@@ -207,7 +221,7 @@ BOOST_AUTO_TEST_CASE(test_tck_style_abs_named)
     };
     
     for (const auto& tc : testCases) {
-        auto result = eval_feel(tc.expr);
+        auto result = eval.evaluate(tc.expr, input, get_test_eval_ctx());
         BOOST_CHECK_CLOSE(result.get<double>(), tc.expected, 0.0001);
     }
 }
@@ -215,6 +229,7 @@ BOOST_AUTO_TEST_CASE(test_tck_style_abs_named)
 BOOST_AUTO_TEST_CASE(test_tck_style_sqrt_named)
 {
     BOOST_TEST_MESSAGE("Testing TCK-style sqrt with named parameter");
+    Evaluator eval;
     
     struct TestCase {
         const char* expr;
@@ -230,7 +245,7 @@ BOOST_AUTO_TEST_CASE(test_tck_style_sqrt_named)
     };
     
     for (const auto& tc : testCases) {
-        auto result = eval_feel(tc.expr);
+        auto result = eval.evaluate(tc.expr, {}, get_test_eval_ctx());
         BOOST_CHECK_CLOSE(result.get<double>(), tc.expected, 0.0001);
     }
 }
@@ -238,6 +253,7 @@ BOOST_AUTO_TEST_CASE(test_tck_style_sqrt_named)
 BOOST_AUTO_TEST_CASE(test_tck_style_modulo_named_out_of_order)
 {
     BOOST_TEST_MESSAGE("Testing TCK-style modulo with named parameters out of order");
+    Evaluator eval;
     
     struct TestCase {
         const char* expr;
@@ -252,7 +268,7 @@ BOOST_AUTO_TEST_CASE(test_tck_style_modulo_named_out_of_order)
     };
     
     for (const auto& tc : testCases) {
-        auto result = eval_feel(tc.expr);
+        auto result = eval.evaluate(tc.expr, {}, get_test_eval_ctx());
         BOOST_CHECK_CLOSE(result.get<double>(), tc.expected, 0.0001);
     }
 }

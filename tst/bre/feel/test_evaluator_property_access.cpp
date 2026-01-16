@@ -20,11 +20,15 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include "orion/bre/ast_node.hpp"
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using namespace orion::bre;
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(test_property_access_suite)
 
@@ -169,14 +173,14 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_property_access)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"loan", {
             {"principal", 100000},
             {"rate", 0.05}
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(input, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<int>(), 100000);
 }
 
@@ -188,7 +192,7 @@ BOOST_AUTO_TEST_CASE(test_eval_chained_property_access)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"person", {
             {"name", "John"},
             {"address", {
@@ -199,7 +203,7 @@ BOOST_AUTO_TEST_CASE(test_eval_chained_property_access)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(input, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "Boston");
 }
 
@@ -211,14 +215,14 @@ BOOST_AUTO_TEST_CASE(test_eval_property_in_arithmetic)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"loan", {
             {"principal", 100000},
             {"rate", 0.05}
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(input, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result.get<double>(), 5000.0, 0.001);
 }
 
@@ -233,7 +237,7 @@ BOOST_AUTO_TEST_CASE(test_eval_complex_expression_with_properties)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"loan", {
             {"principal", 100000},
             {"rate", 0.06},
@@ -241,7 +245,7 @@ BOOST_AUTO_TEST_CASE(test_eval_complex_expression_with_properties)
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(input, get_test_eval_ctx());
     
     // Monthly payment should be around 599.55
     BOOST_CHECK_CLOSE(result.get<double>(), 599.55, 1.0); // Within 1%
@@ -256,13 +260,13 @@ BOOST_AUTO_TEST_CASE(test_eval_property_with_decimal_number)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"obj", {
             {"value", 0.128}
         }}
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(input, get_test_eval_ctx());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.0, 0.001);
 }
 
@@ -278,13 +282,13 @@ BOOST_AUTO_TEST_CASE(test_eval_missing_property)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"loan", {
             {"principal", 100000}
         }}
     };
     
-    BOOST_CHECK_THROW((void)ast->evaluate(context), std::runtime_error);
+    BOOST_CHECK_THROW((void)ast->evaluate(input, get_test_eval_ctx()), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_on_non_object)
@@ -295,11 +299,11 @@ BOOST_AUTO_TEST_CASE(test_eval_property_on_non_object)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"x", 42} // x is a number, not an object
     };
     
-    BOOST_CHECK_THROW((void)ast->evaluate(context), std::runtime_error);
+    BOOST_CHECK_THROW((void)ast->evaluate(input, get_test_eval_ctx()), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_on_null)
@@ -310,11 +314,11 @@ BOOST_AUTO_TEST_CASE(test_eval_property_on_null)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = {
+    json input = {
         {"x", nullptr} // x is null
     };
     
-    json result = ast->evaluate(context);
+    json result = ast->evaluate(input, get_test_eval_ctx());
     BOOST_CHECK(result.is_null()); // DMN: null propagation
 }
 
@@ -331,23 +335,23 @@ BOOST_AUTO_TEST_CASE(test_eval_property_naming_variants)
     auto ast = parser.parse(tokens);
     
     // Test with underscored property name
-    json context1 = {
+    json input1 = {
         {"person", {
             {"first_name", "John"}
         }}
     };
     
-    json result1 = ast->evaluate(context1);
+    json result1 = ast->evaluate(input1, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result1.get<std::string>(), "John");
     
     // Test with lowercase property name
-    json context2 = {
+    json input2 = {
         {"person", {
             {"firstname", "Jane"}
         }}
     };
     
-    json result2 = ast->evaluate(context2);
+    json result2 = ast->evaluate(input2, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result2.get<std::string>(), "Jane");
 }
 

@@ -41,10 +41,43 @@ Following the defined process correctly is MORE IMPORTANT than completing work q
    - Never assume - always verify against the instruction files
 
 7. **Two-Phase Task Workflow**
-   - Phase 1 (Create Task): User requests task creation → Agent creates task file → STOP
+   - Phase 1 (Create Task): User requests task creation → Agent creates task file based on task_template.md → STOP
    - Phase 2 (Execute Task): User says "execute" → Agent creates branch → implements → tests → retrospective
    - NEVER auto-execute after creating task file
    - See the "Development Workflow" section below for complete process
+
+## Architecture Overview
+
+### Core Components (`src/bre/`)
+- **`engine.hpp/cpp`** - Main `BusinessRulesEngine` with stateful model management
+- **`dmn_parser.hpp/cpp`** - DMN XML parsing (rapidxml)
+- **`feel_evaluator.hpp/cpp`** - FEEL expression evaluation
+- **`dmn_model.hpp`** - Data structures: `DecisionTable`, `LiteralDecision`
+- **`hit_policy.hpp/cpp`** - FIRST, UNIQUE, COLLECT with aggregations
+- **`bkm_manager.hpp/cpp`** - Business Knowledge Model management
+
+### Key Usage Pattern
+
+```cpp
+// ✅ CORRECT: Load once, evaluate many (9-45 μs/eval)
+orion::bre::BusinessRulesEngine engine;
+auto result = engine.load_dmn_model(dmn_xml);  // One-time: 100-200μs
+if (!result) {
+    std::cerr << "Error: " << result.error() << std::endl;
+    return 1;
+}
+
+for (auto& request : requests) {
+    std::string result = engine.evaluate(request_json);  // 9-45μs each
+}
+
+// ❌ WRONG: Re-parse every time (100-150 μs/eval - 10x slower!)
+for (auto& request : requests) {
+    std::string result = evaluate(dmn_xml, request_json);  // DEPRECATED
+}
+```
+
+**Performance:** 22,000-110,000 evaluations/second with cached models
 
 ## Quick Start Resources
 

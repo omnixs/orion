@@ -11,6 +11,8 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 
 using namespace orion::bre::feel;
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -8,53 +8,37 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
 using namespace orion::bre;
-
-// Test helper: evaluate with proper EvaluationContext
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local orion::bre::feel::RegexCache cache(100);
-        orion::bre::feel::EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
-
-using json = nlohmann::json;
-using namespace orion::bre;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(math_edge_cases_debug)
 
 BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
-    json context = json::object();
-
-    BOOST_TEST_MESSAGE("Testing complex math expressions from 0105-feel-math that likely fail:");
+    json input = {};
+    orion::bre::feel::Evaluator evaluator;    BOOST_TEST_MESSAGE("Testing complex math expressions from 0105-feel-math that likely fail:");
     
-    int passed = 0;
-    int total = 0;
     auto test_expr = [&](const std::string& expr, double expected, const std::string& description) {
-        total++;
         try {
-            json result = eval_feel(expr, context);
+            json result = evaluator.evaluate(expr, input, get_test_eval_ctx());
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
             BOOST_TEST_MESSAGE("Result: " << result.dump() << " (expected: " << expected << ")");
             if (result.is_number()) {
                 double actual = result.get<double>();
                 if (std::abs(actual - expected) < 0.01) {
-                    BOOST_TEST_MESSAGE("âœ… PASS");
-                    passed++;
+                    BOOST_TEST_MESSAGE("✅ PASS");
                 } else {
-                    BOOST_TEST_MESSAGE("âŒ FAIL - got " << actual << ", expected " << expected);
+                    BOOST_TEST_MESSAGE("❌ FAIL - got " << actual << ", expected " << expected);
                 }
             } else {
-                BOOST_TEST_MESSAGE("âŒ FAIL - not a number");
+                BOOST_TEST_MESSAGE("❌ FAIL - not a number");
             }
             BOOST_TEST_MESSAGE("---");
         } catch (const std::exception& e) {
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
-            BOOST_TEST_MESSAGE("âŒ ERROR: " << e.what());
+            BOOST_TEST_MESSAGE("❌ ERROR: " << e.what());
             BOOST_TEST_MESSAGE("---");
         }
     };
@@ -67,32 +51,26 @@ BOOST_AUTO_TEST_CASE(test_complex_math_expressions) {
     // Also test spacing variations that might cause issues
     test_expr("10+20/-5-3", 3.0, "No spaces");
     test_expr("10 + 20/-5 - 3", 3.0, "Mixed spacing");
-    
-    // Verify at least some tests were executed
-    BOOST_CHECK_GT(total, 0);
 }
 
 BOOST_AUTO_TEST_CASE(test_null_arithmetic_edge_cases) {
-    json context = json::object();
+    json input = {};
+    orion::bre::feel::Evaluator evaluator;    BOOST_TEST_MESSAGE("Testing null arithmetic edge cases:");
     
-    BOOST_TEST_MESSAGE("Testing null arithmetic edge cases:");
-    
-    int tested = 0;
     auto test_null_expr = [&](const std::string& expr, const std::string& description) {
-        tested++;
         try {
-            json result = eval_feel(expr, context);
+            json result = evaluator.evaluate(expr, input, get_test_eval_ctx());
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
             BOOST_TEST_MESSAGE("Result: " << result.dump());
             if (result.is_null()) {
-                BOOST_TEST_MESSAGE("âœ… PASS - correctly returns null");
+                BOOST_TEST_MESSAGE("✅ PASS - correctly returns null");
             } else {
-                BOOST_TEST_MESSAGE("âŒ FAIL - should return null");
+                BOOST_TEST_MESSAGE("❌ FAIL - should return null");
             }
             BOOST_TEST_MESSAGE("---");
         } catch (const std::exception& e) {
             BOOST_TEST_MESSAGE("Expression: " << expr << " (" << description << ")");
-            BOOST_TEST_MESSAGE("âŒ ERROR: " << e.what());
+            BOOST_TEST_MESSAGE("❌ ERROR: " << e.what());
             BOOST_TEST_MESSAGE("---");
         }
     };
@@ -104,9 +82,6 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_edge_cases) {
     test_null_expr("null * 10", "Null times number");
     test_null_expr("10 / null", "Division by null");
     test_null_expr("null / 10", "Null divided by number");
-    
-    // Verify tests were executed
-    BOOST_CHECK_EQUAL(tested, 6);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -5,7 +5,7 @@ status: completed
 category: feature
 priority: high
 estimated-effort: "6-12 hours"
-actual-effort: "8 hours (including debugging)"
+actual-effort: "~20 hours total (8h initial + ~12h rework: RegexCache architecture refactor, matches() spec compliance fix, cross-platform issues, 10 additional commits after premature completion)"
 ---
 
 ## Task: Replace std::regex usage (Issue #17)
@@ -127,6 +127,7 @@ Add or extend tests to cover:
 
 ## Retrospective
 
+<<<<<<< HEAD
 ### What worked well:
 
 - **CTRE integration was seamless**: Header-only library, no build system changes needed beyond vcpkg.json dependency.
@@ -152,6 +153,153 @@ Add or extend tests to cover:
 - **Add configuration for cache size**: Current hardcoded to 100 entries. Should expose via engine options for production tuning.
 - **Add warmup API**: Optional public function to precompile common patterns (e.g., `orion::bre::warmup_regex_cache(patterns)`) for predictable initialization.
 - **Add regex-specific tests**: Current tests validate correctness but not cache behavior, eviction, or thread safety explicitly.
+=======
+> **Process Compliance Note**: This retrospective was re-executed on 2026-01-01 following proper two-step process after initial violation in commit fc8dd1d.
+
+### User Feedback (Step 1)
+
+**What worked well:**
+- CTRE replacement went smoothly with no significant issues
+
+**What was unclear or problematic:**
+- **RegexCache not designed upfront**: PCRE2 replacement initially didn't use a RegexCache, had to add it later as a fix
+- **Wrong architecture choice**: RegexCache implemented as static global singleton instead of engine-specific, required major refactoring (commit c952201)
+- **Cross-platform development issues**: Task started on Windows, Linux CI jobs failed, creating integration problems
+- **DMN specification misunderstanding**: Matching semantics weren't completely understood when writing tests
+  - Wrote incorrect tests expecting full-string matching (violating DMN 1.5 spec)
+  - CI jobs failed due to incorrect tests
+  - Changed implementation to make tests pass (commit 180969f) - **this introduced a specification violation**
+  - By luck discovered the implementation was now broken
+  - Reverted everything to partial matching (commit d961689) to restore DMN compliance
+
+### Agent Analysis (Step 2)
+
+**Root Cause Analysis - Three Critical Process Failures:**
+
+**1. Premature Task Completion (Process Violation)**
+- **Evidence**: Task marked `status: completed` in commit fc8dd1d (commit 2/13), yet 10 more commits followed
+- **Root Cause**: Agent executed retrospective without confirming task was actually finished
+- **Why copilot instructions allowed this**: 
+  - Phase 2 Step 4 states "Fill retrospective (MANDATORY before completion)" but has no checkpoint asking "Is task finished?"
+  - No requirement to confirm with user that ALL work is done before starting retrospective
+  - Agent interpreted "initial implementation works" as "task is finished" even though validation revealed more work needed
+  - Step 1 "ASK user for feedback" was skipped entirely - agent filled retrospective autonomously
+- **Impact**: Retrospective became meaningless because task wasn't actually done, 10 more commits needed to truly finish
+
+**2. Architecture Regression - RegexCache Global Singleton (Design Failure)**
+- **Evidence**: 
+  - Initial implementation used global static RegexCache (commits 1-9)
+  - Commit c952201 refactored to engine-scoped architecture (BREAKING CHANGE)
+  - Memory leaks detected with ORION_TCK_RUN_ALL=1
+- **Root Cause**: Task instructions didn't require upfront architecture review
+  - Step 4 says "Implement PCRE2-based FEEL matches()" but no architecture checkpoint
+  - No requirement to consider lifecycle, ownership, or multi-engine scenarios
+  - Agent chose expedient solution (global singleton) without considering RAII principles
+- **Why this wasn't caught**: 
+  - Unit tests passed (single engine instance)
+  - TCK tests passed (single engine instance)
+  - Only discovered during memory leak investigation
+- **Impact**: Major refactoring required (11 files changed), API changes, backward compatibility shim needed
+
+**3. Specification Regression - matches() Semantics Flip-Flop (Requirements Failure)**
+- **Evidence**:
+  - Commit f3173d2: Correct partial matching implementation (DMN 1.5 compliant)
+  - Commit 180969f: Changed to full-string matching ("fix" that broke DMN compliance)
+  - Commit d961689: Reverted to partial matching (restored DMN compliance)
+- **Root Cause Chain**:
+  1. DMN 1.5 spec study was insufficient - agent didn't fully understand matches() semantics
+  2. Wrote tests based on incorrect understanding (expected full-string matching)
+  3. Tests failed against correct implementation
+  4. Changed implementation to make tests pass (reversed cause/effect)
+  5. CI failures revealed the mistake
+  6. "By luck" realized implementation was now broken, reverted to spec-compliant version
+- **Why task instructions allowed this**:
+  - Step 4 says "Maintain semantics: Full-string matching behavior (equivalent to std::regex_match)"
+  - **This task instruction was WRONG** - DMN 1.5 matches() uses **partial matching** (XPath semantics)
+  - Agent followed incorrect task guidance instead of verifying against DMN spec
+  - No checkpoint requiring "cite DMN 1.5 spec section number and quote exact requirements"
+- **Impact**: Wasted effort (wrong tests → wrong fix → revert), CI churn, incorrect code briefly in repository
+
+**Cross-Platform Development Issue:**
+- Task started on Windows but Linux CI builds failed
+- No requirement in task to validate cross-platform before committing
+- Should have used both local Debug (fast validation) and CI checks (platform validation) before proceeding
+
+### Suggestions for improvement:
+
+**Task Template Improvements:**
+
+1. **Add Architecture Review Checkpoint** (prevents issue #2):
+   ```markdown
+   ### Step 0: Architecture Review (MANDATORY before implementation)
+   Before writing code, answer:
+   - [ ] What is the lifecycle/ownership model? (RAII, engine-scoped, global, static)
+   - [ ] How does this interact with multiple engine instances?
+   - [ ] Are there memory leak risks? (heap allocations, C APIs, static globals)
+   - [ ] Cross-platform considerations? (Windows/Linux differences)
+   - [ ] Cite CODING_STANDARDS.md sections that apply (memory management, dependencies)
+   ```
+
+2. **Add DMN Specification Verification Checkpoint** (prevents issue #3):
+   ```markdown
+   ### Before Writing Tests: Verify DMN Specification
+   - [ ] Read relevant DMN 1.5 spec section: docs/formal-24-01-01.txt
+   - [ ] Quote exact requirement from spec in task notes
+   - [ ] Cite section number (e.g., "DMN 1.5 Section 10.3.2.15")
+   - [ ] Identify test cases in dmn-tck that validate this behavior
+   - [ ] Write tests that match DMN semantics, NOT implementation assumptions
+   ```
+
+3. **Strengthen Phase 2 Step 4 Retrospective Checkpoint** (prevents issue #1):
+   ```markdown
+   4. ✅ **Execute retrospective** in task file (MANDATORY before completion)
+      - ⚠️ STOP - Before starting retrospective, ASK user: "Is the task finished? All implementation, testing, and validation complete?"
+      - ⚠️ If user says NO or identifies remaining work → Continue implementation, do NOT start retrospective
+      - ⚠️ If user says YES → Proceed with two-step retrospective process:
+        - Step 1: ASK user "What worked? What was unclear?" 
+        - Step 2: After user feedback, analyze execution
+        - Step 3: Document in task file
+        - Step 4: Update task status to 'completed' ONLY after retrospective documented
+   ```
+
+**Copilot Instructions Improvements:**
+Task Completion Confirmation Before Retrospective" rule**:
+   ```markdown
+   **Process Validation Checkpoints:**
+   - ✅ Is code implemented? → Implementation phase complete, NOT ready for retrospective
+   - ✅ Are tests passing? → Validation phase complete, NOT ready for retrospective  
+   - ✅ ASK user "Is task finished?" → If NO, continue work. If YES, proceed to retrospectivomplete
+   - ✅ Are tests passing? → Validation phase complete, NOT task complete
+   - ✅ Is retrospective filled WITH user feedback? → NOW task can be marked complete
+   - ✅ Did user approve retrospective? → NOW commit can reference "closes #N"
+   ```
+
+2. **Add "Cross-Platform Validation Before Commit" rule**:
+   ```markdown
+   ### Before First Commit
+   1. Build and test on local platform (Debug mode for fast validation)
+   2. Push to feature branch (trigger CI)
+   3. Verify CI passes for ALL platforms (Windows, Linux)
+   4. If CI fails, fix locally and repeat
+   5. Only proceed with implementation after green CI
+   ```
+
+3. **Add "Specification Citation Required" rule for DMN features**:
+   ```markdown
+   ### DMN Feature Implementation
+   When implementing any DMN/FEEL feature:
+   - [ ] MUST cite DMN 1.5 spec section number in code comments
+   - [ ] MUST quote exact requirement from spec in task notes  
+   - [ ] MUST identify TCK test cases that validate the feature
+   - [ ] Tests MUST match spec semantics, not implementation assumptions
+   ```
+
+### What would have prevented these thrconfirmation with user "Is task finished?" BEFORE starting retrospective proces
+
+1. **Premature completion** → Explicit "STOP - no commits after retrospective" checkpoint in copilot instructions
+2. **RegexCache architecture** → Mandatory architecture review before implementation (lifecycle, ownership, RAII)
+3. **matches() flip-flop** → Mandatory DMN spec citation with section numbers before writing tests
+>>>>>>> main
 
 ### Actual effort:
 
@@ -196,3 +344,68 @@ Add or extend tests to cover:
 - [ ] **Regex-specific tests**: Unit tests for cache eviction, thread safety, invalid patterns, Unicode support.
 - [ ] **Performance benchmarks**: Quantify CTRE vs std::regex overhead savings, PCRE2 JIT improvements.
 - [ ] **Custom allocators for PCRE2**: Hook PCRE2 allocation for better memory tracking in production environments.
+<<<<<<< HEAD
+=======
+
+---
+
+## PR Review Commits Summary
+
+After the initial implementation (commit 91d8cba), 8 additional commits were made based on PR review feedback to improve API clarity, type safety, and code organization:
+
+### 1. API Parameter Renaming (3 commits: e0e8dbc, 5d723fe, 5f6c94e)
+**Problem**: Ambiguous parameter naming - functions had both `context` (input data) and `eval_ctx` (EvaluationContext) parameters, causing confusion.
+
+**Solution**: Systematic rename of all `context` parameters to `input` for clarity:
+- **e0e8dbc**: Renamed `context` → `input` in core evaluate() functions (6 headers, 6 implementation files, 7 test files)
+- **5d723fe**: Completed rename in remaining 10 test files (test_named_parameters.cpp, test_parser.cpp, etc.)
+- **5f6c94e**: Extended rename to BKM and DecisionTable evaluate functions
+
+**Impact**: 35 files changed, ~400 lines refactored for naming consistency
+
+### 2. Type Safety Improvement (1 commit: 19366e2)
+**Problem**: EvaluationContext used raw pointer for regex_cache, allowing potential null pointer bugs and two-phase initialization.
+
+**Solution**: Replace raw pointer with reference - compile-time guarantee of validity
+- Changed `RegexCache* regex_cache` → `RegexCache& regex_cache`
+- Removed default constructor, enforced RAII pattern
+- Updated all 25 test files to use constructor initialization
+
+**Impact**: 28 files changed, follows C++ Core Guidelines R.3 (raw pointer is non-owning)
+
+### 3. Code Organization (2 commits: 9828e1e, c487192)
+**Problem**: 
+- Inconsistent parameter names across functions (eval_feel_literal used `ctx` instead of `input`)
+- EvaluationContext in wrong namespace (orion::bre::feel instead of orion::bre)
+
+**Solution**:
+- **9828e1e**: Renamed `ctx` → `input` in eval_feel_literal for consistency (3 files)
+- **c487192**: Moved EvaluationContext to orion::bre namespace with dedicated header
+  - Created include/orion/bre/evaluation_context.hpp
+  - Removed verbose namespace qualification throughout codebase
+  - Added documentation for future extensibility (profiling, metrics, audit trails)
+  - Reflects broader usage beyond FEEL-specific code
+
+**Impact**: 41 files changed, cleaner architecture and namespace organization
+
+### 4. Bug Fixes (2 commits: 2e2fbfa, 476a1fe)
+**Problem 1**: matches() function in legacy eval_feel_literal() path had broken logic - both branches returned null
+**Solution**: 
+- **2e2fbfa**: Implemented actual regex matching with temporary EvaluationContext
+- Added proper FEEL string unescaping, DMN-compliant edge cases
+- Now consistent with any() and all() functions
+
+**Problem 2**: Unnecessary string conversions in evaluate_complex_arithmetic_expression
+**Solution**:
+- **476a1fe**: Removed redundant string_view → string → string_view cycle
+- Zero-copy string handling, no heap allocations
+
+**Impact**: Performance improvement, correctness fix for legacy code path
+
+### Summary Statistics
+- **Total PR review commits**: 8 (e0e8dbc through 476a1fe)
+- **Files modified**: 66 unique files across all refactoring commits
+- **Primary themes**: API clarity (naming), type safety (references), code organization (namespaces)
+- **Result**: Cleaner, safer, more maintainable codebase with no functional regressions
+- **All tests passing**: 279 unit tests + 126 Level-2 TCK tests (100% compliance maintained)
+>>>>>>> main

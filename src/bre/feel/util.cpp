@@ -180,7 +180,6 @@ namespace orion::bre::detail
         // Handle expressions like "(loan.principal*loan.rate/MONTHS_PER_YEAR)/(1-(1+loan.rate/MONTHS_PER_YEAR)**-loan.termMonths)"
         try
         {
-            string expr(expression);
             string result;
 
             auto replacer = [&context](std::string_view prop_path) -> string
@@ -205,18 +204,17 @@ namespace orion::bre::detail
             };
 
             // Replace all property references using CTRE
-            std::string_view expr_view = expr;
             size_t pos = 0;
-            while (pos < expr_view.size())
+            while (pos < expression.size())
             {
-                if (auto match = ctre::search<R"([a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z][a-zA-Z0-9_]*)">(expr_view.substr(pos)))
+                if (auto match = ctre::search<R"([a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z][a-zA-Z0-9_]*)">(expression.substr(pos)))
                 {
-                    size_t match_pos = match.get<0>().data() - expr_view.data();
-                    result.append(expr_view.substr(pos, match_pos - pos));
+                    size_t match_pos = match.get<0>().data() - expression.data();
+                    result.append(expression.substr(pos, match_pos - pos));
                     result.append(replacer(match.get<0>().to_view()));
                     pos = match_pos + match.get<0>().size();
                 } else {
-                    result.append(expr_view.substr(pos));
+                    result.append(expression.substr(pos));
                     break;
                 }
             }

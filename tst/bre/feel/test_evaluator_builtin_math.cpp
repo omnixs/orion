@@ -10,17 +10,10 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <cmath>
+#include "test_helpers.hpp"
 
 using namespace orion::bre::feel;
-
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local RegexCache cache(100);
-        EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(builtin_math_functions)
 
@@ -29,7 +22,7 @@ BOOST_AUTO_TEST_SUITE(builtin_math_functions)
 BOOST_AUTO_TEST_CASE(test_abs_positive)
 {
     BOOST_TEST_MESSAGE("Testing abs() with positive number");
-    auto result = eval_feel("abs(42)");
+    auto result = Evaluator::evaluate("abs(42)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 42.0);
 }
@@ -37,7 +30,7 @@ BOOST_AUTO_TEST_CASE(test_abs_positive)
 BOOST_AUTO_TEST_CASE(test_abs_negative)
 {
     BOOST_TEST_MESSAGE("Testing abs() with negative number");
-    auto result = eval_feel("abs(-42)");
+    auto result = Evaluator::evaluate("abs(-42)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 42.0);
 }
@@ -45,7 +38,7 @@ BOOST_AUTO_TEST_CASE(test_abs_negative)
 BOOST_AUTO_TEST_CASE(test_abs_zero)
 {
     BOOST_TEST_MESSAGE("Testing abs() with zero");
-    auto result = eval_feel("abs(0)");
+    auto result = Evaluator::evaluate("abs(0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 0.0);
 }
@@ -53,7 +46,7 @@ BOOST_AUTO_TEST_CASE(test_abs_zero)
 BOOST_AUTO_TEST_CASE(test_abs_decimal)
 {
     BOOST_TEST_MESSAGE("Testing abs() with decimal");
-    auto result = eval_feel("abs(-3.14159)");
+    auto result = Evaluator::evaluate("abs(-3.14159)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 3.14159, 0.00001);
 }
@@ -61,7 +54,7 @@ BOOST_AUTO_TEST_CASE(test_abs_decimal)
 BOOST_AUTO_TEST_CASE(test_abs_null)
 {
     BOOST_TEST_MESSAGE("Testing abs() with null");
-    auto result = eval_feel("abs(null)");
+    auto result = Evaluator::evaluate("abs(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -70,7 +63,7 @@ BOOST_AUTO_TEST_CASE(test_abs_null)
 BOOST_AUTO_TEST_CASE(test_sqrt_positive)
 {
     BOOST_TEST_MESSAGE("Testing sqrt() with positive number");
-    auto result = eval_feel("sqrt(16)");
+    auto result = Evaluator::evaluate("sqrt(16)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 4.0);
 }
@@ -78,7 +71,7 @@ BOOST_AUTO_TEST_CASE(test_sqrt_positive)
 BOOST_AUTO_TEST_CASE(test_sqrt_zero)
 {
     BOOST_TEST_MESSAGE("Testing sqrt() with zero");
-    auto result = eval_feel("sqrt(0)");
+    auto result = Evaluator::evaluate("sqrt(0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 0.0);
 }
@@ -86,14 +79,14 @@ BOOST_AUTO_TEST_CASE(test_sqrt_zero)
 BOOST_AUTO_TEST_CASE(test_sqrt_negative)
 {
     BOOST_TEST_MESSAGE("Testing sqrt() with negative number - should return null");
-    auto result = eval_feel("sqrt(-1)");
+    auto result = Evaluator::evaluate("sqrt(-1)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_sqrt_decimal)
 {
     BOOST_TEST_MESSAGE("Testing sqrt() with decimal");
-    auto result = eval_feel("sqrt(2)");
+    auto result = Evaluator::evaluate("sqrt(2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), std::sqrt(2.0), 0.00001);
 }
@@ -101,7 +94,7 @@ BOOST_AUTO_TEST_CASE(test_sqrt_decimal)
 BOOST_AUTO_TEST_CASE(test_sqrt_null)
 {
     BOOST_TEST_MESSAGE("Testing sqrt() with null");
-    auto result = eval_feel("sqrt(null)");
+    auto result = Evaluator::evaluate("sqrt(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -110,7 +103,7 @@ BOOST_AUTO_TEST_CASE(test_sqrt_null)
 BOOST_AUTO_TEST_CASE(test_floor_positive)
 {
     BOOST_TEST_MESSAGE("Testing floor() with positive decimal");
-    auto result = eval_feel("floor(1.5)");
+    auto result = Evaluator::evaluate("floor(1.5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 1.0);
 }
@@ -118,7 +111,7 @@ BOOST_AUTO_TEST_CASE(test_floor_positive)
 BOOST_AUTO_TEST_CASE(test_floor_negative)
 {
     BOOST_TEST_MESSAGE("Testing floor() with negative decimal");
-    auto result = eval_feel("floor(-1.5)");
+    auto result = Evaluator::evaluate("floor(-1.5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -2.0);
 }
@@ -126,7 +119,7 @@ BOOST_AUTO_TEST_CASE(test_floor_negative)
 BOOST_AUTO_TEST_CASE(test_floor_integer)
 {
     BOOST_TEST_MESSAGE("Testing floor() with integer");
-    auto result = eval_feel("floor(5)");
+    auto result = Evaluator::evaluate("floor(5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
 }
@@ -134,7 +127,7 @@ BOOST_AUTO_TEST_CASE(test_floor_integer)
 BOOST_AUTO_TEST_CASE(test_floor_null)
 {
     BOOST_TEST_MESSAGE("Testing floor() with null");
-    auto result = eval_feel("floor(null)");
+    auto result = Evaluator::evaluate("floor(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -143,7 +136,7 @@ BOOST_AUTO_TEST_CASE(test_floor_null)
 BOOST_AUTO_TEST_CASE(test_ceiling_positive)
 {
     BOOST_TEST_MESSAGE("Testing ceiling() with positive decimal");
-    auto result = eval_feel("ceiling(1.5)");
+    auto result = Evaluator::evaluate("ceiling(1.5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 2.0);
 }
@@ -151,7 +144,7 @@ BOOST_AUTO_TEST_CASE(test_ceiling_positive)
 BOOST_AUTO_TEST_CASE(test_ceiling_negative)
 {
     BOOST_TEST_MESSAGE("Testing ceiling() with negative decimal");
-    auto result = eval_feel("ceiling(-1.5)");
+    auto result = Evaluator::evaluate("ceiling(-1.5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -1.0);
 }
@@ -159,7 +152,7 @@ BOOST_AUTO_TEST_CASE(test_ceiling_negative)
 BOOST_AUTO_TEST_CASE(test_ceiling_integer)
 {
     BOOST_TEST_MESSAGE("Testing ceiling() with integer");
-    auto result = eval_feel("ceiling(5)");
+    auto result = Evaluator::evaluate("ceiling(5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
 }
@@ -167,7 +160,7 @@ BOOST_AUTO_TEST_CASE(test_ceiling_integer)
 BOOST_AUTO_TEST_CASE(test_ceiling_null)
 {
     BOOST_TEST_MESSAGE("Testing ceiling() with null");
-    auto result = eval_feel("ceiling(null)");
+    auto result = Evaluator::evaluate("ceiling(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -176,7 +169,7 @@ BOOST_AUTO_TEST_CASE(test_ceiling_null)
 BOOST_AUTO_TEST_CASE(test_exp_zero)
 {
     BOOST_TEST_MESSAGE("Testing exp() with zero");
-    auto result = eval_feel("exp(0)");
+    auto result = Evaluator::evaluate("exp(0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.0, 0.00001);
 }
@@ -184,7 +177,7 @@ BOOST_AUTO_TEST_CASE(test_exp_zero)
 BOOST_AUTO_TEST_CASE(test_exp_one)
 {
     BOOST_TEST_MESSAGE("Testing exp() with one");
-    auto result = eval_feel("exp(1)");
+    auto result = Evaluator::evaluate("exp(1)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), std::exp(1.0), 0.00001);
 }
@@ -192,7 +185,7 @@ BOOST_AUTO_TEST_CASE(test_exp_one)
 BOOST_AUTO_TEST_CASE(test_exp_negative)
 {
     BOOST_TEST_MESSAGE("Testing exp() with negative");
-    auto result = eval_feel("exp(-1)");
+    auto result = Evaluator::evaluate("exp(-1)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), std::exp(-1.0), 0.00001);
 }
@@ -200,7 +193,7 @@ BOOST_AUTO_TEST_CASE(test_exp_negative)
 BOOST_AUTO_TEST_CASE(test_exp_null)
 {
     BOOST_TEST_MESSAGE("Testing exp() with null");
-    auto result = eval_feel("exp(null)");
+    auto result = Evaluator::evaluate("exp(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -209,7 +202,7 @@ BOOST_AUTO_TEST_CASE(test_exp_null)
 BOOST_AUTO_TEST_CASE(test_log_one)
 {
     BOOST_TEST_MESSAGE("Testing log() with one");
-    auto result = eval_feel("log(1)");
+    auto result = Evaluator::evaluate("log(1)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_SMALL(result.get<double>(), 0.00001);
 }
@@ -217,7 +210,7 @@ BOOST_AUTO_TEST_CASE(test_log_one)
 BOOST_AUTO_TEST_CASE(test_log_e)
 {
     BOOST_TEST_MESSAGE("Testing log() with e");
-    auto result = eval_feel("log(2.718281828)");
+    auto result = Evaluator::evaluate("log(2.718281828)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.0, 0.0001);
 }
@@ -225,21 +218,21 @@ BOOST_AUTO_TEST_CASE(test_log_e)
 BOOST_AUTO_TEST_CASE(test_log_zero)
 {
     BOOST_TEST_MESSAGE("Testing log() with zero - should return null");
-    auto result = eval_feel("log(0)");
+    auto result = Evaluator::evaluate("log(0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_log_negative)
 {
     BOOST_TEST_MESSAGE("Testing log() with negative - should return null");
-    auto result = eval_feel("log(-1)");
+    auto result = Evaluator::evaluate("log(-1)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_log_null)
 {
     BOOST_TEST_MESSAGE("Testing log() with null");
-    auto result = eval_feel("log(null)");
+    auto result = Evaluator::evaluate("log(null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -248,7 +241,7 @@ BOOST_AUTO_TEST_CASE(test_log_null)
 BOOST_AUTO_TEST_CASE(test_modulo_basic)
 {
     BOOST_TEST_MESSAGE("Testing modulo() with basic case");
-    auto result = eval_feel("modulo(12, 5)");
+    auto result = Evaluator::evaluate("modulo(12, 5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 2.0);
 }
@@ -256,7 +249,7 @@ BOOST_AUTO_TEST_CASE(test_modulo_basic)
 BOOST_AUTO_TEST_CASE(test_modulo_negative_dividend)
 {
     BOOST_TEST_MESSAGE("Testing modulo() with negative dividend");
-    auto result = eval_feel("modulo(-12, 5)");
+    auto result = Evaluator::evaluate("modulo(-12, 5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 3.0, 0.00001);
 }
@@ -264,7 +257,7 @@ BOOST_AUTO_TEST_CASE(test_modulo_negative_dividend)
 BOOST_AUTO_TEST_CASE(test_modulo_decimal)
 {
     BOOST_TEST_MESSAGE("Testing modulo() with decimals");
-    auto result = eval_feel("modulo(10.1, 4.5)");
+    auto result = Evaluator::evaluate("modulo(10.1, 4.5)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.1, 0.00001);
 }
@@ -272,7 +265,7 @@ BOOST_AUTO_TEST_CASE(test_modulo_decimal)
 BOOST_AUTO_TEST_CASE(test_modulo_null)
 {
     BOOST_TEST_MESSAGE("Testing modulo() with null");
-    auto result = eval_feel("modulo(10, null)");
+    auto result = Evaluator::evaluate("modulo(10, null)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_null());
 }
 
@@ -281,7 +274,7 @@ BOOST_AUTO_TEST_CASE(test_modulo_null)
 BOOST_AUTO_TEST_CASE(test_decimal_basic)
 {
     BOOST_TEST_MESSAGE("Testing decimal() with basic case");
-    auto result = eval_feel("decimal(1/3, 2)");
+    auto result = Evaluator::evaluate("decimal(1/3, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 0.33, 0.01);
 }
@@ -289,7 +282,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_basic)
 BOOST_AUTO_TEST_CASE(test_decimal_half_even_up)
 {
     BOOST_TEST_MESSAGE("Testing decimal() with half-even rounding (rounds to even)");
-    auto result = eval_feel("decimal(1.5, 0)");
+    auto result = Evaluator::evaluate("decimal(1.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 2.0);
 }
@@ -297,7 +290,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_half_even_up)
 BOOST_AUTO_TEST_CASE(test_decimal_half_even_down)
 {
     BOOST_TEST_MESSAGE("Testing decimal() with half-even rounding (rounds to even)");
-    auto result = eval_feel("decimal(2.5, 0)");
+    auto result = Evaluator::evaluate("decimal(2.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 2.0);
 }
@@ -307,7 +300,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_half_even_down)
 BOOST_AUTO_TEST_CASE(test_round_basic)
 {
     BOOST_TEST_MESSAGE("Testing round() with basic case");
-    auto result = eval_feel("round(5.5, 0)");
+    auto result = Evaluator::evaluate("round(5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 6.0);
 }
@@ -315,7 +308,7 @@ BOOST_AUTO_TEST_CASE(test_round_basic)
 BOOST_AUTO_TEST_CASE(test_round_half_even)
 {
     BOOST_TEST_MESSAGE("Testing round() with half-even (banker's rounding)");
-    auto result = eval_feel("round(2.5, 0)");
+    auto result = Evaluator::evaluate("round(2.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 2.0);
 }
@@ -323,7 +316,7 @@ BOOST_AUTO_TEST_CASE(test_round_half_even)
 BOOST_AUTO_TEST_CASE(test_round_precision)
 {
     BOOST_TEST_MESSAGE("Testing round() with precision");
-    auto result = eval_feel("round(1.121, 2)");
+    auto result = Evaluator::evaluate("round(1.121, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.12, 0.001);
 }
@@ -333,7 +326,7 @@ BOOST_AUTO_TEST_CASE(test_round_precision)
 BOOST_AUTO_TEST_CASE(test_round_up_positive)
 {
     BOOST_TEST_MESSAGE("Testing round up() with positive");
-    auto result = eval_feel("round up(5.5, 0)");
+    auto result = Evaluator::evaluate("round up(5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 6.0);
 }
@@ -341,7 +334,7 @@ BOOST_AUTO_TEST_CASE(test_round_up_positive)
 BOOST_AUTO_TEST_CASE(test_round_up_negative)
 {
     BOOST_TEST_MESSAGE("Testing round up() with negative (away from zero)");
-    auto result = eval_feel("round up(-5.5, 0)");
+    auto result = Evaluator::evaluate("round up(-5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -6.0);
 }
@@ -349,7 +342,7 @@ BOOST_AUTO_TEST_CASE(test_round_up_negative)
 BOOST_AUTO_TEST_CASE(test_round_up_precision)
 {
     BOOST_TEST_MESSAGE("Testing round up() with precision");
-    auto result = eval_feel("round up(1.121, 2)");
+    auto result = Evaluator::evaluate("round up(1.121, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.13, 0.001);
 }
@@ -359,7 +352,7 @@ BOOST_AUTO_TEST_CASE(test_round_up_precision)
 BOOST_AUTO_TEST_CASE(test_round_down_positive)
 {
     BOOST_TEST_MESSAGE("Testing round down() with positive");
-    auto result = eval_feel("round down(5.5, 0)");
+    auto result = Evaluator::evaluate("round down(5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
 }
@@ -367,7 +360,7 @@ BOOST_AUTO_TEST_CASE(test_round_down_positive)
 BOOST_AUTO_TEST_CASE(test_round_down_negative)
 {
     BOOST_TEST_MESSAGE("Testing round down() with negative (toward zero)");
-    auto result = eval_feel("round down(-5.5, 0)");
+    auto result = Evaluator::evaluate("round down(-5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -5.0);
 }
@@ -375,7 +368,7 @@ BOOST_AUTO_TEST_CASE(test_round_down_negative)
 BOOST_AUTO_TEST_CASE(test_round_down_precision)
 {
     BOOST_TEST_MESSAGE("Testing round down() with precision");
-    auto result = eval_feel("round down(1.129, 2)");
+    auto result = Evaluator::evaluate("round down(1.129, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.12, 0.001);
 }
@@ -385,7 +378,7 @@ BOOST_AUTO_TEST_CASE(test_round_down_precision)
 BOOST_AUTO_TEST_CASE(test_round_half_up_positive)
 {
     BOOST_TEST_MESSAGE("Testing round half up() with positive");
-    auto result = eval_feel("round half up(5.5, 0)");
+    auto result = Evaluator::evaluate("round half up(5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 6.0);
 }
@@ -393,7 +386,7 @@ BOOST_AUTO_TEST_CASE(test_round_half_up_positive)
 BOOST_AUTO_TEST_CASE(test_round_half_up_negative)
 {
     BOOST_TEST_MESSAGE("Testing round half up() with negative");
-    auto result = eval_feel("round half up(-5.5, 0)");
+    auto result = Evaluator::evaluate("round half up(-5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -6.0);
 }
@@ -401,7 +394,7 @@ BOOST_AUTO_TEST_CASE(test_round_half_up_negative)
 BOOST_AUTO_TEST_CASE(test_round_half_up_precision)
 {
     BOOST_TEST_MESSAGE("Testing round half up() with precision");
-    auto result = eval_feel("round half up(1.125, 2)");
+    auto result = Evaluator::evaluate("round half up(1.125, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.13, 0.001);
 }
@@ -411,7 +404,7 @@ BOOST_AUTO_TEST_CASE(test_round_half_up_precision)
 BOOST_AUTO_TEST_CASE(test_round_half_down_positive)
 {
     BOOST_TEST_MESSAGE("Testing round half down() with positive");
-    auto result = eval_feel("round half down(5.5, 0)");
+    auto result = Evaluator::evaluate("round half down(5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
 }
@@ -419,7 +412,7 @@ BOOST_AUTO_TEST_CASE(test_round_half_down_positive)
 BOOST_AUTO_TEST_CASE(test_round_half_down_negative)
 {
     BOOST_TEST_MESSAGE("Testing round half down() with negative");
-    auto result = eval_feel("round half down(-5.5, 0)");
+    auto result = Evaluator::evaluate("round half down(-5.5, 0)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -5.0);
 }
@@ -427,7 +420,7 @@ BOOST_AUTO_TEST_CASE(test_round_half_down_negative)
 BOOST_AUTO_TEST_CASE(test_round_half_down_precision)
 {
     BOOST_TEST_MESSAGE("Testing round half down() with precision");
-    auto result = eval_feel("round half down(1.125, 2)");
+    auto result = Evaluator::evaluate("round half down(1.125, 2)", {}, get_test_eval_ctx());
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 1.12, 0.001);
 }

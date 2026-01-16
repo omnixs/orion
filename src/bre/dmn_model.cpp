@@ -20,8 +20,11 @@
 #include <orion/api/logger.hpp>
 #include <orion/bre/business_knowledge_model.hpp>
 #include <orion/bre/bkm_manager.hpp>
+#include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/parser.hpp>
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
 using namespace std;
 using json = nlohmann::json;
@@ -85,7 +88,7 @@ namespace orion::bre
     }
 
     // Helper: Collect all matching rules based on input conditions
-    std::vector<json> DecisionTable::find_matching_rules(const json& context) const
+    std::vector<json> DecisionTable::find_matching_rules(const json& input, EvaluationContext& eval_ctx) const
     {
         vector<json> matching_outputs;
 
@@ -96,10 +99,33 @@ namespace orion::bre
             // Check if all input conditions match
             for (size_t i = 0; i < inputs.size() && i < rule.inputEntries.size(); i++)
             {
-                const auto& input = inputs[i];
+                const auto& input_clause = inputs[i];
                 const auto& entry = rule.inputEntries[i];
 
-                json input_value = detail::get_value_from_label(context, input.label);
+                // Evaluate input expression if present, otherwise use label lookup
+                json input_value;
+                if (!input_clause.inputExpression.empty())
+                {
+                    // Input has an expression - evaluate it as FEEL
+                    try
+                    {
+                        feel::Lexer lexer;
+                        auto tokens = lexer.tokenize(input_clause.inputExpression);
+                        feel::Parser parser;
+                        auto ast = parser.parse(tokens);
+                        input_value = ast->evaluate(input, eval_ctx);
+                    }
+                    catch (...)
+                    {
+                        // Expression evaluation failed - use null
+                        input_value = nullptr;
+                    }
+                }
+                else
+                {
+                    // No expression - use label lookup (legacy behavior)
+                    input_value = detail::get_value_from_label(input, input_clause.label);
+                }
 
                 // Phase 3: Use cached AST if available, otherwise fall back to unary_test_matches
                 bool entry_matches_result = false;
@@ -109,7 +135,7 @@ namespace orion::bre
                     // Use pre-parsed AST for complex FEEL expressions
                     try
                     {
-                        json ast_result = rule.inputEntries_ast[i]->evaluate(context);
+                        json ast_result = rule.inputEntries_ast[i]->evaluate(input, eval_ctx);
                         
                         // Compare AST result with input value
                         entry_matches_result = (ast_result == input_value);
@@ -159,7 +185,7 @@ namespace orion::bre
                                 // Use pre-parsed AST to evaluate output expression
                                 try
                                 {
-                                    output_value = rule.outputEntries_ast[i]->evaluate(context);
+                                    output_value = rule.outputEntries_ast[i]->evaluate(input, eval_ctx);
                                 }
                                 catch (const std::runtime_error&)
                                 {
@@ -215,7 +241,7 @@ namespace orion::bre
                         // Use pre-parsed AST to evaluate output expression
                         try
                         {
-                            output_value = rule.outputEntries_ast[0]->evaluate(context);
+                            output_value = rule.outputEntries_ast[0]->evaluate(input, eval_ctx);
                         }
                         catch (const std::runtime_error&)
                         {
@@ -386,7 +412,7 @@ namespace orion::bre
                     }
                     return json(min_val);
                 }
-                return matching_outputs.empty() ? json{} : matching_outputs[0]; // Fallback
+                return matching_outputs[0]; // Fallback
             }
         case CollectAggregation::MAX:
             {
@@ -436,7 +462,7 @@ namespace orion::bre
                     }
                     return json(max_val);
                 }
-                return matching_outputs.empty() ? json{} : matching_outputs[0]; // Fallback
+                return matching_outputs[0]; // Fallback
             }
         case CollectAggregation::NONE:
         default:
@@ -526,28 +552,19 @@ namespace orion::bre
     }
 
     // Implementation of DecisionTable::evaluate
-    json DecisionTable::evaluate(const json& context,
-                                 [[maybe_unused]] orion::bre::feel::EvaluationContext* eval_ctx) const
+    json DecisionTable::evaluate(const json& input,
+                                 [[maybe_unused]] EvaluationContext& eval_ctx) const
     {
         // Step 1: Validate input values against allowed values
-        validate_input_values(context);
+        validate_input_values(input);
 
         // Step 2: Find all matching rules based on input conditions
-        vector<json> matching_outputs = find_matching_rules(context);
+        vector<json> matching_outputs = find_matching_rules(input, eval_ctx);
 
-        // Step 3: If no matches, return result based on policy
+        // Step 3: If no matches, return empty result
         if (matching_outputs.empty())
         {
-            if (hitPolicy == HitPolicy::COLLECT)
-            {
-                return apply_collect_aggregation(matching_outputs);
-            }
-            if (hitPolicy == HitPolicy::RULE_ORDER || hitPolicy == HitPolicy::OUTPUT_ORDER)
-            {
-                return json::array();
-            }
-            // For FIRST, UNIQUE, PRIORITY, ANY -> null
-            return json{};
+            return json::object();
         }
 
         // Step 4: Handle early exit for FIRST/UNIQUE/ANY policies
@@ -618,9 +635,9 @@ namespace orion::bre
     }
 
     // Implementation of LiteralDecision::evaluate
-    json LiteralDecision::evaluate(const json& context,
+    json LiteralDecision::evaluate(const json& input,
                                    const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
-                                   orion::bre::feel::EvaluationContext* eval_ctx) const
+                                   EvaluationContext& eval_ctx) const
     {
         if (expression_text.empty())
         {
@@ -632,7 +649,7 @@ namespace orion::bre
         {
             try
             {
-                json ast_result = expression_ast->evaluate(context, eval_ctx);
+                json ast_result = expression_ast->evaluate(input, eval_ctx);
                 debug("LiteralDecision AST result for '{}': {}", expression_text, ast_result.dump());
                 return ast_result;
             }
@@ -648,7 +665,7 @@ namespace orion::bre
         }
 
         // Fallback: Use evaluate_bkm_expression which handles both BKM calls and regular FEEL expressions
-        json result = evaluate_bkm_expression(expression_text, context, available_bkms);
+        json result = evaluate_bkm_expression(expression_text, input, available_bkms, eval_ctx);
         return result;
     }
 }

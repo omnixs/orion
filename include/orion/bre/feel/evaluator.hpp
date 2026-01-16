@@ -20,20 +20,13 @@
 
 #include <string>
 #include <nlohmann/json.hpp>
+#include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre::feel {
     using json = nlohmann::json;
 
     // Forward declaration
     class RegexCache;
-
-    /**
-     * @brief Evaluation context containing engine resources
-     */
-    struct EvaluationContext
-    {
-        RegexCache* regex_cache = nullptr; // Non-owning pointer to engine's regex cache
-    };
 
     /**
      * @brief FEEL Expression Evaluator
@@ -47,11 +40,11 @@ namespace orion::bre::feel {
         /**
          * @brief Evaluate a FEEL expression
          * @param expression The FEEL expression to evaluate
-         * @param context The evaluation context with variable bindings
-         * @param eval_ctx Evaluation context with engine resources (required for proper resource management)
+         * @param input Input data/variable bindings as JSON object
+         * @param eval_ctx Evaluation context with engine resources (contains regex cache)
          * @return The result of evaluation as JSON
          * @throws std::runtime_error if evaluation fails
          */
-        [[nodiscard]] static json evaluate(std::string_view expression, const json& context, EvaluationContext& eval_ctx);
+        [[nodiscard]] static json evaluate(std::string_view expression, const json& input, const bre::EvaluationContext& eval_ctx);
     };
 }

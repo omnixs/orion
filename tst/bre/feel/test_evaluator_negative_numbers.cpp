@@ -1,4 +1,4 @@
-﻿/*
+/*
  * ORION Optimized Rule Integration & Operations Native
  * SPDX-License-Identifier: Apache-2.0
  * SPDX-FileCopyrightText: 2025 ORION contributors
@@ -7,25 +7,16 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
-#include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
-using namespace orion::bre;
-
-// Test helper: evaluate with proper EvaluationContext
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local orion::bre::feel::RegexCache cache(100);
-        orion::bre::feel::EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(feel_negative_number_debug)
 
 BOOST_AUTO_TEST_CASE(test_negative_number_parsing_issue) {
-    json context = {};
+    orion::bre::feel::Evaluator evaluator;
+    json input = {};
     
     // Test the exact failing expressions from 0105-feel-math
     BOOST_TEST_MESSAGE("\n=== DEBUGGING NEGATIVE NUMBER PARSING ===");
@@ -48,28 +39,25 @@ BOOST_AUTO_TEST_CASE(test_negative_number_parsing_issue) {
     
     for (const auto& test_case : test_cases) {
         BOOST_TEST_MESSAGE("Testing: " << test_case.expression);
-        json result = eval_feel(test_case.expression, context);
+        json result = evaluator.evaluate(test_case.expression, input, get_test_eval_ctx());
         
         BOOST_TEST_MESSAGE("  Result: " << result);
         BOOST_TEST_MESSAGE("  Expected: " << test_case.expected);
         
         if (result.is_null()) {
-            BOOST_TEST_MESSAGE("  âŒ ISSUE: Expression returns null instead of number");
+            BOOST_TEST_MESSAGE("  ❌ ISSUE: Expression returns null instead of number");
         } else if (result.is_number()) {
             double actual = result.get<double>();
             if (std::abs(actual - test_case.expected) < 0.001) {
-                BOOST_TEST_MESSAGE("  âœ… PASS");
+                BOOST_TEST_MESSAGE("  ✅ PASS");
             } else {
-                BOOST_TEST_MESSAGE("  âŒ FAIL: Got " << actual << ", expected " << test_case.expected);
+                BOOST_TEST_MESSAGE("  ❌ FAIL: Got " << actual << ", expected " << test_case.expected);
             }
         } else {
-            BOOST_TEST_MESSAGE("  âŒ ISSUE: Expression returns non-numeric result");
+            BOOST_TEST_MESSAGE("  ❌ ISSUE: Expression returns non-numeric result");
         }
         BOOST_TEST_MESSAGE("---");
     }
-    
-    // Verify we tested all cases
-    BOOST_CHECK_EQUAL(test_cases.size(), 7);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

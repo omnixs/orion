@@ -6,12 +6,16 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/api/engine.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include <nlohmann/json.hpp>
 #include <string>
+#include "test_helpers.hpp"
 
 BOOST_AUTO_TEST_SUITE(test_dmn_abs_named_params, *boost::unit_test::disabled())
 
 using json = nlohmann::json;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 // Test the exact DMN structure from TCK test 0050-feel-abs-function
 BOOST_AUTO_TEST_CASE(test_abs_positional_basic) {
@@ -108,6 +112,7 @@ BOOST_AUTO_TEST_CASE(test_abs_named_param_correct) {
 }
 
 BOOST_AUTO_TEST_CASE(test_abs_named_param_wrong_name) {
+
     // TCK test decision007: abs(number:-1) should return null (wrong param name)
     std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="test">

@@ -18,7 +18,6 @@
 
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/evaluator.hpp>
-#include <orion/bre/feel/regex_cache.hpp>
 #include <sstream>
 
 namespace orion::bre::feel {
@@ -596,13 +595,9 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     return node;
 }
 
-    nlohmann::json Parser::eval_expression(std::string_view expression, const nlohmann::json& context)
+    nlohmann::json Parser::eval_expression(std::string_view expression, const nlohmann::json& input, const EvaluationContext& eval_ctx)
     {
-        // Create a temporary EvaluationContext with default regex cache
-        // Note: This is used by legacy code paths - prefer passing eval_ctx from engine
-        static thread_local RegexCache default_cache(100);
-        EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &default_cache;
-        return Evaluator::evaluate(expression, context, eval_ctx);
+        // Use the existing Evaluator which already provides this functionality
+        return Evaluator::evaluate(expression, input, eval_ctx);
     }
 } // namespace orion::bre

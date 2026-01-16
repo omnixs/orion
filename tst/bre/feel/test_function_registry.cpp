@@ -6,8 +6,12 @@
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/function_registry.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include "test_helpers.hpp"
 
 using namespace orion::bre::feel;
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(function_registry)
 

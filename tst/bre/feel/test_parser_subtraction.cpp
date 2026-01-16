@@ -23,18 +23,11 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using namespace orion::bre;
 using json = nlohmann::json;
-
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local feel::RegexCache cache(100);
-        feel::EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(test_subtraction_parsing)
 
@@ -179,8 +172,8 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_subtraction)
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
     
-    json context = json::object();
-    auto result = ast->evaluate(context);
+    json input = {};
+    auto result = ast->evaluate(input, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
@@ -188,8 +181,9 @@ BOOST_AUTO_TEST_CASE(test_eval_simple_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_subtraction_with_spaces)
 {
+    
     // 10 - 5 = 5
-    auto result = eval_feel("10 - 5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("10 - 5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
@@ -197,8 +191,9 @@ BOOST_AUTO_TEST_CASE(test_eval_subtraction_with_spaces)
 
 BOOST_AUTO_TEST_CASE(test_eval_negative_addition)
 {
+    
     // 10+-5 = 5
-    auto result = eval_feel("10+-5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("10+-5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 5.0);
@@ -206,8 +201,9 @@ BOOST_AUTO_TEST_CASE(test_eval_negative_addition)
 
 BOOST_AUTO_TEST_CASE(test_eval_negative_subtraction)
 {
+    
     // -10+-5 = -15
-    auto result = eval_feel("-10+-5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("-10+-5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -15.0);
@@ -215,8 +211,9 @@ BOOST_AUTO_TEST_CASE(test_eval_negative_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_double_negative_subtraction)
 {
+    
     // -10--5 = -10 - (-5) = -10 + 5 = -5
-    auto result = eval_feel("-10--5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("-10--5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -5.0);
@@ -224,8 +221,9 @@ BOOST_AUTO_TEST_CASE(test_eval_double_negative_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_parenthesized_negative)
 {
+    
     // (-10)+(-5) = -15
-    auto result = eval_feel("(-10)+(-5)", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("(-10)+(-5)", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -15.0);
@@ -233,8 +231,9 @@ BOOST_AUTO_TEST_CASE(test_eval_parenthesized_negative)
 
 BOOST_AUTO_TEST_CASE(test_eval_parenthesized_subtraction)
 {
+    
     // (-10)-(-5) = -10 - (-5) = -10 + 5 = -5
-    auto result = eval_feel("(-10)-(-5)", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("(-10)-(-5)", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), -5.0);
@@ -242,8 +241,9 @@ BOOST_AUTO_TEST_CASE(test_eval_parenthesized_subtraction)
 
 BOOST_AUTO_TEST_CASE(test_eval_complex_expression)
 {
+    
     // (10+20)-(-5+3) = 30 - (-2) = 30 + 2 = 32
-    auto result = eval_feel("(10+20)-(-5+3)", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("(10+20)-(-5+3)", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 32.0);
@@ -251,8 +251,9 @@ BOOST_AUTO_TEST_CASE(test_eval_complex_expression)
 
 BOOST_AUTO_TEST_CASE(test_eval_division_with_negative)
 {
+    
     // 10+20/-5-3 = 10 + (20/(-5)) - 3 = 10 + (-4) - 3 = 10 - 4 - 3 = 3
-    auto result = eval_feel("10+20/-5-3", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("10+20/-5-3", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 3.0);
@@ -260,8 +261,9 @@ BOOST_AUTO_TEST_CASE(test_eval_division_with_negative)
 
 BOOST_AUTO_TEST_CASE(test_eval_chained_subtraction)
 {
+    
     // 100-20-10-5 = ((100-20)-10)-5 = 65
-    auto result = eval_feel("100-20-10-5", json::object());
+    auto result = orion::bre::feel::Evaluator::evaluate("100-20-10-5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_EQUAL(result.get<double>(), 65.0);

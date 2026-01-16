@@ -139,13 +139,12 @@ namespace orion
             json results = json::object();
 
             // Create evaluation context with engine's regex cache
-            bre::feel::EvaluationContext eval_ctx;
-            eval_ctx.regex_cache = &pimpl->regex_cache_;
+            bre::EvaluationContext eval_ctx(pimpl->regex_cache_);
 
             // Evaluate all decision tables
             for (const auto& [name, dt] : pimpl->decision_tables_)
             {
-                json result = dt->evaluate(data, &eval_ctx);
+                json result = dt->evaluate(data, eval_ctx);
                 results[name] = result;
             }
 
@@ -157,7 +156,7 @@ namespace orion
                     // Use BKMManager to create BKM map for evaluation
                     auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
 
-                    json result = ld->evaluate(data, bkm_map, &eval_ctx);
+                    json result = ld->evaluate(data, bkm_map, eval_ctx);
                     results[name] = result;
                 }
                 catch ([[maybe_unused]] const exception& e)

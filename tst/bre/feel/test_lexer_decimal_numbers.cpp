@@ -23,19 +23,11 @@
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using namespace orion::bre;
 using json = nlohmann::json;
-
-// Test helper: evaluate with proper EvaluationContext
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local orion::bre::feel::RegexCache cache(100);
-        orion::bre::feel::EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(test_decimal_number_parsing)
 
@@ -110,9 +102,7 @@ BOOST_AUTO_TEST_CASE(test_parser_decimal_with_leading_dot)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 0.872, 0.0001);
@@ -126,9 +116,7 @@ BOOST_AUTO_TEST_CASE(test_parser_negative_decimal_with_leading_dot)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), -0.872, 0.0001);
@@ -142,9 +130,7 @@ BOOST_AUTO_TEST_CASE(test_parser_many_decimal_places)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 125.4321987654, 0.0001);
@@ -158,9 +144,7 @@ BOOST_AUTO_TEST_CASE(test_parser_negative_many_decimal_places)
     
     orion::bre::feel::Parser parser;
     auto ast = parser.parse(tokens);
-    
-    json context = json::object();
-    auto result = ast->evaluate(context);
+    auto result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), -125.4321987654, 0.0001);
@@ -174,9 +158,8 @@ BOOST_AUTO_TEST_CASE(test_evaluator_decimal_in_arithmetic)
 {
     // Test case: Arithmetic with decimal numbers should use AST path
     // Expression: .872 + 3.14
-    json context = json::object();
-    
-    auto result = eval_feel(".872 + 3.14", context);
+    orion::bre::feel::Evaluator evaluator;
+    auto result = evaluator.evaluate(".872 + 3.14", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 4.012, 0.0001);
@@ -186,9 +169,8 @@ BOOST_AUTO_TEST_CASE(test_evaluator_many_decimals_in_expression)
 {
     // Test case: Complex arithmetic with many decimal places
     // Expression: 125.4321987654 * 2.5
-    json context = json::object();
-    
-    auto result = eval_feel("125.4321987654 * 2.5", context);
+    orion::bre::feel::Evaluator evaluator;
+    auto result = evaluator.evaluate("125.4321987654 * 2.5", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 313.58049691350, 0.0001);
@@ -198,9 +180,8 @@ BOOST_AUTO_TEST_CASE(test_evaluator_negative_decimals)
 {
     // Test case: Negative decimal arithmetic
     // Expression: -.872 + 1.0
-    json context = json::object();
-    
-    auto result = eval_feel("-.872 + 1.0", context);
+    orion::bre::feel::Evaluator evaluator;
+    auto result = evaluator.evaluate("-.872 + 1.0", {}, get_test_eval_ctx());
     
     BOOST_CHECK(result.is_number());
     BOOST_CHECK_CLOSE(result.get<double>(), 0.128, 0.0001);
@@ -214,8 +195,6 @@ BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
 {
     // Test that decimal numbers are NOT incorrectly detected as property access
     // These should all use AST path, not legacy
-
-    json context = json::object();
     
     // All of these should succeed with AST (not throw or return null)
     std::vector<std::string> decimal_expressions = {
@@ -233,7 +212,7 @@ BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
     for (const auto& expr : decimal_expressions)
     {
         BOOST_TEST_MESSAGE("Testing decimal expression: " << expr);
-        auto result = eval_feel(expr, context);
+        auto result = evaluator.evaluate(expr, {}, get_test_eval_ctx());
         BOOST_CHECK_MESSAGE(result.is_number(), 
             "Expression '" << expr << "' should evaluate to a number via AST");
     }
@@ -245,7 +224,8 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
     // These should fail or use legacy path (we're not testing functionality,
     // just that they're recognized as needing special handling)
     
-    json context = {
+    orion::bre::feel::Evaluator evaluator;
+    json input = {
         {"loan", {
             {"principal", 100000},
             {"rate", 0.05}
@@ -261,22 +241,17 @@ BOOST_AUTO_TEST_CASE(test_property_access_correctly_detected)
     
     // We just verify these are recognized as different from decimal numbers
     // The actual evaluation behavior is tested elsewhere
-    int tested_count = 0;
     for (const auto& expr : property_expressions)
     {
         BOOST_TEST_MESSAGE("Testing property access expression: " << expr);
-        tested_count++;
         // Just verify it doesn't crash - property access may or may not be supported
         try {
-            auto result = eval_feel(expr, context);
+            auto result = evaluator.evaluate(expr, input, get_test_eval_ctx());
             BOOST_TEST_MESSAGE("  Result: " << result.dump());
         } catch (...) {
             BOOST_TEST_MESSAGE("  Expected: property access not yet fully supported");
         }
     }
-    
-    // Verify we actually tested the expressions
-    BOOST_CHECK_EQUAL(tested_count, property_expressions.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

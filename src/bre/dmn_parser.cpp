@@ -18,8 +18,6 @@
 
 #include <orion/bre/dmn_parser.hpp>
 #include <orion/api/logger.hpp>
-#include <cstring>
-#include <algorithm>
 #include <orion/bre/business_knowledge_model.hpp>
 #include "orion/bre/contract_violation.hpp"
 #include <orion/bre/feel/lexer.hpp>
@@ -37,34 +35,6 @@ namespace orion::bre
 {
     // Import logger
     using orion::api::warn;
-
-    namespace {
-        // Helper to check if a node name matches the target name, ignoring namespace prefix
-        // e.g., "dmn:decision" matches "decision"
-        bool is_node_name(const rapidxml::xml_node<>* node, const char* name) {
-            if (!node || !node->name()) return false;
-            const char* node_name = node->name();
-            
-            // Exact match
-            if (std::strcmp(node_name, name) == 0) return true;
-            
-            // Suffix match (namespace:name)
-            const char* colon = std::strchr(node_name, ':');
-            if (colon) {
-                return std::strcmp(colon + 1, name) == 0;
-            }
-            return false;
-        }
-
-        // Helper to find the first child node matching the name (ignoring namespace)
-        rapidxml::xml_node<>* find_child_node(const rapidxml::xml_node<>* parent, const char* name) {
-            if (!parent) return nullptr;
-            for (auto* node = parent->first_node(); node; node = node->next_sibling()) {
-                if (is_node_name(node, name)) return node;
-            }
-            return nullptr;
-        }
-    }
 
     /**
      * @brief Helper function to parse FEEL expression into AST during model load
@@ -166,7 +136,7 @@ namespace orion::bre
         rapidxml::xml_node<>* table = nullptr;
         for (auto* n = root->first_node(); n != nullptr; n = n->next_sibling())
         {
-            if (is_node_name(n, "decision"))
+            if (std::string(n->name()) == "decision")
             {
                 dec = n;
                 break;
@@ -176,7 +146,7 @@ namespace orion::bre
         {
             for (auto* n = dec->first_node(); n != nullptr; n = n->next_sibling())
             {
-                if (is_node_name(n, "decisionTable"))
+                if (std::string(n->name()) == "decisionTable")
                 {
                     table = n;
                     break;
@@ -208,26 +178,31 @@ namespace orion::bre
 }
         }
 
-        for (auto* in = table->first_node(); in != nullptr; in = in->next_sibling())
+        for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
         {
-            if (!is_node_name(in, "input")) continue;
-
             InputClause ic{};
-            auto* ie = find_child_node(in, "inputExpression");
+            
+            // Get label from input element attribute
+            if (auto* label_attr = in->first_attribute("label")) {
+                ic.label = label_attr->value();
+            }
+            
+            // Parse input expression
+            auto* ie = in->first_node("inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
-                auto* txt = find_child_node(ie, "text");
-                if ((txt != nullptr) && (txt->value() != nullptr)) { ic.label = txt->value();
+                // Get expression text from <text> element
+                auto* txt = ie->first_node("text");
+                if ((txt != nullptr) && (txt->value() != nullptr)) { 
+                    ic.inputExpression = txt->value();
 }
             }
             dt.inputs.push_back(std::move(ic));
         }
-        for (auto* on = table->first_node(); on != nullptr; on = on->next_sibling())
+        for (auto* on = table->first_node("output"); on != nullptr; on = on->next_sibling("output"))
         {
-            if (!is_node_name(on, "output")) continue;
-
             OutputClause oc{};
             if (auto* a = on->first_attribute("name")) { oc.label = a->value();
 }
@@ -235,9 +210,9 @@ namespace orion::bre
 }
 
             // Parse output values (priorities for PRIORITY hit policy)
-            if (auto* outputValuesNode = find_child_node(on, "outputValues"))
+            if (auto* outputValuesNode = on->first_node("outputValues"))
             {
-                if (auto* textNode = find_child_node(outputValuesNode, "text"))
+                if (auto* textNode = outputValuesNode->first_node("text"))
                 {
                     if (textNode->value() != nullptr)
                     {
@@ -276,16 +251,12 @@ namespace orion::bre
 
             dt.outputs.push_back(std::move(oc));
         }
-        for (auto* rn = table->first_node(); rn != nullptr; rn = rn->next_sibling())
+        for (auto* rn = table->first_node("rule"); rn != nullptr; rn = rn->next_sibling("rule"))
         {
-            if (!is_node_name(rn, "rule")) continue;
-
             Rule r{};
-            for (auto* ien = rn->first_node(); ien != nullptr; ien = ien->next_sibling())
+            for (auto* ien = rn->first_node("inputEntry"); ien != nullptr; ien = ien->next_sibling("inputEntry"))
             {
-                if (!is_node_name(ien, "inputEntry")) continue;
-
-                auto* txt = find_child_node(ien, "text");
+                auto* txt = ien->first_node("text");
                 string entry_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "-";
                 
                 // Store original string
@@ -296,11 +267,9 @@ namespace orion::bre
             }
 
             // Handle multiple output entries for multi-output tables
-            for (auto* oen = rn->first_node(); oen != nullptr; oen = oen->next_sibling())
+            for (auto* oen = rn->first_node("outputEntry"); oen != nullptr; oen = oen->next_sibling("outputEntry"))
             {
-                if (!is_node_name(oen, "outputEntry")) continue;
-
-                auto* txt = find_child_node(oen, "text");
+                auto* txt = oen->first_node("text");
                 string output_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 
                 // Store original string
@@ -313,10 +282,10 @@ namespace orion::bre
             // Fallback for single output entry (backward compatibility)
             if (r.outputEntries.empty())
             {
-                auto* oen = find_child_node(rn, "outputEntry");
+                auto* oen = rn->first_node("outputEntry");
                 if (oen != nullptr)
                 {
-                    auto* txt = find_child_node(oen, "text");
+                    auto* txt = oen->first_node("text");
                     r.outputEntry = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 }
             }
@@ -335,19 +304,20 @@ namespace orion::bre
         auto* root = doc.first_node();
         if (root == nullptr) { throw std::runtime_error("DMN: empty document");
 }
-        for (auto* dec = root->first_node(); dec != nullptr; dec = dec->next_sibling())
+        for (auto* dec = root->first_node("decision"); dec != nullptr; dec = dec->next_sibling("decision"))
         {
-            if (!is_node_name(dec, "decision")) continue;
-
             std::string dname;
             if (const auto* a = dec->first_attribute("name")) { dname = a->value();
             } else if (auto* attribute = dec->first_attribute("id")) { dname = attribute->value();
 }
-            if (auto* child = find_child_node(dec, "literalExpression"))
+            for (auto* child = dec->first_node(); child != nullptr; child = child->next_sibling())
             {
-                if (auto* txt = find_child_node(child, "text"))
+                if (std::string(child->name()) == "literalExpression")
                 {
-                    return {dname, (txt->value() != nullptr) ? std::string(txt->value()) : std::string()};
+                    if (auto* txt = child->first_node("text"))
+                    {
+                        return {dname, (txt->value() != nullptr) ? std::string(txt->value()) : std::string()};
+                    }
                 }
             }
         }
@@ -366,10 +336,9 @@ namespace orion::bre
         if (root == nullptr) { throw std::runtime_error("DMN: empty document");
 }
 
-        for (auto* bkm = root->first_node(); bkm != nullptr; bkm = bkm->next_sibling())
+        for (auto* bkm = root->first_node("businessKnowledgeModel"); bkm != nullptr; bkm = bkm->next_sibling(
+                 "businessKnowledgeModel"))
         {
-            if (!is_node_name(bkm, "businessKnowledgeModel")) continue;
-
             std::string name;
             if (auto* a = bkm->first_attribute("name"))
             {
@@ -386,14 +355,13 @@ namespace orion::bre
                 std::string expression;
 
                 // Find encapsulatedLogic
-                auto* logic = find_child_node(bkm, "encapsulatedLogic");
+                auto* logic = bkm->first_node("encapsulatedLogic");
                 if (logic != nullptr)
                 {
                     // Get formal parameters
-                    for (auto* param = logic->first_node(); param != nullptr; param = param->next_sibling())
+                    for (auto* param = logic->first_node("formalParameter"); param != nullptr; param = param->next_sibling(
+                             "formalParameter"))
                     {
-                        if (!is_node_name(param, "formalParameter")) continue;
-
                         if (auto* nameAttr = param->first_attribute("name"))
                         {
                             parameters.push_back(nameAttr->value());
@@ -401,10 +369,10 @@ namespace orion::bre
                     }
 
                     // Get literal expression
-                    auto* litExpr = find_child_node(logic, "literalExpression");
+                    auto* litExpr = logic->first_node("literalExpression");
                     if (litExpr != nullptr)
                     {
-                        auto* txt = find_child_node(litExpr, "text");
+                        auto* txt = litExpr->first_node("text");
                         if ((txt != nullptr) && (txt->value() != nullptr))
                         {
                             expression = txt->value();
@@ -439,10 +407,9 @@ namespace orion::bre
         // If no namespace attribute, namespace_uri remains empty (default behavior)
 
         // Parse all decisions in the model
-        for (auto* decision_node = root->first_node(); decision_node != nullptr; decision_node = decision_node->next_sibling())
+        for (auto* decision_node = root->first_node("decision"); decision_node != nullptr; decision_node = decision_node->
+             next_sibling("decision"))
         {
-            if (!is_node_name(decision_node, "decision")) continue;
-
             Decision decision;
             decision.id = (decision_node->first_attribute("id") != nullptr) ? decision_node->first_attribute("id")->value() : "";
             decision.name = (decision_node->first_attribute("name") != nullptr)
@@ -450,15 +417,15 @@ namespace orion::bre
                                 : "";
 
             // Parse decision table if present
-            if (auto* decision_table = find_child_node(decision_node, "decisionTable"))
+            if (auto* decision_table = decision_node->first_node("decisionTable"))
             {
                 decision.decisionTable = parse_decision_table_from_node(decision_table, decision_node);
             }
 
             // Parse literal expression if present
-            if (auto* literal_expr = find_child_node(decision_node, "literalExpression"))
+            if (auto* literal_expr = decision_node->first_node("literalExpression"))
             {
-                if (auto* text = find_child_node(literal_expr, "text"))
+                if (auto* text = literal_expr->first_node("text"))
                 {
                     if (text->value() != nullptr)
                     {
@@ -476,18 +443,25 @@ namespace orion::bre
     // Helper: Parse input clauses from decision table XML
     void DmnParser::parse_input_clauses(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* in = table->first_node(); in != nullptr; in = in->next_sibling())
+        for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
         {
-            if (!is_node_name(in, "input")) continue;
-
             InputClause ic{};
-            auto* ie = find_child_node(in, "inputExpression");
+            
+            // Get label from input element attribute
+            if (auto* label_attr = in->first_attribute("label")) {
+                ic.label = label_attr->value();
+            }
+            
+            // Parse input expression
+            auto* ie = in->first_node("inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
-                auto* txt = find_child_node(ie, "text");
-            if ((txt != nullptr) && (txt->value() != nullptr)) { ic.label = txt->value();
+                // Get expression text from <text> element
+                auto* txt = ie->first_node("text");
+                if ((txt != nullptr) && (txt->value() != nullptr)) { 
+                    ic.inputExpression = txt->value();
 }
         }
         decision_table.inputs.push_back(std::move(ic));
@@ -495,10 +469,8 @@ namespace orion::bre
 }   // Helper: Parse output clauses from decision table XML (including output values for PRIORITY)
     void DmnParser::parse_output_clauses(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* on = table->first_node(); on != nullptr; on = on->next_sibling())
+        for (auto* on = table->first_node("output"); on != nullptr; on = on->next_sibling("output"))
         {
-            if (!is_node_name(on, "output")) continue;
-
             OutputClause oc{};
             if (auto* a = on->first_attribute("name")) { oc.label = a->value();
 }
@@ -506,9 +478,9 @@ namespace orion::bre
 }
 
             // Parse output values (priorities for PRIORITY hit policy)
-            if (auto* outputValuesNode = find_child_node(on, "outputValues"))
+            if (auto* outputValuesNode = on->first_node("outputValues"))
             {
-                if (auto* textNode = find_child_node(outputValuesNode, "text"))
+                if (auto* textNode = outputValuesNode->first_node("text"))
                 {
                     if (textNode->value() != nullptr)
                     {
@@ -550,16 +522,12 @@ namespace orion::bre
 }   // Helper: Parse rules from decision table XML
     void DmnParser::parse_rules(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* rn = table->first_node(); rn != nullptr; rn = rn->next_sibling())
+        for (auto* rn = table->first_node("rule"); rn != nullptr; rn = rn->next_sibling("rule"))
         {
-            if (!is_node_name(rn, "rule")) continue;
-
             Rule r{};
-            for (auto* ien = rn->first_node(); ien != nullptr; ien = ien->next_sibling())
+            for (auto* ien = rn->first_node("inputEntry"); ien != nullptr; ien = ien->next_sibling("inputEntry"))
             {
-                if (!is_node_name(ien, "inputEntry")) continue;
-
-                auto* txt = find_child_node(ien, "text");
+                auto* txt = ien->first_node("text");
                 string entry_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "-";
                 
                 // Store original string
@@ -570,11 +538,9 @@ namespace orion::bre
             }
 
             // Handle multiple output entries for multi-output tables
-            for (auto* oen = rn->first_node(); oen != nullptr; oen = oen->next_sibling())
+            for (auto* oen = rn->first_node("outputEntry"); oen != nullptr; oen = oen->next_sibling("outputEntry"))
             {
-                if (!is_node_name(oen, "outputEntry")) continue;
-
-                auto* txt = find_child_node(oen, "text");
+                auto* txt = oen->first_node("text");
                 string output_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 
                 // Store original string
@@ -587,10 +553,10 @@ namespace orion::bre
             // Fallback for single output entry (backward compatibility)
             if (r.outputEntries.empty())
             {
-                auto* oen = find_child_node(rn, "outputEntry");
+                auto* oen = rn->first_node("outputEntry");
                 if (oen != nullptr)
                 {
-                    auto* txt = find_child_node(oen, "text");
+                    auto* txt = oen->first_node("text");
                     r.outputEntry = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 }
         }

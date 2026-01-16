@@ -11,20 +11,10 @@
 #include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
-#include <nlohmann/json.hpp>
+#include "test_helpers.hpp"
 
 using json = nlohmann::json;
-using namespace orion::bre;
-
-// Test helper: evaluate with proper EvaluationContext
-namespace {
-    json eval_feel(std::string_view expression, const json& context = json::object()) {
-        static thread_local orion::bre::feel::RegexCache cache(100);
-        orion::bre::feel::EvaluationContext eval_ctx;
-        eval_ctx.regex_cache = &cache;
-        return orion::bre::feel::Evaluator::evaluate(expression, context, eval_ctx);
-    }
-}
+using orion::bre::feel::test::get_test_eval_ctx;
 
 BOOST_AUTO_TEST_SUITE(debug_not_function)
 
@@ -33,11 +23,11 @@ BOOST_AUTO_TEST_CASE(test_not_with_evaluator)
     // Test not() using Evaluator (should work)
     using orion::bre::feel::Evaluator;
     
-    json result1 = eval_feel("not(true)");
+    json result1 = Evaluator::evaluate("not(true)", {}, get_test_eval_ctx());
     BOOST_TEST(result1.is_boolean());
     BOOST_TEST(result1 == false);
     
-    json result2 = eval_feel("not(false)");
+    json result2 = Evaluator::evaluate("not(false)", {}, get_test_eval_ctx());
     BOOST_TEST(result2.is_boolean());
     BOOST_TEST(result2 == true);
 }
@@ -63,10 +53,7 @@ BOOST_AUTO_TEST_CASE(test_not_with_parser_directly)
         {
             BOOST_TEST_MESSAGE("  Parameter " << i << " has valueExpr");
         }
-    }
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    }    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result.is_boolean());
     BOOST_TEST(result == false);
@@ -88,10 +75,7 @@ BOOST_AUTO_TEST_CASE(test_abs_with_parser_directly)
     for (size_t i = 0; i < ast->parameters.size(); ++i)
     {
         BOOST_TEST_MESSAGE("  ABS Parameter " << i << " name: '" << ast->parameters[i].name << "'");
-    }
-    
-    json context = json::object();
-    json result = ast->evaluate(context);
+    }    json result = ast->evaluate({}, get_test_eval_ctx());
     
     BOOST_TEST(result == 42);
 }
