@@ -147,40 +147,4 @@ namespace orion::bre::feel {
         std::map<std::string, std::pair<CompiledRegex, std::list<std::string>::iterator>> cache_;
     };
 
-<<<<<<< HEAD
-
-
-    /**
-     * @brief Warm up the regex cache with realistic patterns
-     * 
-     * Compiles and tests several representative regex patterns to ensure
-     * PCRE2 initialization and reduce first-use latency variability.
-     * Exercises common features: character classes, quantifiers, anchors,
-     * alternation, and escape sequences.
-     * 
-     * This function is automatically called once on first BusinessRulesEngine
-     * construction (via std::call_once). Manual calls are optional but safe.
-     * 
-     * Performance impact: ~1-2 microseconds one-time cost at engine startup.
-     * Benefit: Eliminates cold-start variability for first matches() call.
-     * 
-     * @note This function is idempotent and safe to call multiple times.
-     * @note This function is thread-safe.
-     * @note Automatic warmup occurs via BusinessRulesEngine constructor.
-     */
-    void warmup_regex_cache();
-
-    /**
-     * @brief Get thread-local regex cache instance (for testing/backward compatibility)
-     * 
-     * Returns a reference to thread-local RegexCache used by Evaluator::evaluate() overload
-     * that doesn't take explicit EvaluationContext. Test code can use this to inspect cache.
-     * 
-     * @return Reference to thread-local RegexCache instance
-     * @warning Production code should use engine-scoped RegexCache through EvaluationContext
-     */
-    [[nodiscard]] RegexCache& get_regex_cache();
-
-=======
->>>>>>> main
 } // namespace orion::bre::feel

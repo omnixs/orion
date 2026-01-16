@@ -1329,7 +1329,7 @@ static Value eval_range(const ERange* r, const json& ctx)
 
 } // end anonymous namespace
 
-    bool eval_feel_literal(std::string_view expr, const json& input, json& out, std::string& err, const EvaluationContext& eval_ctx)
+    bool eval_feel_literal(std::string_view expr, const json& input, json& out, std::string& err, const bre::EvaluationContext& eval_ctx)
     {
         try {
             // Use main parser for consistent parsing behavior

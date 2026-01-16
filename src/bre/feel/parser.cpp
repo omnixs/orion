@@ -595,7 +595,7 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     return node;
 }
 
-    nlohmann::json Parser::eval_expression(std::string_view expression, const nlohmann::json& input, const EvaluationContext& eval_ctx)
+    nlohmann::json Parser::eval_expression(std::string_view expression, const nlohmann::json& input, const bre::EvaluationContext& eval_ctx)
     {
         // Use the existing Evaluator which already provides this functionality
         return Evaluator::evaluate(expression, input, eval_ctx);

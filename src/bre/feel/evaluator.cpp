@@ -37,7 +37,7 @@ namespace orion::bre::feel {
     using orion::api::warn;
     using orion::api::error;
 
-    json Evaluator::evaluate(std::string_view expression, const json& input, const EvaluationContext& eval_ctx)
+    json Evaluator::evaluate(std::string_view expression, const json& input, const bre::EvaluationContext& eval_ctx)
     {
         // AST-based evaluation path (all FEEL features supported)
         

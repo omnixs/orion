@@ -196,6 +196,8 @@ BOOST_AUTO_TEST_CASE(test_decimal_not_detected_as_property_access)
     // Test that decimal numbers are NOT incorrectly detected as property access
     // These should all use AST path, not legacy
     
+    orion::bre::feel::Evaluator evaluator;
+    
     // All of these should succeed with AST (not throw or return null)
     std::vector<std::string> decimal_expressions = {
         ".872",
