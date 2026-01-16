@@ -2,7 +2,7 @@ name: CI - Full Validation
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "**" ]
     tags: [ "v*" ]
     paths-ignore:
       - 'docs/**'

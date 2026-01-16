@@ -19,11 +19,16 @@
 #include <orion/api/engine.hpp>
 #include <orion/bre/dmn_model.hpp>
 #include <orion/bre/dmn_parser.hpp>
+#include <orion/bre/drg_evaluator.hpp>
+#include <orion/api/logger.hpp>
+#include <orion/bre/evaluation_context.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/contract_violation.hpp>
 #include <expected>
 #include <stdexcept>
+#include <set>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
-#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -40,6 +45,7 @@ namespace orion
         using bre::LiteralDecision;
         using bre::BusinessKnowledgeModel;
         using bre::DmnParser;
+        using bre::DRGEvaluator;
 
         // Pimpl implementation class
         class BusinessRulesEngine::Impl
@@ -48,8 +54,10 @@ namespace orion
             std::map<std::string, std::unique_ptr<DecisionTable>> decision_tables_;
             BKMManager bkm_manager_; // Use BKMManager instead of raw map
             std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
-            std::string namespace_uri_; // Stored DMN namespace from definitions element
-            bre::feel::RegexCache regex_cache_; // Instance-scoped regex cache
+            std::unique_ptr<DRGEvaluator> drg_evaluator_; // Decision Requirement Graph evaluator (optional)
+            std::vector<bre::Decision> decisions_; // Store parsed decisions for DRG
+            std::string namespace_uri_; // Store namespace from DMN model
+            bre::feel::RegexCache regex_cache_; // Regex cache for FEEL evaluation
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
@@ -62,12 +70,7 @@ namespace orion
         };
 
         // Constructor/Destructor
-        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>())
-        {
-            // Warm up instance regex cache
-            pimpl->regex_cache_.warmup();
-        }
-        
+        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>()) {}
         BusinessRulesEngine::~BusinessRulesEngine() = default;
 
         // Move constructor and assignment
@@ -88,10 +91,11 @@ namespace orion
                 DmnParser parser;
                 auto model = parser.parse(dmn_xml);
                 
-                // Store namespace information from parsed model
                 pimpl->namespace_uri_ = model.namespace_uri;
                 
-                // Process all decisions in the model
+                // Process decisions into tables/literal decisions FIRST
+                // (extract/move decision tables before DRG analyzes structure)
+                // DRG only needs IDs and informationRequirements, not the actual tables
                 for (auto& decision : model.decisions)
                 {
                     // Handle decision table if present
@@ -102,18 +106,30 @@ namespace orion
                         pimpl->add_decision_table(std::move(dTable));
                     }
                     
-                    // Handle literal expression if present
-                    if (!decision.expression.empty())
+                    // Handle literal decisions (FEEL expressions)
+                    else if (!decision.expression.empty())
                     {
-                        auto litDec = make_unique<LiteralDecision>();
-                        litDec->name = decision.name;
-                        litDec->expression_text = decision.expression;
-                        
-                        // Pre-parse expression as AST for performance (using tryParseExpressionToAST from dmn_parser.cpp)
-                        // This function is currently static in dmn_parser.cpp, need to make it accessible
-                        
-                        pimpl->add_literal_decision(std::move(litDec));
+                        auto literalDec = make_unique<LiteralDecision>();
+                        literalDec->name = decision.name;
+                        literalDec->expression_text = decision.expression;
+                        pimpl->add_literal_decision(std::move(literalDec));
                     }
+                }
+                
+                // Try to build DRG if there are dependencies (takes ownership)
+                // Decision tables are already extracted, but IDs/names/requirements remain
+                try
+                {
+                    pimpl->drg_evaluator_ = std::make_unique<DRGEvaluator>(std::move(model.decisions));
+                }
+                catch (const orion::bre::ContractViolation&)
+                {
+                    // Re-throw contract violations (cyclic dependencies)
+                    throw;
+                }
+                catch (const std::exception&)
+                {
+                    pimpl->drg_evaluator_ = nullptr;
                 }
 
                 // Parse all Business Knowledge Models using BKMManager
@@ -122,6 +138,11 @@ namespace orion
                 // BKM parsing is optional, continue if none found
 
                 return {};
+            }
+            catch (const orion::bre::ContractViolation&)
+            {
+                // Re-throw contract violations (critical errors that should not be caught)
+                throw;
             }
             catch (const exception& e)
             {
@@ -133,37 +154,104 @@ namespace orion
         {
             json data = json::parse(data_json);
             json results = json::object();
-
-            // Create evaluation context with engine's regex cache
-            bre::EvaluationContext eval_ctx(pimpl->regex_cache_);
-
-            // Evaluate all decision tables
-            for (const auto& [name, dt] : pimpl->decision_tables_)
+            
+            // Create evaluation context for FEEL expressions
+            bre::EvaluationContext eval_ctx{pimpl->regex_cache_};
+            
+            // If we have a DRG evaluator, use it to determine evaluation order
+            if (pimpl->drg_evaluator_)
             {
-                json result = dt->evaluate(data, eval_ctx);
-                results[name] = result;
-            }
-
-            // Evaluate all literal decisions with BKM support
-            for (const auto& [name, ld] : pimpl->literal_decisions_)
-            {
+                // Create augmented context for cascading evaluations (don't modify original data)
+                json augmented_context = data;
+                
+                // Get evaluation order for all decisions
+                std::vector<std::string> eval_order;
                 try
                 {
-                    // Use BKMManager to create BKM map for evaluation
-                    auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
-
-                    json result = ld->evaluate(data, bkm_map, eval_ctx);
-                    results[name] = result;
+                    eval_order = pimpl->drg_evaluator_->get_evaluation_order();
                 }
-                catch ([[maybe_unused]] const exception& e)
+                catch (const std::exception&)
                 {
-                    // Set error result for this decision
-                    results[name] = json{};
+                    // Fall back to independent evaluation
+                    eval_order.clear();
+                    for (const auto& [name, _] : pimpl->decision_tables_)
+                        eval_order.push_back(name);
+                    for (const auto& [name, _] : pimpl->literal_decisions_)
+                        eval_order.push_back(name);
+                }
+                
+                // Evaluate decisions in order, augmenting context as we go
+                for (const auto& name : eval_order)
+                {
+                    // Check if it's a decision table
+                    auto dt_it = pimpl->decision_tables_.find(name);
+                    if (dt_it != pimpl->decision_tables_.end())
+                    {
+                        try
+                        {
+                            json result = dt_it->second->evaluate(augmented_context, eval_ctx);
+                            results[name] = result;
+                            augmented_context[name] = result; // Add to augmented context for dependent decisions
+                        }
+                        catch (const exception&)
+                        {
+                            results[name] = json{};
+                        }
+                        continue;
+                    }
+                    
+                    // Check if it's a literal decision
+                    auto ld_it = pimpl->literal_decisions_.find(name);
+                    if (ld_it != pimpl->literal_decisions_.end())
+                    {
+                        try
+                        {
+                            auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
+                            json result = ld_it->second->evaluate(augmented_context, bkm_map, eval_ctx);
+                            results[name] = result;
+                            augmented_context[name] = result; // Add to augmented context for dependent decisions
+                        }
+                        catch (const exception&)
+                        {
+                            results[name] = json{};
+                        }
+                        continue;
+                    }
                 }
             }
-
-            // Always return results as object with decision names as keys
-            // This ensures compatibility with TCK test expectations
+            else
+            {
+                // No DRG - evaluate each decision independently
+                
+                // Evaluate decision tables
+                for (const auto& [name, table] : pimpl->decision_tables_)
+                {
+                    try
+                    {
+                        json result = table->evaluate(data, eval_ctx);
+                        results[name] = result;
+                    }
+                    catch (const exception&)
+                    {
+                        results[name] = json{};
+                    }
+                }
+                
+                // Evaluate literal decisions
+                for (const auto& [name, decision] : pimpl->literal_decisions_)
+                {
+                    try
+                    {
+                        auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
+                        json result = decision->evaluate(data, bkm_map, eval_ctx);
+                        results[name] = result;
+                    }
+                    catch (const exception&)
+                    {
+                        results[name] = json{};
+                    }
+                }
+            }
             return results.dump();
         }
 
@@ -214,7 +302,7 @@ namespace orion
             pimpl->literal_decisions_.clear();
             pimpl->namespace_uri_.clear();
         }
-
+        
         string BusinessRulesEngine::get_namespace() const
         {
             return pimpl->namespace_uri_;

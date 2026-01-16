@@ -49,6 +49,7 @@ Each release includes:
 ## Features
 
 - Decision Table evaluation compatible with DMN L1/L2 (hit policies, FEEL expressions)
+- **Decision Requirements Graph (DRG)** evaluation with topological sorting and dependency resolution
 - Business Knowledge Models (BKM) support
 - Portable C++ API under `orion::api` namespace
 - FEEL (Friendly Enough Expression Language) expression evaluator

@@ -193,6 +193,7 @@ set(ORION_SRC
   src/bre/business_knowledge_model.cpp
   src/bre/dmn_model.cpp
   src/bre/dmn_parser.cpp
+  src/bre/drg_evaluator.cpp
   src/bre/feel/evaluator.cpp
   src/bre/feel/expr.cpp
   src/bre/feel/function_registry.cpp
@@ -271,6 +272,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/test_hit_policy_debug.cpp
       tst/bre/test_airline_ticketing.cpp
       tst/bre/test_namespace_support.cpp
+      tst/bre/test_drg_compliance.cpp
       # TCK-specific tests
       tst/bre/tck/test_tck_runner.cpp
       tst/bre/tck/test_tck_0112_comparison.cpp

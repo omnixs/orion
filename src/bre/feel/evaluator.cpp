@@ -40,10 +40,6 @@ namespace orion::bre::feel {
     json Evaluator::evaluate(std::string_view expression, const json& input, const EvaluationContext& eval_ctx)
     {
         // AST-based evaluation path (all FEEL features supported)
-        
-        debug("[LEGACY-TRACE] Evaluator::evaluate() called: '{}'", expression);
-        
-        // All FEEL features now supported via AST!
         // Phase 1: Function calls (not, all, any, contains)
         // Phase 2: List operations ([...])
         bool has_unsupported_features = false;
@@ -57,22 +53,17 @@ namespace orion::bre::feel {
         {
             try
             {
-                debug("[AST-PATH] Trying AST evaluation for: '{}'", expression);
                 Lexer lexer;
                 auto tokens = lexer.tokenize(expression);
                 
                 Parser parser;
                 auto ast = parser.parse(tokens);
                 
-                auto result = ast->evaluate(input, eval_ctx);
-                debug("[AST-SUCCESS] AST evaluation succeeded: '{}'", expression);
-                return result;
+                return ast->evaluate(input, eval_ctx);
             }
             catch (const std::exception& e)
             {
-                // AST evaluation failed - log at debug level to avoid spam during TCK testing
-                // When testing compliance suites, many unimplemented features are expected
-                debug("[AST-FAILED] AST evaluation failed: '{}' - Error: {}", expression, e.what());
+                // AST evaluation failed - unsupported FEEL features
                 throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression) + " - " + e.what());
             }
         }

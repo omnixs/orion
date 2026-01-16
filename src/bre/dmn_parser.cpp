@@ -24,7 +24,6 @@
 #include <orion/bre/feel/parser.hpp>
 #include <rapidxml/rapidxml.hpp>  // Use RapidXML instead of TinyXML2
 
-
 using std::string;
 using std::unique_ptr;
 using std::make_unique;
@@ -181,22 +180,13 @@ namespace orion::bre
         for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
         {
             InputClause ic{};
-            
-            // Get label from input element attribute
-            if (auto* label_attr = in->first_attribute("label")) {
-                ic.label = label_attr->value();
-            }
-            
-            // Parse input expression
             auto* ie = in->first_node("inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
-                // Get expression text from <text> element
                 auto* txt = ie->first_node("text");
-                if ((txt != nullptr) && (txt->value() != nullptr)) { 
-                    ic.inputExpression = txt->value();
+                if ((txt != nullptr) && (txt->value() != nullptr)) { ic.label = txt->value();
 }
             }
             dt.inputs.push_back(std::move(ic));
@@ -387,6 +377,17 @@ namespace orion::bre
         throw std::runtime_error(std::string("DMN: businessKnowledgeModel '").append(bkm_name) + "' not found");
     }
 
+    // Helper to find XML node with or without namespace prefix
+    static rapidxml::xml_node<>* find_node(rapidxml::xml_node<>* parent, const char* name_with_prefix, const char* name_without_prefix)
+    {
+        auto* node = parent->first_node(name_with_prefix);
+        if (node == nullptr)
+        {
+            node = parent->first_node(name_without_prefix);
+        }
+        return node;
+    }
+
     DmnModel DmnParser::parse(std::string_view xml)
     {
         rapidxml::xml_document<> doc;
@@ -394,47 +395,114 @@ namespace orion::bre
         doc.parse<0>(&buf[0]);
 
         auto* root = doc.first_node();
-        if (root == nullptr) { throw std::runtime_error("DMN: empty document");
-}
+        if (root == nullptr)
+        {
+            throw std::runtime_error("DMN: empty document");
+        }
 
         DmnModel model;
-        
-        // Extract namespace from definitions element (DMN 1.5 specification)
-        if (auto* namespace_attr = root->first_attribute("namespace"))
-        {
-            model.namespace_uri = std::string(namespace_attr->value());
-        }
-        // If no namespace attribute, namespace_uri remains empty (default behavior)
 
-        // Parse all decisions in the model
-        for (auto* decision_node = root->first_node("decision"); decision_node != nullptr; decision_node = decision_node->
-             next_sibling("decision"))
+        // Parse namespace from definitions element
+        if (auto* ns_attr = root->first_attribute("namespace"))
+        {
+            model.namespace_uri = ns_attr->value();
+        }
+
+        // Parse all decisions in the model (handle both with and without dmn: namespace prefix)
+        // Try prefixed first, then unprefixed (for DMN files with default namespace)
+        auto* decision_node = find_node(root, "dmn:decision", "decision");
+        while (decision_node != nullptr)
         {
             Decision decision;
             decision.id = (decision_node->first_attribute("id") != nullptr) ? decision_node->first_attribute("id")->value() : "";
             decision.name = (decision_node->first_attribute("name") != nullptr)
                                 ? decision_node->first_attribute("name")->value()
                                 : "";
+            // If no id attribute, use name as id (DMN spec allows this)
+            if (decision.id.empty() && !decision.name.empty())
+            {
+                decision.id = decision.name;
+            }
 
-            // Parse decision table if present
-            if (auto* decision_table = decision_node->first_node("decisionTable"))
+            // Parse decision table if present (try both prefixed and unprefixed)
+            auto* decision_table = find_node(decision_node, "dmn:decisionTable", "decisionTable");
+            if (decision_table != nullptr)
             {
                 decision.decisionTable = parse_decision_table_from_node(decision_table, decision_node);
             }
 
-            // Parse literal expression if present
-            if (auto* literal_expr = decision_node->first_node("literalExpression"))
+            // Parse literal expression if present (try both prefixed and unprefixed)
+            auto* literal_expr = find_node(decision_node, "dmn:literalExpression", "literalExpression");
+            if (literal_expr != nullptr)
             {
-                if (auto* text = literal_expr->first_node("text"))
+                auto* text = find_node(literal_expr, "dmn:text", "text");
+                if (text != nullptr && text->value() != nullptr)
                 {
-                    if (text->value() != nullptr)
-                    {
-                        decision.expression = std::string(text->value());
-                    }
+                    decision.expression = std::string(text->value());
                 }
             }
 
+            // Parse information requirements (decision dependencies)
+            auto* info_req = find_node(decision_node, "dmn:informationRequirement", "informationRequirement");
+            while (info_req != nullptr)
+            {
+                InformationRequirement requirement;
+                
+                if (auto* id_attr = info_req->first_attribute("id"))
+                {
+                    requirement.id = id_attr->value();
+                }
+                
+                // Parse requiredDecision element
+                auto* req_decision = find_node(info_req, "dmn:requiredDecision", "requiredDecision");
+                if (req_decision != nullptr)
+                {
+                    if (auto* href_attr = req_decision->first_attribute("href"))
+                    {
+                        std::string href = href_attr->value();
+                        // href format: "#decision_id"
+                        if (!href.empty() && href[0] == '#')
+                        {
+                            requirement.requiredDecisionId = href.substr(1);
+                        }
+                    }
+                }
+                
+                // Parse requiredInput element (for input data dependencies)
+                auto* req_input = find_node(info_req, "dmn:requiredInput", "requiredInput");
+                if (req_input != nullptr)
+                {
+                    if (auto* href_attr = req_input->first_attribute("href"))
+                    {
+                        std::string href = href_attr->value();
+                        // href format: "#input_id"
+                        if (!href.empty() && href[0] == '#')
+                        {
+                            requirement.requiredInputId = href.substr(1);
+                        }
+                    }
+                }
+                
+                decision.informationRequirements.push_back(std::move(requirement));
+                
+                // Move to next informationRequirement sibling
+                auto* next = info_req->next_sibling("dmn:informationRequirement");
+                if (next == nullptr)
+                {
+                    next = info_req->next_sibling("informationRequirement");
+                }
+                info_req = next;
+            }
+
             model.decisions.push_back(std::move(decision));
+            
+            // Move to next decision sibling
+            auto* next_decision = decision_node->next_sibling("dmn:decision");
+            if (next_decision == nullptr)
+            {
+                next_decision = decision_node->next_sibling("decision");
+            }
+            decision_node = next_decision;
         }
 
         return model;
@@ -443,7 +511,8 @@ namespace orion::bre
     // Helper: Parse input clauses from decision table XML
     void DmnParser::parse_input_clauses(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
+        auto* in = find_node(table, "dmn:input", "input");
+        while (in != nullptr)
         {
             InputClause ic{};
             
@@ -453,23 +522,32 @@ namespace orion::bre
             }
             
             // Parse input expression
-            auto* ie = in->first_node("inputExpression");
+            auto* ie = find_node(in, "dmn:inputExpression", "inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
                 // Get expression text from <text> element
-                auto* txt = ie->first_node("text");
+                auto* txt = find_node(ie, "dmn:text", "text");
                 if ((txt != nullptr) && (txt->value() != nullptr)) { 
                     ic.inputExpression = txt->value();
 }
+            }
+            decision_table.inputs.push_back(std::move(ic));
+            
+            // Move to next input sibling
+            auto* next = in->next_sibling("dmn:input");
+            if (next == nullptr)
+            {
+                next = in->next_sibling("input");
+            }
+            in = next;
         }
-        decision_table.inputs.push_back(std::move(ic));
-    }
-}   // Helper: Parse output clauses from decision table XML (including output values for PRIORITY)
+    }   // Helper: Parse output clauses from decision table XML (including output values for PRIORITY)
     void DmnParser::parse_output_clauses(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* on = table->first_node("output"); on != nullptr; on = on->next_sibling("output"))
+        auto* on = find_node(table, "dmn:output", "output");
+        while (on != nullptr)
         {
             OutputClause oc{};
             if (auto* a = on->first_attribute("name")) { oc.label = a->value();
@@ -478,56 +556,67 @@ namespace orion::bre
 }
 
             // Parse output values (priorities for PRIORITY hit policy)
-            if (auto* outputValuesNode = on->first_node("outputValues"))
+            auto* outputValuesNode = find_node(on, "dmn:outputValues", "outputValues");
+            if (outputValuesNode != nullptr)
             {
-                if (auto* textNode = outputValuesNode->first_node("text"))
+                auto* textNode = find_node(outputValuesNode, "dmn:text", "text");
+                if (textNode != nullptr && textNode->value() != nullptr)
                 {
-                    if (textNode->value() != nullptr)
+                    std::string valuesText = textNode->value();
+                    // Parse comma-separated quoted values like: "Approved", "Declined"
+                    std::vector<std::string> values;
+                    bool inQuote = false;
+                    std::string current;
+                    for (size_t i = 0; i < valuesText.length(); ++i)
                     {
-                        std::string valuesText = textNode->value();
-                        // Parse comma-separated quoted values like: "Approved", "Declined"
-                        std::vector<std::string> values;
-                        bool inQuote = false;
-                        std::string current;
-                        for (size_t i = 0; i < valuesText.length(); ++i)
+                        char c = valuesText[i];
+                        if (c == '"')
                         {
-                            char c = valuesText[i];
-                            if (c == '"')
+                            if (inQuote)
                             {
-                                if (inQuote)
-                                {
-                                    // End of quoted value
-                                    values.push_back(current);
-                                    current.clear();
-                                    inQuote = false;
-                                }
-                                else
-                                {
-                                    // Start of quoted value
-                                    inQuote = true;
-                                }
+                                // End of quoted value
+                                values.push_back(current);
+                                current.clear();
+                                inQuote = false;
                             }
-                            else if (inQuote)
+                            else
                             {
-                                current += c;
+                                // Start of quoted value
+                                inQuote = true;
                             }
                         }
-                        oc.outputValues = values;
+                        else if (inQuote)
+                        {
+                            current += c;
+                        }
                     }
+                    oc.outputValues = values;
                 }
-        }
+            }
 
-        decision_table.outputs.push_back(std::move(oc));
-    }
-}   // Helper: Parse rules from decision table XML
+            decision_table.outputs.push_back(std::move(oc));
+            
+            // Move to next output sibling
+            auto* next = on->next_sibling("dmn:output");
+            if (next == nullptr)
+            {
+                next = on->next_sibling("output");
+            }
+            on = next;
+        }
+    }   // Helper: Parse rules from decision table XML
     void DmnParser::parse_rules(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* rn = table->first_node("rule"); rn != nullptr; rn = rn->next_sibling("rule"))
+        auto* rn = find_node(table, "dmn:rule", "rule");
+        while (rn != nullptr)
         {
             Rule r{};
-            for (auto* ien = rn->first_node("inputEntry"); ien != nullptr; ien = ien->next_sibling("inputEntry"))
+            
+            // Parse input entries
+            auto* ien = find_node(rn, "dmn:inputEntry", "inputEntry");
+            while (ien != nullptr)
             {
-                auto* txt = ien->first_node("text");
+                auto* txt = find_node(ien, "dmn:text", "text");
                 string entry_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "-";
                 
                 // Store original string
@@ -535,12 +624,21 @@ namespace orion::bre
                 
                 // Phase 3: Pre-parse as AST for performance (cache during model load)
                 r.inputEntries_ast.push_back(tryParseExpressionToAST(entry_text));
+                
+                // Move to next inputEntry sibling
+                auto* next = ien->next_sibling("dmn:inputEntry");
+                if (next == nullptr)
+                {
+                    next = ien->next_sibling("inputEntry");
+                }
+                ien = next;
             }
 
             // Handle multiple output entries for multi-output tables
-            for (auto* oen = rn->first_node("outputEntry"); oen != nullptr; oen = oen->next_sibling("outputEntry"))
+            auto* oen = find_node(rn, "dmn:outputEntry", "outputEntry");
+            while (oen != nullptr)
             {
-                auto* txt = oen->first_node("text");
+                auto* txt = find_node(oen, "dmn:text", "text");
                 string output_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 
                 // Store original string
@@ -548,22 +646,38 @@ namespace orion::bre
                 
                 // Parse output entry as FEEL expression (for proper type evaluation)
                 r.outputEntries_ast.push_back(tryParseExpressionToAST(output_text));
+                
+                // Move to next outputEntry sibling
+                auto* next_oe = oen->next_sibling("dmn:outputEntry");
+                if (next_oe == nullptr)
+                {
+                    next_oe = oen->next_sibling("outputEntry");
+                }
+                oen = next_oe;
             }
 
             // Fallback for single output entry (backward compatibility)
             if (r.outputEntries.empty())
             {
-                auto* oen = rn->first_node("outputEntry");
-                if (oen != nullptr)
+                auto* oe_fallback = find_node(rn, "dmn:outputEntry", "outputEntry");
+                if (oe_fallback != nullptr)
                 {
-                    auto* txt = oen->first_node("text");
+                    auto* txt = find_node(oe_fallback, "dmn:text", "text");
                     r.outputEntry = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 }
-        }
+            }
 
-        decision_table.rules.push_back(std::move(r));
-    }
-}   DecisionTable DmnParser::parse_decision_table_from_node(rapidxml::xml_node<>* table,
+            decision_table.rules.push_back(std::move(r));
+            
+            // Move to next rule sibling
+            auto* next = rn->next_sibling("dmn:rule");
+            if (next == nullptr)
+            {
+                next = rn->next_sibling("rule");
+            }
+            rn = next;
+        }
+    }   DecisionTable DmnParser::parse_decision_table_from_node(rapidxml::xml_node<>* table,
                                                             rapidxml::xml_node<>* decision_node)
     {
         DecisionTable dt{};
