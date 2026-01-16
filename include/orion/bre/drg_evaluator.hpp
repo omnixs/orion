@@ -77,14 +77,14 @@ namespace orion::bre
          * Automatically evaluates all required decisions and propagates results.
          * 
          * @param decision_id ID of decision to evaluate
-         * @param context Input context (JSON object)
+         * @param input Input context (JSON object)
          * @param eval_ctx Evaluation context for FEEL expressions
          * @return JSON result of decision evaluation
          * @throws std::runtime_error if decision not found or cycle detected
          */
         [[nodiscard]] nlohmann::json evaluate_decision(
             std::string_view decision_id,
-            const nlohmann::json& context,
+            const nlohmann::json& input,
             EvaluationContext& eval_ctx) const;
 
         /**

@@ -18,6 +18,7 @@
 
 #include <orion/bre/drg_evaluator.hpp>
 #include <orion/bre/contract_violation.hpp>
+#include <algorithm>
 #include <utility>
 #include <queue>
 #include <sstream>
@@ -46,26 +47,18 @@ namespace orion::bre
 
     const Decision* DRGEvaluator::find_decision(std::string_view id) const
     {
-        for (const auto& decision : decisions_)
-        {
-            if (decision.id == id)
-            {
-                return &decision;
-            }
-        }
-        return nullptr;
+        auto it = std::ranges::find_if(decisions_, [&](const auto& decision) {
+            return decision.id == id;
+        });
+        return it != decisions_.end() ? std::addressof(*it) : nullptr;
     }
 
     const Decision* DRGEvaluator::find_decision_by_name(std::string_view name) const
     {
-        for (const auto& decision : decisions_)
-        {
-            if (decision.name == name)
-            {
-                return &decision;
-            }
-        }
-        return nullptr;
+        auto it = std::ranges::find_if(decisions_, [&](const auto& decision) {
+            return decision.name == name;
+        });
+        return it != decisions_.end() ? std::addressof(*it) : nullptr;
     }
 
     std::unordered_map<std::string, std::vector<std::string>> 
@@ -254,7 +247,7 @@ namespace orion::bre
 
     nlohmann::json DRGEvaluator::evaluate_decision_recursive(
         std::string_view decision_id,
-        const nlohmann::json& context,
+        const nlohmann::json& input,
         EvaluationContext& eval_ctx,
         std::unordered_map<std::string, nlohmann::json>& memo,
         std::unordered_set<std::string>& visiting) const
@@ -284,7 +277,7 @@ namespace orion::bre
         visiting.insert(id);
 
         // Build augmented context by evaluating dependencies
-        nlohmann::json augmented_context = context;
+        nlohmann::json augmented_context = input;
 
         for (const auto& info_req : decision->informationRequirements)
         {
@@ -293,7 +286,7 @@ namespace orion::bre
                 // Recursively evaluate required decision
                 nlohmann::json dep_result = evaluate_decision_recursive(
                     info_req.requiredDecisionId,
-                    context,
+                    input,
                     eval_ctx,
                     memo,
                     visiting);
@@ -339,13 +332,13 @@ namespace orion::bre
 
     nlohmann::json DRGEvaluator::evaluate_decision(
         std::string_view decision_id,
-        const nlohmann::json& context,
+        const nlohmann::json& input,
         EvaluationContext& eval_ctx) const
     {
         std::unordered_map<std::string, nlohmann::json> memo;
         std::unordered_set<std::string> visiting;
 
-        return evaluate_decision_recursive(decision_id, context, eval_ctx, memo, visiting);
+        return evaluate_decision_recursive(decision_id, input, eval_ctx, memo, visiting);
     }
 
 } // namespace orion::bre
