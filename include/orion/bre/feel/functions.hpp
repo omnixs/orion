@@ -37,9 +37,6 @@
 
 namespace orion::bre::feel {
     using json = nlohmann::json;
-    
-    // Forward declaration
-    struct EvaluationContext;
 
     /**
      * @brief Boolean negation function
@@ -383,7 +380,7 @@ namespace orion::bre::feel {
      * - matches("foobar", "foo") → true
      * - matches("foobar", "baz") → false
      */
-    [[nodiscard]] json evaluate_matches_function(const std::vector<json>& args, const bre::EvaluationContext& eval_ctx);
+    [[nodiscard]] json evaluate_matches_function(const std::vector<json>& args, const EvaluationContext& eval_ctx);
 
     /**
      * @brief Split string into list by delimiter

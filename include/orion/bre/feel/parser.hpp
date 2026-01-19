@@ -112,7 +112,7 @@ namespace orion::bre::feel {
      * @return The result of evaluation as JSON
      * @throws std::runtime_error if parsing or evaluation fails
      */
-    static nlohmann::json eval_expression(std::string_view expression, const nlohmann::json& input, const bre::EvaluationContext& eval_ctx);  private:
+    static nlohmann::json eval_expression(std::string_view expression, const nlohmann::json& input, const EvaluationContext& eval_ctx);  private:
         const std::vector<Token>* tokens_ = nullptr;  ///< Current token stream
         size_t position_ = 0;                         ///< Current position in token stream
         

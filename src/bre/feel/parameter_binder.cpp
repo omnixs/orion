@@ -30,7 +30,7 @@ std::vector<json> bind_positional_parameters(
     const FunctionSignature& sig,
     const std::vector<FunctionParameter>& parameters,
     const json& input,
-    const bre::EvaluationContext& eval_ctx)
+    const EvaluationContext& eval_ctx)
 {
     const auto& formal_params = sig.parameters;
     std::vector<json> args;
@@ -86,7 +86,7 @@ std::vector<json> bind_named_parameters(
     const FunctionSignature& sig,
     const std::vector<FunctionParameter>& parameters,
     const json& input,
-    const bre::EvaluationContext& eval_ctx)
+    const EvaluationContext& eval_ctx)
 {
     const auto& formal_params = sig.parameters;
     std::vector<json> args;
@@ -159,7 +159,7 @@ bool has_named_parameters(const std::vector<FunctionParameter>& parameters)
         const std::string& functionName,
         const std::vector<FunctionParameter>& parameters,
         const json& input,
-        const bre::EvaluationContext& eval_ctx
+        const EvaluationContext& eval_ctx
     )
     {
     // Get function signature from registry

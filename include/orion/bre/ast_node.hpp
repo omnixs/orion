@@ -78,10 +78,6 @@
 #include <nlohmann/json.hpp>
 #include <orion/bre/evaluation_context.hpp>
 
-namespace orion::bre::feel {
-    struct EvaluationContext; // Forward declaration
-}
-
 namespace orion::bre
 {
     using json = nlohmann::json;

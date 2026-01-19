@@ -127,33 +127,6 @@ Add or extend tests to cover:
 
 ## Retrospective
 
-<<<<<<< HEAD
-### What worked well:
-
-- **CTRE integration was seamless**: Header-only library, no build system changes needed beyond vcpkg.json dependency.
-- **Clear API migration path**: CTRE's `ctre::match<pattern>()` and `ctre::search<pattern>()` provide intuitive compile-time alternatives to std::regex.
-- **PCRE2 performance benefits immediate**: LRU cache with thread safety ensures patterns compiled once and reused.
-- **Comprehensive test coverage**: Both unit tests (100% pass) and TCK Level 2 (126/126 = 100%) validated no regressions.
-- **Zero runtime overhead for fixed patterns**: CTRE compiles patterns at compile-time, eliminating all regex parsing overhead.
-
-### What was unclear or problematic:
-
-- **CTRE API differences**: Result type fundamentally different from std::regex:
-  - No `std::smatch` equivalent - direct result object
-  - No `operator[]` for capture groups - must use `.get<N>()`
-  - String conversion explicit: `.to_string()` or `.to_view()`
-  - Match position not stored - must calculate via pointer arithmetic (`match.get<0>().data() - input.data()`)
-- **Batch refactoring risks**: Initial batch replacement created inconsistent code mixing old and new APIs, requiring manual function-level rewrites.
-- **PCRE2 header pollution**: PCRE2 C API exposes many macros/types, required careful header isolation in `regex_cache.hpp` to avoid polluting project namespace.
-
-### Suggestions for improvement:
-
-- **Document CTRE API patterns**: Add examples to CODING_STANDARDS.md showing CTRE match position calculation, capture group access.
-- **Consider precompilation for static patterns in matches()**: Currently all matches() patterns are compiled at runtime via cache. Could detect string literals at parse time and precompile.
-- **Add configuration for cache size**: Current hardcoded to 100 entries. Should expose via engine options for production tuning.
-- **Add warmup API**: Optional public function to precompile common patterns (e.g., `orion::bre::warmup_regex_cache(patterns)`) for predictable initialization.
-- **Add regex-specific tests**: Current tests validate correctness but not cache behavior, eviction, or thread safety explicitly.
-=======
 > **Process Compliance Note**: This retrospective was re-executed on 2026-01-01 following proper two-step process after initial violation in commit fc8dd1d.
 
 ### User Feedback (Step 1)
@@ -299,7 +272,6 @@ Task Completion Confirmation Before Retrospective" rule**:
 1. **Premature completion** → Explicit "STOP - no commits after retrospective" checkpoint in copilot instructions
 2. **RegexCache architecture** → Mandatory architecture review before implementation (lifecycle, ownership, RAII)
 3. **matches() flip-flop** → Mandatory DMN spec citation with section numbers before writing tests
->>>>>>> main
 
 ### Actual effort:
 
@@ -344,8 +316,6 @@ Task Completion Confirmation Before Retrospective" rule**:
 - [ ] **Regex-specific tests**: Unit tests for cache eviction, thread safety, invalid patterns, Unicode support.
 - [ ] **Performance benchmarks**: Quantify CTRE vs std::regex overhead savings, PCRE2 JIT improvements.
 - [ ] **Custom allocators for PCRE2**: Hook PCRE2 allocation for better memory tracking in production environments.
-<<<<<<< HEAD
-=======
 
 ---
 
@@ -408,4 +378,3 @@ After the initial implementation (commit 91d8cba), 8 additional commits were mad
 - **Primary themes**: API clarity (naming), type safety (references), code organization (namespaces)
 - **Result**: Cleaner, safer, more maintainable codebase with no functional regressions
 - **All tests passing**: 279 unit tests + 126 Level-2 TCK tests (100% compliance maintained)
->>>>>>> main

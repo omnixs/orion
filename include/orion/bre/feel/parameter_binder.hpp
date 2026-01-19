@@ -108,6 +108,6 @@ namespace orion::bre::feel {
         const std::string& functionName,
         const std::vector<FunctionParameter>& parameters,
         const json& input,
-        const bre::EvaluationContext& eval_ctx
+        const EvaluationContext& eval_ctx
     );
 } // namespace orion::bre::feel

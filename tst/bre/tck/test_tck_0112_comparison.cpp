@@ -87,12 +87,7 @@ BOOST_AUTO_TEST_CASE(test_0112_exact_tck_comparison) {
         BOOST_FAIL("Failed to load DMN model: " + load_result.error());
     }
     json actual = engine.evaluate(json::parse(input_json));
-    std::string result = actual.dump();
-    BOOST_TEST_MESSAGE("Engine result string: " + result);
-    
-    // Parse the result
-    // json actual = json::parse(result); -- Already JSON
-    BOOST_TEST_MESSAGE("Parsed result JSON: " + actual.dump(2));
+    BOOST_TEST_MESSAGE("Engine result: " + actual.dump(2));
     
     // TCK expected value (manually parsed from XML)
     json expected = json::array({"Best", "Standard"});

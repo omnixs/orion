@@ -1058,7 +1058,7 @@ json evaluate_replace_function(const std::vector<json>& args)
     return result;
 }
 
-json evaluate_matches_function(const std::vector<json>& args, const bre::EvaluationContext& eval_ctx)
+json evaluate_matches_function(const std::vector<json>& args, const EvaluationContext& eval_ctx)
 {
     // Validate argument count (2 or 3 - flags is optional)
     if (args.size() < 2 || args.size() > 3)

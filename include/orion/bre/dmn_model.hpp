@@ -73,10 +73,6 @@
 #include "feel/unary.hpp"
 #include "evaluation_context.hpp"
 
-namespace orion::bre::feel {
-    struct EvaluationContext;  // Forward declaration
-}
-
 namespace orion::bre
 {
     /**
