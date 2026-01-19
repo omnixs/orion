@@ -93,12 +93,14 @@ if (!result) {
 }
 
 for (auto& request : requests) {
-    std::string result = engine.evaluate(request_json);  // 9-45μs each
+    nlohmann::json result = engine.evaluate(request);  // 9-45μs each
 }
 
-// ❌ WRONG: Re-parse every time (100-150 μs/eval - 10x slower!)
+// ❌ WRONG: Re-load model every time (100-150 μs/eval - 10x slower!)
 for (auto& request : requests) {
-    std::string result = evaluate(dmn_xml, request_json);  // DEPRECATED
+    orion::api::BusinessRulesEngine temp_engine;
+    temp_engine.load_dmn_model(dmn_xml);
+    nlohmann::json result = temp_engine.evaluate(request);  // Inefficient!
 }
 ```
 

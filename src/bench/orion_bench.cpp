@@ -320,6 +320,9 @@ static void BM_CalcDiscount_A1_Infant_NoPriority(benchmark::State& state) {
     }
 }
 
+// Benchmark: Infant with priority, expected discount: 0.15
+// Note: Input JSON is parsed once outside the benchmark loop to measure
+// pure evaluation performance with zero-copy JSON input, excluding parsing overhead.
 static void BM_CalcDiscount_A1_Infant_Priority(benchmark::State& state) {
     auto engine = createEngineForA1();
     auto input = nlohmann::json::parse(kCalcDiscountA1_Input2);

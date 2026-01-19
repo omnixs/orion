@@ -129,13 +129,8 @@ namespace orion
             }
         }
 
-        nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& ctxt) const
-        {
-            // Use const reference to avoid copy if possible, but APIs expect copy
-            // The parameter is named 'ctxt' to avoid conflict with 'context' 
-            // used in other places, though shadowing is not an issue here.
-            // Using 'context' to match the argument name.
-            const json& data = ctxt; 
+nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& context) const
+    {
             json results = json::object();
 
             // Create evaluation context with engine's regex cache
@@ -144,7 +139,7 @@ namespace orion
             // Evaluate all decision tables
             for (const auto& [name, dt] : pimpl->decision_tables_)
             {
-                json result = dt->evaluate(data, eval_ctx);
+                json result = dt->evaluate(context, eval_ctx);
                 results[name] = result;
             }
 
@@ -156,7 +151,7 @@ namespace orion
                     // Use BKMManager to create BKM map for evaluation
                     auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
 
-                    json result = ld->evaluate(data, bkm_map, eval_ctx);
+                    json result = ld->evaluate(context, bkm_map, eval_ctx);
                     results[name] = result;
                 }
                 catch ([[maybe_unused]] const exception& e)

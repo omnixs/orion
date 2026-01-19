@@ -53,7 +53,6 @@ BOOST_AUTO_TEST_CASE(test_0118_case_001_debug) {
     BOOST_TEST_MESSAGE("Engine Result: " + result);
     
     // Parse result
-    // // json result_json = json::parse(result);
     BOOST_TEST_MESSAGE("Parsed Result Type: " + std::string(result_json.type_name()));
     
     // Expected result structure
@@ -127,7 +126,7 @@ BOOST_AUTO_TEST_CASE(test_0118_case_003_debug) {
     BOOST_TEST_MESSAGE("Engine Result: " + result);
     
     // Parse result
-    // // json result_json = json::parse(result);
+
     BOOST_TEST_MESSAGE("Parsed Result Type: " + std::string(result_json.type_name()));
     
     // Expected result structure
