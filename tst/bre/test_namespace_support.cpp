@@ -107,6 +107,9 @@ BOOST_AUTO_TEST_CASE(test_airline_namespace_integration)
     
     // Load the DMN with namespace
     auto result = engine.load_dmn_model(airline_dmn);
+    if (!result.has_value()) {
+        BOOST_TEST_MESSAGE("Load failed with error: " << result.error());
+    }
     BOOST_CHECK(result.has_value());
     
     // Verify namespace extraction

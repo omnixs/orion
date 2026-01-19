@@ -37,6 +37,51 @@ namespace orion::bre
     using orion::api::warn;
 
     /**
+     * @brief Helper to find first child node, trying both unprefixed and dmn: prefixed names
+     * 
+     * RapidXML treats "decision" and "dmn:decision" as different element names.
+     * This helper tries the unprefixed name first, then the "dmn:" prefixed variant.
+     * 
+     * @param parent Parent XML node to search within
+     * @param name Element name without namespace prefix (e.g., "decision")
+     * @return Pointer to first matching node, or nullptr if not found
+     */
+    static rapidxml::xml_node<>* find_node(rapidxml::xml_node<>* parent, const char* name)
+    {
+        if (parent == nullptr) return nullptr;
+        
+        // Try unprefixed name first (works with default namespace xmlns="...")
+        if (auto* node = parent->first_node(name)) {
+            return node;
+        }
+        
+        // Try dmn: prefixed name (works with xmlns:dmn="...")
+        std::string prefixed = std::string("dmn:") + name;
+        return parent->first_node(prefixed.c_str());
+    }
+
+    /**
+     * @brief Helper to find next sibling node, trying both unprefixed and dmn: prefixed names
+     * 
+     * @param node Current XML node
+     * @param name Element name without namespace prefix (e.g., "decision")
+     * @return Pointer to next matching sibling, or nullptr if not found
+     */
+    static rapidxml::xml_node<>* find_next_sibling(rapidxml::xml_node<>* node, const char* name)
+    {
+        if (node == nullptr) return nullptr;
+        
+        // Try unprefixed name first
+        if (auto* sibling = node->next_sibling(name)) {
+            return sibling;
+        }
+        
+        // Try dmn: prefixed name
+        std::string prefixed = std::string("dmn:") + name;
+        return node->next_sibling(prefixed.c_str());
+    }
+
+    /**
      * @brief Helper function to parse FEEL expression into AST during model load
      * 
      * Attempts to pre-compile FEEL expressions into AST for performance.
@@ -407,8 +452,8 @@ namespace orion::bre
         // If no namespace attribute, namespace_uri remains empty (default behavior)
 
         // Parse all decisions in the model
-        for (auto* decision_node = root->first_node("decision"); decision_node != nullptr; decision_node = decision_node->
-             next_sibling("decision"))
+        for (auto* decision_node = find_node(root, "decision"); decision_node != nullptr; 
+             decision_node = find_next_sibling(decision_node, "decision"))
         {
             Decision decision;
             decision.id = (decision_node->first_attribute("id") != nullptr) ? decision_node->first_attribute("id")->value() : "";
@@ -417,15 +462,15 @@ namespace orion::bre
                                 : "";
 
             // Parse decision table if present
-            if (auto* decision_table = decision_node->first_node("decisionTable"))
+            if (auto* decision_table = find_node(decision_node, "decisionTable"))
             {
                 decision.decisionTable = parse_decision_table_from_node(decision_table, decision_node);
             }
 
             // Parse literal expression if present
-            if (auto* literal_expr = decision_node->first_node("literalExpression"))
+            if (auto* literal_expr = find_node(decision_node, "literalExpression"))
             {
-                if (auto* text = literal_expr->first_node("text"))
+                if (auto* text = find_node(literal_expr, "text"))
                 {
                     if (text->value() != nullptr)
                     {
@@ -443,7 +488,7 @@ namespace orion::bre
     // Helper: Parse input clauses from decision table XML
     void DmnParser::parse_input_clauses(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* in = table->first_node("input"); in != nullptr; in = in->next_sibling("input"))
+        for (auto* in = find_node(table, "input"); in != nullptr; in = find_next_sibling(in, "input"))
         {
             InputClause ic{};
             
@@ -453,13 +498,13 @@ namespace orion::bre
             }
             
             // Parse input expression
-            auto* ie = in->first_node("inputExpression");
+            auto* ie = find_node(in, "inputExpression");
             if (ie != nullptr)
             {
                 if (auto* a = ie->first_attribute("typeRef")) { ic.typeRef = a->value();
 }
                 // Get expression text from <text> element
-                auto* txt = ie->first_node("text");
+                auto* txt = find_node(ie, "text");
                 if ((txt != nullptr) && (txt->value() != nullptr)) { 
                     ic.inputExpression = txt->value();
 }
@@ -469,7 +514,7 @@ namespace orion::bre
 }   // Helper: Parse output clauses from decision table XML (including output values for PRIORITY)
     void DmnParser::parse_output_clauses(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* on = table->first_node("output"); on != nullptr; on = on->next_sibling("output"))
+        for (auto* on = find_node(table, "output"); on != nullptr; on = find_next_sibling(on, "output"))
         {
             OutputClause oc{};
             if (auto* a = on->first_attribute("name")) { oc.label = a->value();
@@ -478,9 +523,9 @@ namespace orion::bre
 }
 
             // Parse output values (priorities for PRIORITY hit policy)
-            if (auto* outputValuesNode = on->first_node("outputValues"))
+            if (auto* outputValuesNode = find_node(on, "outputValues"))
             {
-                if (auto* textNode = outputValuesNode->first_node("text"))
+                if (auto* textNode = find_node(outputValuesNode, "text"))
                 {
                     if (textNode->value() != nullptr)
                     {
@@ -522,12 +567,12 @@ namespace orion::bre
 }   // Helper: Parse rules from decision table XML
     void DmnParser::parse_rules(rapidxml::xml_node<>* table, DecisionTable& decision_table)
     {
-        for (auto* rn = table->first_node("rule"); rn != nullptr; rn = rn->next_sibling("rule"))
+        for (auto* rn = find_node(table, "rule"); rn != nullptr; rn = find_next_sibling(rn, "rule"))
         {
             Rule r{};
-            for (auto* ien = rn->first_node("inputEntry"); ien != nullptr; ien = ien->next_sibling("inputEntry"))
+            for (auto* ien = find_node(rn, "inputEntry"); ien != nullptr; ien = find_next_sibling(ien, "inputEntry"))
             {
-                auto* txt = ien->first_node("text");
+                auto* txt = find_node(ien, "text");
                 string entry_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "-";
                 
                 // Store original string
@@ -538,9 +583,9 @@ namespace orion::bre
             }
 
             // Handle multiple output entries for multi-output tables
-            for (auto* oen = rn->first_node("outputEntry"); oen != nullptr; oen = oen->next_sibling("outputEntry"))
+            for (auto* oen = find_node(rn, "outputEntry"); oen != nullptr; oen = find_next_sibling(oen, "outputEntry"))
             {
-                auto* txt = oen->first_node("text");
+                auto* txt = find_node(oen, "text");
                 string output_text = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 
                 // Store original string
@@ -553,10 +598,10 @@ namespace orion::bre
             // Fallback for single output entry (backward compatibility)
             if (r.outputEntries.empty())
             {
-                auto* oen = rn->first_node("outputEntry");
+                auto* oen = find_node(rn, "outputEntry");
                 if (oen != nullptr)
                 {
-                    auto* txt = oen->first_node("text");
+                    auto* txt = find_node(oen, "text");
                     r.outputEntry = (txt != nullptr) && (txt->value() != nullptr) ? txt->value() : "{}";
                 }
         }
