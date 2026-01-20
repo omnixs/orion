@@ -71,8 +71,10 @@ Each release includes:
 - ❌ Advanced functions, quantified expressions (some, every)
 
 **API Stability:**
-- Version 1.0.1 released: Stable API with semantic versioning
+- Version 2.0.0 released: Native JSON API with semantic versioning
+- Breaking change from v1.x: evaluate() now uses nlohmann::json directly
 - Thread-safety: Single-threaded usage model (share-nothing across threads)
+- See [CHANGELOG.md](CHANGELOG.md) for version history
 - See [CHANGELOG.md](CHANGELOG.md) for version history
 
 ## Quick Start
