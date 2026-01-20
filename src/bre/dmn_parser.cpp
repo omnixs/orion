@@ -36,17 +36,6 @@ namespace orion::bre
     using orion::api::warn;
 
     /**
-     * @brief Helper to find first child node, trying both unprefixed and dmn: prefixed names
-     * 
-     * RapidXML treats "decision" and "dmn:decision" as different element names.
-     * This helper tries the unprefixed name first, then the "dmn:" prefixed variant.
-     * 
-     * @param parent Parent XML node to search within
-     * @param name Element name without namespace prefix (e.g., "decision")
-     * @return Pointer to first matching node, or nullptr if not found
-     */
-
-    /**
      * @brief Helper function to parse FEEL expression into AST during model load
      * 
      * Attempts to pre-compile FEEL expressions into AST for performance.

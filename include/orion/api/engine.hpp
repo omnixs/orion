@@ -53,7 +53,7 @@ namespace orion::api
         [[nodiscard]] bool remove_literal_decision(std::string_view name);
 
         // Evaluate with native JSON object (Zero-copy API)
-        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& context) const;
+        [[nodiscard]] nlohmann::json evaluate(const nlohmann::json& input) const;
 
         // Introspection
         [[nodiscard]] std::vector<std::string> get_decision_table_names() const;
