@@ -26,10 +26,17 @@ dat/tck_*.csv
 dat/tck_*.properties
 dat/dmn-tck/TestResults/Orion/
 
+# Confidential / Local Tests
+src/bench/orion_bench_bundle.cpp
+dat/tst/dmn-tck-extra/bundle-discount-*/
+
 # Backup files
 *.zip
 *.backup
 temp/
+
+# CI log downloads (local scratch)
+.github/temp/
 
 # Compiled binaries
 *.o

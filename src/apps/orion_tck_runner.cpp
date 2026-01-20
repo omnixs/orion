@@ -786,8 +786,8 @@ static bool execute_single_test_case(
         if (!load_result) {
             throw std::runtime_error("Failed to load DMN model: " + load_result.error());
         }
-        result = engine.evaluate(input_json);
-        actual = json::parse(result);
+        actual = engine.evaluate(test_case.input);
+        result = actual.dump();
         if (config.verbose) {
             spdlog::debug("[DEBUG] Raw result: {}", result);
             spdlog::debug("[DEBUG] Parsed result: {}", actual.dump(2));

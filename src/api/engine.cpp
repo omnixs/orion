@@ -60,14 +60,14 @@ namespace orion
             bre::feel::RegexCache regex_cache_; // Regex cache for FEEL evaluation
 
             // Helper methods
-            [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
+            [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& input) const;
             [[nodiscard]] std::string format_result(std::string_view decision_name, const nlohmann::json& result) const;
             
             // Evaluation helper methods
             void evaluate_with_drg(const nlohmann::json& data, nlohmann::json& results, bre::EvaluationContext& eval_ctx) const;
             void evaluate_without_drg(const nlohmann::json& data, nlohmann::json& results, bre::EvaluationContext& eval_ctx) const;
-            bool try_evaluate_decision_table(std::string_view name, const nlohmann::json& context, bre::EvaluationContext& eval_ctx, nlohmann::json& result) const;
-            bool try_evaluate_literal_decision(std::string_view name, const nlohmann::json& context, bre::EvaluationContext& eval_ctx, nlohmann::json& result) const;
+            bool try_evaluate_decision_table(std::string_view name, const nlohmann::json& input, bre::EvaluationContext& eval_ctx, nlohmann::json& result) const;
+            bool try_evaluate_literal_decision(std::string_view name, const nlohmann::json& input, bre::EvaluationContext& eval_ctx, nlohmann::json& result) const;
 
             // Internal component management (moved from public API)
             void add_decision_table(std::unique_ptr<DecisionTable> table);
@@ -145,22 +145,22 @@ namespace orion
             }
         }
 
-        string BusinessRulesEngine::evaluate(string_view data_json) const
+nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
         {
-            json data = json::parse(data_json);
             json results = json::object();
             bre::EvaluationContext eval_ctx{pimpl->regex_cache_};
             
             if (pimpl->drg_evaluator_)
             {
-                pimpl->evaluate_with_drg(data, results, eval_ctx);
+                pimpl->evaluate_with_drg(input, results, eval_ctx);
             }
             else
             {
-                pimpl->evaluate_without_drg(data, results, eval_ctx);
+                pimpl->evaluate_without_drg(input, results, eval_ctx);
             }
             
-            return results.dump();
+            // Return native JSON object (not string) - zero-copy API
+            return results;
         }
 
         vector<string> BusinessRulesEngine::get_decision_table_names() const
@@ -297,7 +297,7 @@ namespace orion
             }
         }
         
-        bool BusinessRulesEngine::Impl::try_evaluate_decision_table(string_view name, const json& context, bre::EvaluationContext& eval_ctx, json& result) const
+        bool BusinessRulesEngine::Impl::try_evaluate_decision_table(string_view name, const json& input, bre::EvaluationContext& eval_ctx, json& result) const
         {
             auto it = decision_tables_.find(string(name));
             if (it == decision_tables_.end())
@@ -307,7 +307,7 @@ namespace orion
             
             try
             {
-                result = it->second->evaluate(context, eval_ctx);
+                result = it->second->evaluate(input, eval_ctx);
                 return true;  // Success - result is valid
             }
             catch (const exception&)
@@ -317,7 +317,7 @@ namespace orion
             }
         }
         
-        bool BusinessRulesEngine::Impl::try_evaluate_literal_decision(string_view name, const json& context, bre::EvaluationContext& eval_ctx, json& result) const
+        bool BusinessRulesEngine::Impl::try_evaluate_literal_decision(string_view name, const json& input, bre::EvaluationContext& eval_ctx, json& result) const
         {
             auto it = literal_decisions_.find(string(name));
             if (it == literal_decisions_.end())
@@ -328,7 +328,7 @@ namespace orion
             try
             {
                 auto bkm_map = bkm_manager_.create_bkm_map();
-                result = it->second->evaluate(context, bkm_map, eval_ctx);
+                result = it->second->evaluate(input, bkm_map, eval_ctx);
                 return true;  // Success - result is valid
             }
             catch (const exception&)
@@ -338,11 +338,11 @@ namespace orion
             }
         }
         
-            json BusinessRulesEngine::Impl::resolve_variable(string_view name, const json& context) const
+            json BusinessRulesEngine::Impl::resolve_variable(string_view name, const json& input) const
         {
-            if (context.contains(name))
+            if (input.contains(name))
             {
-                return context[name];
+                return input[name];
             }
             return json{};
         }

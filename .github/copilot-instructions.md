@@ -22,8 +22,7 @@ Following the defined process correctly is MORE IMPORTANT than completing work q
    - Never assume user approval or skip feedback requests
    
 2. **Evidence-Based Statements**
-   - Use tools (`read_file`, `grep_search`) BEFORE stating facts
-   - Never speculate with "probably", "likely", "seems"
+   - Follow the "Evidence-Based Reasoning" rules below (no speculation)
    
 3. **Sequential Verification**
    - Build → Verify → Test → Verify (never batch unless instructed)
@@ -34,8 +33,7 @@ Following the defined process correctly is MORE IMPORTANT than completing work q
    - Step 2: Analyze execution (only after user feedback)
    
 5. **Simple Commands Only**
-   - No pipes, redirection, or chaining (see Command Rules below)
-   - One command → verify → next command
+   - Follow the "Command Execution Rules" section below (no pipes/redirection/chaining)
 
 6. **Follow Instruction Files**
    - When working on build, test, or quality tasks, READ the applicable instruction file COMPLETELY
@@ -46,6 +44,7 @@ Following the defined process correctly is MORE IMPORTANT than completing work q
    - Phase 1 (Create Task): User requests task creation → Agent creates task file based on task_template.md → STOP
    - Phase 2 (Execute Task): User says "execute" → Agent creates branch → implements → tests → retrospective
    - NEVER auto-execute after creating task file
+   - See the "Development Workflow" section below for complete process
 
 ## Architecture Overview
 
@@ -176,8 +175,7 @@ User should provide:
    - Use evidence-based reasoning (read files before stating facts)
 
 3. ✅ **Verify with build + tests**
-   - Follow [Build Instructions](./instructions/build.md)
-   - Follow [Test Instructions](./instructions/run_unit_tests.md)
+   - Follow the applicable instruction files under `.github/instructions/` (build, unit tests, and TCK when required)
    - No shortcuts - each step must pass
 
 4. ✅ **Fill retrospective** in task file (MANDATORY before completion)
@@ -198,50 +196,10 @@ User should provide:
 - ✅ Is retrospective filled before marking complete? → Mandatory, ask user for feedback first
 - ✅ Was branch created before any code changes? → Mandatory, never work on main
 
-### Task-Based Development
+### Notes (Non-duplicative)
 
-When creating or working on tasks from `.github/tasks/`:
-
-1. **Create Feature Branch** - Always create a new branch: `feature/<task-name>`
-   ```bash
-   git checkout -b feature/task-name
-   ```
-
-2. **Task File Format** - All task files MUST follow the [Task Template](./task_template.md):
-   - Copy template from `.github/task_template.md`
-   - Save to `.github/tasks/<ISSUE_NUMBER>_<snake_case_title>.md`
-   - Fill in all sections with YAML frontmatter
-   - Required fields: template, agent, status, category, priority, estimated-effort
-
-3. **Branch Naming** - Use descriptive names matching task focus:
-   - `feature/<feature-name>` - New features
-   - `fix/<bug-description>` - Bug fixes
-   - `quality/<improvement-type>` - Code quality improvements
-   - `perf/<optimization-area>` - Performance optimizations
-   - `ci/<workflow-name>` - CI/CD changes
-
-### Adding Features
-See [DMN Feature Template](./prompts/add_dmn_feature.md) for full process. Quick steps:
-1. Create feature branch: `git checkout -b feature/<feature-name>`
-2. Update headers in `include/orion/bre/`
-3. Implement in `src/bre/`
-4. Add tests in `tst/bre/`
-5. Update `CMakeLists.txt` if needed
-6. Validate DMN 1.5 compliance
-
-### Working with Tests
-- **Unit Tests**: Boost Test in `tst/bre/`, focus on edge cases
-- **TCK Tests**: Official DMN compliance in `dat/dmn-tck/TestCases/`
-- **NEVER hardcode test data** - parse from XML test files
-- Validate DMN spec compliance, not just implementation
-
-```cpp
-// ✅ CORRECT: Parse from official test files
-nlohmann::json test_input = parseTestInputFromXML(test_xml_file);
-
-// ❌ WRONG: Hardcoded data
-test_input = {{"Monthly Salary", 10000}};
-```
+- Task file format and branch naming: see `CONTRIBUTING.md` and `.github/task_template.md`.
+- Build/test specifics: use `.github/instructions/*.md` (authoritative).
 
 ### Code Standards
 - **Naming**: CamelCase classes, snake_case functions (enforced by clang-tidy)
@@ -259,6 +217,21 @@ After completing tasks from `.github/tasks/`:
 2. **Analyze Execution** - Review conversation for blockers/ambiguities (after user responds)
 3. **Document in Task File** - Add to Retrospective section with user feedback + analysis
 4. **Update Template** - If patterns emerge across multiple tasks
+
+### Turn-Based Enforcement (Anti-Shortcut Rule)
+
+To prevent “process compliance” failures:
+
+- You MUST NOT mark a task `completed` or edit the Retrospective **until after** you have asked for feedback and the user has responded.
+- The “verified” checkpoint is: build/tests pass, you report results, and you STOP.
+- Only in a later turn (after user feedback) may you write the Retrospective and proceed to any completion steps.
+
+**Completion checklist (must be true before marking complete):**
+- [ ] Code changes implemented (if Phase 2)
+- [ ] Build succeeded (per `.github/instructions/build.md`)
+- [ ] Tests succeeded (per `.github/instructions/run_unit_tests.md` and optionally TCK)
+- [ ] User feedback question asked AND answered
+- [ ] Retrospective updated with user feedback + agent analysis
 
 **Quality Criteria:** Be specific (reference exact issues), actionable (suggest improvements), brief (3-5 bullets max)
 
@@ -300,53 +273,7 @@ After completing tasks from `.github/tasks/`:
 | `find . -name "*.cpp"` | `file_search(query="**/*.cpp")` |
 | `cmd \| grep pattern` | Run cmd → analyze output in response |
 
-## Common Workflows
+## Reference Pointers
 
-> ⚠️ **IMPORTANT**: Always consult the detailed instruction files for complete workflows:
-
-### Build & Test Workflows
-
-**Before starting any build or test task, READ the applicable instruction file:**
-- **Building**: See [Build Instructions](./instructions/build.md) for complete CMake configuration, compiler requirements, and troubleshooting
-- **Unit Tests**: See [Unit Test Instructions](./instructions/run_unit_tests.md) for test execution modes, filtering, and debugging
-- **TCK Tests**: See [TCK Test Instructions](./instructions/run_tck_tests.md) for compliance testing and regression detection
-- **Performance**: See [Performance Test Instructions](./instructions/run_perf_tests.md) for benchmarking and statistical analysis
-- **Code Quality**: See [Code Review Checklist](./instructions/code_review_checklist.md) for comprehensive quality gates
-- **Clang-Tidy**: See [Clang-Tidy Instructions](./instructions/run_clang_tidy.md) for static analysis and code quality checks
-- **Adaptive CI**: See [Adaptive CI Loop](./instructions/adaptive_ci_loop.md) for intelligent testing strategies during code-quality-refactor agent
-
-### Quick Reference (Always verify against instruction files)
-
-**Standard workflow:**
-1. Build → Verify build success → Unit tests → Verify tests pass → (Optional) TCK tests
-2. Each step must complete successfully before proceeding to the next
-3. Never batch or parallelize unless the instruction file explicitly allows it
-
----
-
-## Available Scripts
-
-**Location:** `tools/scripts/`
-
-**Referenced in documentation:**
-- `compare_benchmarks.py` - Statistical benchmark comparison (used in performance workflow)
-
-**Other scripts** (not currently referenced):
-- PowerShell: `setup-clang-tidy.ps1`, `run-clang-tidy.ps1`, `autofix.ps1`, `list-project-files.ps1`, `compare_benchmarks.ps1`
-- Bash: `orion_bench_smoke.sh`
-
-## Dependencies
-
-**Build System:**
-- CMake 3.20+, vcpkg for dependencies
-- C++23 standard (fallback to C++20)
-- See [build.md](./instructions/build.md) for setup
-
-**Core Libraries:**
-- **spdlog** - Logging
-- **nlohmann-json** - JSON processing
-- **rapidxml** - XML parsing (header-only)
-- **boost-test** - Unit testing
-- **benchmark** - Performance (optional)
-
-See [CODING_STANDARDS.md](../CODING_STANDARDS.md) for dependency guidelines.
+- Dependencies: see `README.md`, `vcpkg.json`, and `.github/instructions/build.md`
+- Scripts: see `tools/scripts/`

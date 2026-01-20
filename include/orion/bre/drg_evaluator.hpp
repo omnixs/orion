@@ -122,7 +122,7 @@ namespace orion::bre
         // Recursive evaluation with memoization
         [[nodiscard]] nlohmann::json evaluate_decision_recursive(
             std::string_view decision_id,
-            const nlohmann::json& context,
+            const nlohmann::json& input,
             EvaluationContext& eval_ctx,
             std::unordered_map<std::string, nlohmann::json>& memo,
             std::unordered_set<std::string>& visiting) const;

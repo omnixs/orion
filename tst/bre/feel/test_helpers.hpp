@@ -11,9 +11,9 @@ namespace orion::bre::feel::test {
 using json = nlohmann::json_abi_v3_12_0::json;
 
 /// Get a static test evaluation context
-inline EvaluationContext& get_test_eval_ctx() {
+inline bre::EvaluationContext& get_test_eval_ctx() {
     static RegexCache regex_cache;
-    static EvaluationContext eval_ctx(regex_cache);
+    static bre::EvaluationContext eval_ctx(regex_cache);
     return eval_ctx;
 }
 

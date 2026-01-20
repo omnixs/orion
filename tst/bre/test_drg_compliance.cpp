@@ -117,8 +117,7 @@ BOOST_AUTO_TEST_CASE(test_complex_multilevel_drg)
     BOOST_REQUIRE(load_result.has_value());
     
     json input = {{"Base Input", 5}};
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Result: " << result_json.dump(2));
     
@@ -201,8 +200,7 @@ BOOST_AUTO_TEST_CASE(test_simple_two_level_drg)
     BOOST_REQUIRE(load_result.has_value());
     
     json input = {{"Input Value", 5}};
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Input: " << input.dump(2));
     BOOST_TEST_MESSAGE("Result: " << result_json.dump(2));
@@ -270,8 +268,7 @@ BOOST_AUTO_TEST_CASE(test_diamond_drg_pattern)
     BOOST_REQUIRE(load_result.has_value());
     
     json input = {{"Base Value", 10}};
-    std::string result = engine.evaluate(input.dump());
-    json result_json = json::parse(result);
+    json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Result: " << result_json.dump(2));
     
@@ -365,8 +362,7 @@ BOOST_AUTO_TEST_CASE(test_disconnected_decision_trees)
         {"Input2", 25}
     };
     
-    std::string result = engine.evaluate(input.dump());
-    nlohmann::json result_json = nlohmann::json::parse(result);
+    nlohmann::json result_json = engine.evaluate(input);
     
     BOOST_TEST_MESSAGE("Input: " << input.dump(2));
     BOOST_TEST_MESSAGE("Result: " << result_json.dump(2));

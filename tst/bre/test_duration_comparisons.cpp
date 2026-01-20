@@ -50,9 +50,8 @@ BOOST_AUTO_TEST_CASE(duration_comparisons_in_decision_table)
         json input = test_case["input"];
         json expected_output = test_case["expected_output"];
         
-        // Evaluate decision
-        std::string result_str = engine.evaluate(input.dump());
-        json result = json::parse(result_str);
+        // Evaluate decision with native JSON API
+        json result = engine.evaluate(input);
         
         // Debug output
         std::cout << "Test: " << test_name << std::endl;
@@ -78,14 +77,12 @@ BOOST_AUTO_TEST_CASE(duration_hour_to_day_equivalence)
     
     // PT120H = P5D (boundary test)
     json input1 = {{"WaitTime", "PT120H"}};
-    std::string result1_str = engine.evaluate(input1.dump());
-    json result1 = json::parse(result1_str);
+    json result1 = engine.evaluate(input1);
     BOOST_CHECK_EQUAL(result1["Eligibility Decision"], "Eligible");
     
     // P5D (boundary test)
     json input2 = {{"WaitTime", "P5D"}};
-    std::string result2_str = engine.evaluate(input2.dump());
-    json result2 = json::parse(result2_str);
+    json result2 = engine.evaluate(input2);
     BOOST_CHECK_EQUAL(result2["Eligibility Decision"], "Eligible");
     
     // Both should produce same result
@@ -103,20 +100,17 @@ BOOST_AUTO_TEST_CASE(duration_range_comparison)
     
     // Below range
     json input_below = {{"WaitTime", "P3D"}};
-    std::string result_below_str = engine.evaluate(input_below.dump());
-    json result_below = json::parse(result_below_str);
+    json result_below = engine.evaluate(input_below);
     BOOST_CHECK_EQUAL(result_below["Eligibility Decision"], "Too Short");
     
     // In range
     json input_in = {{"WaitTime", "P7D"}};
-    std::string result_in_str = engine.evaluate(input_in.dump());
-    json result_in = json::parse(result_in_str);
+    json result_in = engine.evaluate(input_in);
     BOOST_CHECK_EQUAL(result_in["Eligibility Decision"], "Eligible");
     
     // Above range
     json input_above = {{"WaitTime", "P15D"}};
-    std::string result_above_str = engine.evaluate(input_above.dump());
-    json result_above = json::parse(result_above_str);
+    json result_above = engine.evaluate(input_above);
     BOOST_CHECK_EQUAL(result_above["Eligibility Decision"], "Too Long");
 }
 

@@ -19,7 +19,7 @@ using namespace orion::bre;
 using orion::bre::feel::test::get_test_eval_ctx;
 
 // Helper function to parse and evaluate FEEL expressions
-json evaluate_feel(const std::string& expression, const json& input, const EvaluationContext& eval_ctx)
+json evaluate_feel(const std::string& expression, const json& input, const orion::bre::EvaluationContext& eval_ctx)
 {
     Lexer lexer;
     auto tokens = lexer.tokenize(expression);

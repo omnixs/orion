@@ -26,8 +26,14 @@ namespace orion::common
 
     nlohmann::json parse_xml_value(std::string_view value, std::string_view xsiType)
         {
-            if (value.empty()) { return json{};
-}
+            if (value.empty())
+            {
+                if (xsiType.find("list") != std::string::npos)
+                {
+                    return json::array();
+                }
+                return json{};
+            }
 
             // Handle different XSD types
             if (xsiType.find("decimal") != std::string::npos || xsiType.find("double") != std::string::npos || xsiType.

@@ -23,5 +23,5 @@
 #include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre::feel {
-    bool eval_feel_literal(std::string_view expr, const nlohmann::json& input, nlohmann::json& out, std::string& err, const bre::EvaluationContext& eval_ctx);
+    bool eval_feel_literal(std::string_view expr, const nlohmann::json& input, nlohmann::json& out, std::string& err, const EvaluationContext& eval_ctx);
 }

@@ -73,9 +73,9 @@ int main(int argc, char** argv)
             return 1;
         }
         
-        auto out = engine.evaluate(data_json);
-        spdlog_instance->info("Result: {}", out);
-        cout << out << endl;  // Also print to console
+        auto out = engine.evaluate(nlohmann::json::parse(data_json));
+        spdlog_instance->info("Result: {}", out.dump());
+        cout << out.dump() << endl;  // Also print to console
         return 0;
     }
     catch (const exception& e)

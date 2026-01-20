@@ -63,15 +63,12 @@ BOOST_AUTO_TEST_CASE(test_rule_order_hit_policy) {
             BOOST_FAIL("Failed to load DMN model: " + load_result.error());
         }
         
-        std::string result = engine.evaluate(input_json);
-        BOOST_TEST_MESSAGE("Result: " << result);
-        
-        // Parse result to check if it's valid JSON
-        json result_json = json::parse(result);
-        BOOST_TEST_MESSAGE("Parsed result: " << result_json.dump(2));
+        json result = engine.evaluate(input);
+        BOOST_TEST_MESSAGE("Result: " << result.dump());
+        BOOST_TEST_MESSAGE("Parsed result: " << result.dump(2));
         
         // The result should contain the decision
-        BOOST_CHECK(result_json.contains("Decision"));
+        BOOST_CHECK(result.contains("Decision"));
         
     } catch (const std::exception& ex) {
         BOOST_TEST_MESSAGE("❌ Exception caught: " << ex.what());
@@ -129,15 +126,12 @@ BOOST_AUTO_TEST_CASE(test_output_order_hit_policy) {
             BOOST_FAIL("Failed to load DMN model: " + load_result.error());
         }
         
-        std::string result = engine.evaluate(input_json);
-        BOOST_TEST_MESSAGE("Result: " << result);
-        
-        // Parse result to check if it's valid JSON
-        json result_json = json::parse(result);
-        BOOST_TEST_MESSAGE("Parsed result: " << result_json.dump(2));
+        json result = engine.evaluate(input);
+        BOOST_TEST_MESSAGE("Result: " << result.dump());
+        BOOST_TEST_MESSAGE("Parsed result: " << result.dump(2));
         
         // The result should contain the decision
-        BOOST_CHECK(result_json.contains("Decision"));
+        BOOST_CHECK(result.contains("Decision"));
         
     } catch (const std::exception& ex) {
         BOOST_TEST_MESSAGE("❌ Exception caught: " << ex.what());

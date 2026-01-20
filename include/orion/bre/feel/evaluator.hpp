@@ -45,6 +45,6 @@ namespace orion::bre::feel {
          * @return The result of evaluation as JSON
          * @throws std::runtime_error if evaluation fails
          */
-        [[nodiscard]] static json evaluate(std::string_view expression, const json& input, const bre::EvaluationContext& eval_ctx);
+        [[nodiscard]] static json evaluate(std::string_view expression, const json& input, const EvaluationContext& eval_ctx);
     };
 }
