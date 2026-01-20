@@ -60,8 +60,8 @@ Each release includes:
 ## Current Limitations
 
 **DMN Feature Coverage:**
-- ✅ Level 2: 100% (126/126 tests) - Decision tables with UNIQUE, FIRST, COLLECT hit policies
-- ⏳ Level 3: 13.7% (484/3,535 tests) - Partial FEEL expression support
+- ✅ Level 2: 100% (125/125 tests) - Decision tables with UNIQUE, FIRST, COLLECT hit policies
+- ⏳ Level 3: 11.2% (375/3,351 tests) - Partial FEEL expression support
 - ❌ Boxed expressions, decision services, and advanced DMN features not yet implemented
 
 **FEEL Language Support:**
