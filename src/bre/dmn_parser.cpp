@@ -45,40 +45,6 @@ namespace orion::bre
      * @param name Element name without namespace prefix (e.g., "decision")
      * @return Pointer to first matching node, or nullptr if not found
      */
-    static rapidxml::xml_node<>* find_node(rapidxml::xml_node<>* parent, const char* name)
-    {
-        if (parent == nullptr) return nullptr;
-        
-        // Try unprefixed name first (works with default namespace xmlns="...")
-        if (auto* node = parent->first_node(name)) {
-            return node;
-        }
-        
-        // Try dmn: prefixed name (works with xmlns:dmn="...")
-        std::string prefixed = std::string("dmn:") + name;
-        return parent->first_node(prefixed.c_str());
-    }
-
-    /**
-     * @brief Helper to find next sibling node, trying both unprefixed and dmn: prefixed names
-     * 
-     * @param node Current XML node
-     * @param name Element name without namespace prefix (e.g., "decision")
-     * @return Pointer to next matching sibling, or nullptr if not found
-     */
-    static rapidxml::xml_node<>* find_next_sibling(rapidxml::xml_node<>* node, const char* name)
-    {
-        if (node == nullptr) return nullptr;
-        
-        // Try unprefixed name first
-        if (auto* sibling = node->next_sibling(name)) {
-            return sibling;
-        }
-        
-        // Try dmn: prefixed name
-        std::string prefixed = std::string("dmn:") + name;
-        return node->next_sibling(prefixed.c_str());
-    }
 
     /**
      * @brief Helper function to parse FEEL expression into AST during model load
