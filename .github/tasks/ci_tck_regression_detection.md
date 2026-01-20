@@ -51,8 +51,8 @@ The README should document:
 See the full content specification in the original combined task file.
 
 #### 1.3 Initial Baseline Migration
-- Copy current results from `dat/dmn-tck/TestResults/Orion/0.1.0/` to `dat/tck-baselines/1.0.0/`
-- Verify CMakeLists.txt version = `1.0.0`
+- Copy current results from `dat/dmn-tck/TestResults/Orion/0.1.0/` to `dat/tck-baselines/2.0.0/`
+- Verify CMakeLists.txt version = `2.0.0`
 - Commit baseline files to repository
 
 ### 2. TCK Runner Regression Detection
@@ -214,10 +214,10 @@ Run TCK tests with baseline comparison:
 
 ```powershell
 # Windows
-.\build\orion_tck_runner.exe --baseline dat/tck-baselines/1.0.0/tck_results.csv --regression-check --level2-strict
+.\build\orion_tck_runner.exe --baseline dat/tck-baselines/2.0.0/tck_results.csv --regression-check --level2-strict
 
 # Linux
-./build/orion_tck_runner --baseline dat/tck-baselines/1.0.0/tck_results.csv --regression-check --level2-strict
+./build/orion_tck_runner --baseline dat/tck-baselines/2.0.0/tck_results.csv --regression-check --level2-strict
 ```
 
 **Options:**

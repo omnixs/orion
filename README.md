@@ -6,7 +6,7 @@
 [![CI](https://github.com/omnixs/orion/actions/workflows/ci-full.yml/badge.svg)](https://github.com/omnixs/orion/actions/workflows/ci-full.yml)
 [![C++](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus)](https://en.cppreference.com/w/cpp/23)
 [![DMN](https://img.shields.io/badge/DMN-1.5-orange)](https://www.omg.org/spec/DMN/)
-[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/1.0.0/)
+[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/2.0.0/)
 
 <img src="docs/orion.png" align="right" width="180" alt="ORION Logo">
 
@@ -152,14 +152,14 @@ int main() {
     }
     
     // Create input context as JSON
-    nlohmann::json context = {
+    nlohmann::json input = {
         {"age", 25},
         {"category", "premium"}
     };
     
-    // Evaluate decision
-    std::string result = engine.evaluate(context.dump());
-    std::cout << "Result: " << result << std::endl;
+    // Evaluate decision (native JSON API - zero-copy)
+    nlohmann::json result = engine.evaluate(input);
+    std::cout << "Result: " << result.dump() << std::endl;
     
     return 0;
 }

@@ -186,8 +186,12 @@ To add benchmarks for additional DMN models:
 3. **Write benchmark function**:
    ```cpp
    static void BM_MyModel_Scenario(benchmark::State& state) {
+       orion::api::BusinessRulesEngine engine;
+       engine.load_dmn_model(kMyModel_DMN);
+       nlohmann::json input = nlohmann::json::parse(kMyModel_Input);
+       
        for (auto _ : state) {
-           std::string result = evaluate(kMyModel_DMN, kMyModel_Input, {});
+           nlohmann::json result = engine.evaluate(input);
            benchmark::DoNotOptimize(result);
        }
    }

@@ -149,7 +149,7 @@ fi
 
 **`--baseline <path>`**
 - Path to baseline CSV file for comparison
-- Example: `--baseline dat/tck-baselines/1.0.0/tck_results.csv`
+- Example: `--baseline dat/tck-baselines/2.0.0/tck_results.csv`
 - Without this, tests run normally without regression detection
 
 **`--regression-check`**

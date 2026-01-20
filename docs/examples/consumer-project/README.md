@@ -179,8 +179,16 @@ auto engine = orion::api::BusinessRulesEngine::create();
 ### Evaluating Decisions
 
 ```cpp
-nlohmann::json context = {{"age", 25}};
-auto result = engine->evaluate_decision(dmn_xml, "decision_001", context);
+// Load DMN model once
+auto load_result = engine->load_dmn_model(dmn_xml);
+if (!load_result) {
+    std::cerr << "Failed to load model: " << load_result.error() << std::endl;
+    return 1;
+}
+
+// Evaluate with input context
+nlohmann::json input = {{"age", 25}};
+nlohmann::json result = engine->evaluate(input);
 ```
 
 ## Adapting for Your Project

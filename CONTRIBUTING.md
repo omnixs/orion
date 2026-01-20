@@ -79,18 +79,18 @@ When implementing features that improve TCK test coverage, update the baseline f
 
 # 2. Generate updated baseline (current version directory)
 ./build-release/orion_tck_runner \
-  --output-csv dat/tck-baselines/1.0.0/tck_results.csv \
-  --output-properties dat/tck-baselines/1.0.0/tck_results.properties \
+  --output-csv dat/tck-baselines/2.0.0/tck_results.csv \
+  --output-properties dat/tck-baselines/2.0.0/tck_results.properties \
   --log_level=error
 
 # 3. Review improvements
-git diff dat/tck-baselines/1.0.0/tck_results.properties
+git diff dat/tck-baselines/2.0.0/tck_results.properties
 # Should show:
 # -level3_passed=350
 # +level3_passed=375  (+25 tests!)
 
 # 4. Commit updated baseline with feature
-git add src/ dat/tck-baselines/1.0.0/tck_results.*
+git add src/ dat/tck-baselines/2.0.0/tck_results.*
 git commit -m "feat: Implement FEEL string functions - improves Level 3 coverage
 
 Added support for:
@@ -116,10 +116,10 @@ Updated baseline to reflect improvements."
 
 CI automatically adapts based on baseline presence:
 
-**With baseline** (e.g., `dat/tck-baselines/1.0.0/` exists):
+**With baseline** (e.g., `dat/tck-baselines/2.0.0/` exists):
 ```yaml
 # Strict mode - fails on regressions
---baseline dat/tck-baselines/1.0.0/tck_results.csv
+--baseline dat/tck-baselines/2.0.0/tck_results.csv
 --regression-check    # Exit code 2 if regressions detected
 --level2-strict       # Exit code 3 if Level 2 fails (must be 100%)
 ```

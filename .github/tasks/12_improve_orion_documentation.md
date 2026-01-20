@@ -148,7 +148,7 @@ docs/** linguist-documentation
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus)](https://en.cppreference.com/w/cpp/23)
 [![DMN](https://img.shields.io/badge/DMN-1.5-orange)](https://www.omg.org/spec/DMN/)
-[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/1.0.0/)
+[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/2.0.0/)
 ```
 
 **Add GitHub Topics (via repository settings or README footer note)**
