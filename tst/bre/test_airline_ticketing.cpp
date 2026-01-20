@@ -301,14 +301,13 @@ BOOST_FIXTURE_TEST_CASE(test_baggage_fee_five_bags, AirlineTicketingFixture) {
 }
 
 // ==================== TotalPrice Hierarchical Decision Tests ====================
-// NOTE: These tests currently fail because the engine does not yet support
-// Decision Requirements Graphs (DRG) where decisions depend on other decisions.
-// The TotalPrice decision requires BaseFare and BaggageFee to be available in
-// the evaluation context, but currently the engine evaluates each decision
-// independently without resolving dependencies.
-//
-// This is a known limitation that needs to be addressed in a future enhancement.
-// See: Future work - implement DRG dependency resolution in BusinessRulesEngine
+// These tests verify Decision Requirements Graph (DRG) evaluation where decisions
+// depend on other decisions. The TotalPrice decision requires BaseFare and BaggageFee
+// to be evaluated first, and the engine correctly resolves these dependencies by:
+// 1. Evaluating BaseFare based on PassengerType and Class
+// 2. Evaluating BaggageFee as a literal expression based on BaggageCount
+// 3. Evaluating TotalPrice as a literal expression using BaseFare + BaggageFee
+// The engine automatically adds computed decision values to the evaluation context.
 
 BOOST_FIXTURE_TEST_CASE(test_total_price_adult_economy_no_bags, AirlineTicketingFixture) {
     json input = {
@@ -329,9 +328,8 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_adult_economy_no_bags, AirlineTicketing
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 200);
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 0);
     
-    // TotalPrice will be null because DRG resolution is not yet implemented
-    // When DRG is implemented, this should be 200
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 200.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(test_total_price_adult_business_two_bags, AirlineTicketingFixture) {
@@ -351,8 +349,8 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_adult_business_two_bags, AirlineTicketi
     
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 500);
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 30);
-    // TotalPrice is null (DRG not implemented), would be 530
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 530.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(test_total_price_child_first_three_bags, AirlineTicketingFixture) {
@@ -372,8 +370,8 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_child_first_three_bags, AirlineTicketin
     
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 500);
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 80);
-    // TotalPrice is null (DRG not implemented), would be 580
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 580.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(test_total_price_senior_economy_one_bag, AirlineTicketingFixture) {
@@ -393,8 +391,8 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_senior_economy_one_bag, AirlineTicketin
     
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 160);
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 0);
-    // TotalPrice is null (DRG not implemented), would be 160
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 160.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(test_total_price_senior_business_four_bags, AirlineTicketingFixture) {
@@ -414,8 +412,8 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_senior_business_four_bags, AirlineTicke
     
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 400);
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 130);
-    // TotalPrice is null (DRG not implemented), would be 530
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 530.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(test_total_price_adult_first_five_bags, AirlineTicketingFixture) {
@@ -435,8 +433,8 @@ BOOST_FIXTURE_TEST_CASE(test_total_price_adult_first_five_bags, AirlineTicketing
     
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 1000);
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 180);
-    // TotalPrice is null (DRG not implemented), would be 1180
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 1180.0);
 }
 
 // ==================== Edge Case Tests ====================
@@ -457,8 +455,8 @@ BOOST_FIXTURE_TEST_CASE(test_edge_case_large_baggage_count, AirlineTicketingFixt
     BOOST_CHECK_EQUAL(result_json["BaggageFee"].get<int>(), 430);
     
     BOOST_REQUIRE(result_json.contains("TotalPrice"));
-    // TotalPrice is null (DRG not implemented), would be 630 (200 + 430)
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation: 200 + 430 = 630
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 630.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(test_edge_case_child_first_no_bags, AirlineTicketingFixture) {
@@ -477,8 +475,8 @@ BOOST_FIXTURE_TEST_CASE(test_edge_case_child_first_no_bags, AirlineTicketingFixt
     BOOST_CHECK_EQUAL(result_json["BaseFare"].get<int>(), 500);
     
     BOOST_REQUIRE(result_json.contains("TotalPrice"));
-    // TotalPrice is null (DRG not implemented), would be 500
-    BOOST_CHECK(result_json["TotalPrice"].is_null());
+    // TotalPrice computed by DRG evaluation
+    BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 500.0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

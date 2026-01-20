@@ -19,11 +19,16 @@
 #include <orion/api/engine.hpp>
 #include <orion/bre/dmn_model.hpp>
 #include <orion/bre/dmn_parser.hpp>
+#include <orion/bre/drg_evaluator.hpp>
+#include <orion/api/logger.hpp>
+#include <orion/bre/evaluation_context.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/contract_violation.hpp>
 #include <expected>
 #include <stdexcept>
+#include <set>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
-#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -40,6 +45,7 @@ namespace orion
         using bre::LiteralDecision;
         using bre::BusinessKnowledgeModel;
         using bre::DmnParser;
+        using bre::DRGEvaluator;
 
         // Pimpl implementation class
         class BusinessRulesEngine::Impl
@@ -48,12 +54,20 @@ namespace orion
             std::map<std::string, std::unique_ptr<DecisionTable>> decision_tables_;
             BKMManager bkm_manager_; // Use BKMManager instead of raw map
             std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
-            std::string namespace_uri_; // Stored DMN namespace from definitions element
-            bre::feel::RegexCache regex_cache_; // Instance-scoped regex cache
+            std::unique_ptr<DRGEvaluator> drg_evaluator_; // Decision Requirement Graph evaluator (optional)
+            std::vector<bre::Decision> decisions_; // Store parsed decisions for DRG
+            std::string namespace_uri_; // Store namespace from DMN model
+            bre::feel::RegexCache regex_cache_; // Regex cache for FEEL evaluation
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& context) const;
             [[nodiscard]] std::string format_result(std::string_view decision_name, const nlohmann::json& result) const;
+            
+            // Evaluation helper methods
+            void evaluate_with_drg(const nlohmann::json& data, nlohmann::json& results, bre::EvaluationContext& eval_ctx) const;
+            void evaluate_without_drg(const nlohmann::json& data, nlohmann::json& results, bre::EvaluationContext& eval_ctx) const;
+            bool try_evaluate_decision_table(std::string_view name, const nlohmann::json& context, bre::EvaluationContext& eval_ctx, nlohmann::json& result) const;
+            bool try_evaluate_literal_decision(std::string_view name, const nlohmann::json& context, bre::EvaluationContext& eval_ctx, nlohmann::json& result) const;
 
             // Internal component management (moved from public API)
             void add_decision_table(std::unique_ptr<DecisionTable> table);
@@ -62,12 +76,7 @@ namespace orion
         };
 
         // Constructor/Destructor
-        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>())
-        {
-            // Warm up instance regex cache
-            pimpl->regex_cache_.warmup();
-        }
-        
+        BusinessRulesEngine::BusinessRulesEngine() : pimpl(std::make_unique<Impl>()) {}
         BusinessRulesEngine::~BusinessRulesEngine() = default;
 
         // Move constructor and assignment
@@ -88,10 +97,11 @@ namespace orion
                 DmnParser parser;
                 auto model = parser.parse(dmn_xml);
                 
-                // Store namespace information from parsed model
                 pimpl->namespace_uri_ = model.namespace_uri;
                 
-                // Process all decisions in the model
+                // Process decisions into tables/literal decisions FIRST
+                // (extract/move decision tables before DRG analyzes structure)
+                // DRG only needs IDs and informationRequirements, not the actual tables
                 for (auto& decision : model.decisions)
                 {
                     // Handle decision table if present
@@ -102,19 +112,20 @@ namespace orion
                         pimpl->add_decision_table(std::move(dTable));
                     }
                     
-                    // Handle literal expression if present
-                    if (!decision.expression.empty())
+                    // Handle literal decisions (FEEL expressions)
+                    else if (!decision.expression.empty())
                     {
-                        auto litDec = make_unique<LiteralDecision>();
-                        litDec->name = decision.name;
-                        litDec->expression_text = decision.expression;
-                        
-                        // Pre-parse expression as AST for performance (using tryParseExpressionToAST from dmn_parser.cpp)
-                        // This function is currently static in dmn_parser.cpp, need to make it accessible
-                        
-                        pimpl->add_literal_decision(std::move(litDec));
+                        auto literalDec = make_unique<LiteralDecision>();
+                        literalDec->name = decision.name;
+                        literalDec->expression_text = decision.expression;
+                        pimpl->add_literal_decision(std::move(literalDec));
                     }
                 }
+                
+                // Try to build DRG if there are dependencies (takes ownership)
+                // Decision tables are already extracted, but IDs/names/requirements remain
+                // Let all exceptions propagate - caller should handle DRG construction errors
+                pimpl->drg_evaluator_ = std::make_unique<DRGEvaluator>(std::move(model.decisions));
 
                 // Parse all Business Knowledge Models using BKMManager
                 string temp_error;
@@ -123,6 +134,11 @@ namespace orion
 
                 return {};
             }
+            catch (const orion::bre::ContractViolation&)
+            {
+                // Re-throw contract violations (critical errors that should not be caught)
+                throw;
+            }
             catch (const exception& e)
             {
                 return std::unexpected(string(e.what()));
@@ -130,39 +146,20 @@ namespace orion
         }
 
 nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& context) const
-    {
+        {
             json results = json::object();
-
-            // Create evaluation context with engine's regex cache
-            bre::EvaluationContext eval_ctx(pimpl->regex_cache_);
-
-            // Evaluate all decision tables
-            for (const auto& [name, dt] : pimpl->decision_tables_)
+            bre::EvaluationContext eval_ctx{pimpl->regex_cache_};
+            
+            if (pimpl->drg_evaluator_)
             {
-                json result = dt->evaluate(context, eval_ctx);
-                results[name] = result;
+                pimpl->evaluate_with_drg(context, results, eval_ctx);
             }
-
-            // Evaluate all literal decisions with BKM support
-            for (const auto& [name, ld] : pimpl->literal_decisions_)
+            else
             {
-                try
-                {
-                    // Use BKMManager to create BKM map for evaluation
-                    auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
-
-                    json result = ld->evaluate(context, bkm_map, eval_ctx);
-                    results[name] = result;
-                }
-                catch ([[maybe_unused]] const exception& e)
-                {
-                    // Set error result for this decision
-                    results[name] = json{};
-                }
+                pimpl->evaluate_without_drg(context, results, eval_ctx);
             }
-
-            // Always return results as object with decision names as keys
-            // This ensures compatibility with TCK test expectations
+            
+            // Return native JSON object (not string) - zero-copy API
             return results;
         }
 
@@ -213,7 +210,7 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& context) cons
             pimpl->literal_decisions_.clear();
             pimpl->namespace_uri_.clear();
         }
-
+        
         string BusinessRulesEngine::get_namespace() const
         {
             return pimpl->namespace_uri_;
@@ -227,6 +224,120 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& context) cons
         }
 
         // Impl helper methods implementation
+        void BusinessRulesEngine::Impl::evaluate_with_drg(const json& data, json& results, bre::EvaluationContext& eval_ctx) const
+        {
+            // Create augmented context for cascading evaluations (don't modify original data)
+            json augmented_context = data;
+            
+            // Get evaluation order for all decisions
+            std::vector<std::string> eval_order;
+            try
+            {
+                eval_order = drg_evaluator_->get_evaluation_order();
+            }
+            catch (const std::exception&)
+            {
+                // Fall back to independent evaluation
+                eval_order.clear();
+                for (const auto& [name, _] : decision_tables_)
+                    eval_order.push_back(name);
+                for (const auto& [name, _] : literal_decisions_)
+                    eval_order.push_back(name);
+            }
+            
+            // Evaluate decisions in order, augmenting context as we go
+            for (const auto& name : eval_order)
+            {
+                json result;
+                
+                // Try decision table first
+                if (try_evaluate_decision_table(name, augmented_context, eval_ctx, result))
+                {
+                    results[name] = result;
+                    augmented_context[name] = result;  // Add successful evaluations to context for dependent decisions
+                    continue;
+                }
+                
+                // Try literal decision
+                bool literal_success = try_evaluate_literal_decision(name, augmented_context, eval_ctx, result);
+                
+                // Always add result to output (even if evaluation failed - DMN spec requires error results)
+                results[name] = result;
+                
+                // Only add successful evaluations to augmented context for dependent decisions
+                if (literal_success)
+                {
+                    augmented_context[name] = result;
+                }
+            }
+        }
+        
+        void BusinessRulesEngine::Impl::evaluate_without_drg(const json& data, json& results, bre::EvaluationContext& eval_ctx) const
+        {
+            // Evaluate decision tables
+            for (const auto& [name, table] : decision_tables_)
+            {
+                json result;
+                if (!try_evaluate_decision_table(name, data, eval_ctx, result))
+                {
+                    result = json{};  // Set empty result on error
+                }
+                results[name] = result;
+            }
+            
+            // Evaluate literal decisions
+            for (const auto& [name, decision] : literal_decisions_)
+            {
+                json result;
+                if (!try_evaluate_literal_decision(name, data, eval_ctx, result))
+                {
+                    result = json{};  // Set empty result on error
+                }
+                results[name] = result;
+            }
+        }
+        
+        bool BusinessRulesEngine::Impl::try_evaluate_decision_table(string_view name, const json& context, bre::EvaluationContext& eval_ctx, json& result) const
+        {
+            auto it = decision_tables_.find(string(name));
+            if (it == decision_tables_.end())
+            {
+                return false;
+            }
+            
+            try
+            {
+                result = it->second->evaluate(context, eval_ctx);
+                return true;  // Success - result is valid
+            }
+            catch (const exception&)
+            {
+                result = json{};  // Set empty on error
+                return false;  // Failure - error occurred
+            }
+        }
+        
+        bool BusinessRulesEngine::Impl::try_evaluate_literal_decision(string_view name, const json& context, bre::EvaluationContext& eval_ctx, json& result) const
+        {
+            auto it = literal_decisions_.find(string(name));
+            if (it == literal_decisions_.end())
+            {
+                return false;
+            }
+            
+            try
+            {
+                auto bkm_map = bkm_manager_.create_bkm_map();
+                result = it->second->evaluate(context, bkm_map, eval_ctx);
+                return true;  // Success - result is valid
+            }
+            catch (const exception&)
+            {
+                result = json{};  // Set empty on error
+                return false;  // Failure - error occurred
+            }
+        }
+        
             json BusinessRulesEngine::Impl::resolve_variable(string_view name, const json& context) const
         {
             if (context.contains(name))

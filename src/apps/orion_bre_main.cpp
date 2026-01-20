@@ -18,6 +18,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <iostream>
 #include <filesystem>
 #include <orion/api/engine.hpp>
 #include <orion/api/logger.hpp>
@@ -74,6 +75,7 @@ int main(int argc, char** argv)
         
         auto out = engine.evaluate(nlohmann::json::parse(data_json));
         spdlog_instance->info("Result: {}", out.dump());
+        cout << out.dump() << endl;  // Also print to console
         return 0;
     }
     catch (const exception& e)
