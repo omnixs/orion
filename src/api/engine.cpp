@@ -24,6 +24,7 @@
 #include <orion/bre/evaluation_context.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/contract_violation.hpp>
+#include <orion/bre/type_validator.hpp>
 #include <expected>
 #include <stdexcept>
 #include <set>
@@ -58,6 +59,7 @@ namespace orion
             std::vector<bre::Decision> decisions_; // Store parsed decisions for DRG
             std::string namespace_uri_; // Store namespace from DMN model
             bre::feel::RegexCache regex_cache_; // Regex cache for FEEL evaluation
+            std::map<std::string, bre::ItemDefinition> item_definitions_; // DMN 1.5 custom data types
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& input) const;
@@ -98,6 +100,9 @@ namespace orion
                 auto model = parser.parse(dmn_xml);
                 
                 pimpl->namespace_uri_ = model.namespace_uri;
+                
+                // Store ItemDefinitions (custom data types)
+                pimpl->item_definitions_ = std::move(model.item_definitions);
                 
                 // Process decisions into tables/literal decisions FIRST
                 // (extract/move decision tables before DRG analyzes structure)
@@ -208,6 +213,7 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
             pimpl->decision_tables_.clear();
             pimpl->bkm_manager_.clear();
             pimpl->literal_decisions_.clear();
+            pimpl->item_definitions_.clear();
             pimpl->namespace_uri_.clear();
         }
         
@@ -218,9 +224,45 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
 
         vector<string> BusinessRulesEngine::validate_models() const
         {
-            // Future enhancement: Implement DMN model validation
-            // Could validate: decision table structure, hit policies, expression syntax, etc.
-            return {}; // No validation errors
+            vector<string> errors;
+            
+            // Validate ItemDefinitions (check for circular references, invalid type refs)
+            for (const auto& [name, item_def] : pimpl->item_definitions_)
+            {
+                // Check if typeRef references a valid ItemDefinition or built-in type
+                if (!item_def.typeRef.empty())
+                {
+                    // Check if typeRef is a built-in DMN type or references another ItemDefinition
+                    bool is_builtin = (item_def.typeRef == "string" || 
+                                      item_def.typeRef == "number" || 
+                                      item_def.typeRef == "boolean" || 
+                                      item_def.typeRef == "date" || 
+                                      item_def.typeRef == "time" || 
+                                      item_def.typeRef == "dateTime" ||
+                                      item_def.typeRef == "duration" ||
+                                      item_def.typeRef == "dayTimeDuration" ||
+                                      item_def.typeRef == "yearMonthDuration");
+                    
+                    if (!is_builtin && pimpl->item_definitions_.find(item_def.typeRef) == pimpl->item_definitions_.end())
+                    {
+                        errors.push_back("ItemDefinition '" + name + "' references unknown type '" + item_def.typeRef + "'");
+                    }
+                }
+                
+                // Check structured types have components
+                if (item_def.is_structured_type() && item_def.itemComponents.empty())
+                {
+                    errors.push_back("ItemDefinition '" + name + "' is structured but has no components");
+                }
+            }
+            
+            // Future enhancement: Additional validations
+            // - Decision table structure validation
+            // - Hit policy validation
+            // - FEEL expression syntax validation
+            // - DRG circular dependency detection
+            
+            return errors;
         }
 
         // Impl helper methods implementation

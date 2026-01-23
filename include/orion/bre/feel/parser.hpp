@@ -216,6 +216,7 @@ namespace orion::bre::feel {
     std::unique_ptr<ASTNode> parse_variable_with_properties(std::string_view var_name);
     std::unique_ptr<ASTNode> parse_parenthesized_expression();
     std::unique_ptr<ASTNode> parse_list_literal();
+    std::unique_ptr<ASTNode> parse_context_literal();
     std::unique_ptr<ASTNode> parse_unary_minus();
 };
 } // namespace orion::bre

@@ -235,6 +235,21 @@ namespace orion::bre
             return listArray;
         }
         
+        case ASTNodeType::LITERAL_CONTEXT:
+        {
+            json contextObject = json::object();
+            // Children are stored as pairs: [key_node, value_node, key_node, value_node, ...]
+            for (size_t i = 0; i + 1 < children.size(); i += 2)
+            {
+                // Key is stored in a LITERAL_STRING node
+                const std::string& key = children[i]->value;
+                // Value is any expression
+                json val = children[i + 1]->evaluate(input, eval_ctx);
+                contextObject[key] = val;
+            }
+            return contextObject;
+        }
+        
         case ASTNodeType::VARIABLE:
         {
             return resolveVariable(value, input);

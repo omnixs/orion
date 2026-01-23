@@ -73,6 +73,8 @@ namespace orion::bre::feel {
             case ')': type = TokenType::RPAREN; break;
             case '[': type = TokenType::LBRACKET; break;
             case ']': type = TokenType::RBRACKET; break;
+            case '{': type = TokenType::LBRACE; break;
+            case '}': type = TokenType::RBRACE; break;
             case ',': type = TokenType::COMMA; break;
             case ':': type = TokenType::COLON; break;
             case '.': type = TokenType::DOT; break;
@@ -115,7 +117,7 @@ namespace orion::bre::feel {
             }
             // Single-character punctuation
             else if (current == '(' || current == ')' || current == '[' || current == ']' ||
-                     current == ',' || current == ':' || current == '.')
+                     current == '{' || current == '}' || current == ',' || current == ':' || current == '.')
             {
                 process_punctuation(current, tokens);
             }

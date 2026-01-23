@@ -331,6 +331,11 @@ namespace orion::bre::feel {
         return parse_list_literal();
     }
     
+    if (check(TokenType::LBRACE))
+    {
+        return parse_context_literal();
+    }
+    
     if (check(TokenType::OPERATOR) && check_text("-"))
     {
         return parse_unary_minus();
@@ -593,6 +598,73 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     auto node = std::make_unique<ASTNode>(ASTNodeType::UNARY_OP, "-");
     node->children.push_back(std::move(operand));
     return node;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_context_literal()
+{
+    advance(); // consume '{'
+    
+    auto context_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_CONTEXT, "");
+    
+    // Parse context entries (if any)
+    if (!check(TokenType::RBRACE))
+    {
+        while (true)
+        {
+            // Parse key (must be identifier or string)
+            std::string key;
+            if (check(TokenType::IDENTIFIER))
+            {
+                key = advance().text;
+            }
+            else if (check(TokenType::STRING))
+            {
+                Token str_token = advance();
+                key = str_token.text;
+                // Remove quotes if present
+                if (key.length() >= 2 && key.front() == '"' && key.back() == '"')
+                {
+                    key = key.substr(1, key.length() - 2);
+                }
+            }
+            else
+            {
+                std::ostringstream oss;
+                oss << "Expected identifier or string for context key at position " << peek().position;
+                throw std::runtime_error(oss.str());
+            }
+            
+            // Expect colon
+            expect(TokenType::COLON, "Expected ':' after context key");
+            
+            // Parse value expression
+            auto value_expr = parse_logical_or();
+            
+            // Store key-value pair as child nodes
+            // Key is stored in a special LITERAL_STRING node
+            auto key_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, key);
+            context_node->children.push_back(std::move(key_node));
+            context_node->children.push_back(std::move(value_expr));
+            
+            // Check for comma (more entries)
+            if (check(TokenType::COMMA))
+            {
+                advance(); // consume ','
+                // Allow trailing comma
+                if (check(TokenType::RBRACE))
+                {
+                    break;
+                }
+            }
+            else
+            {
+                break; // No more entries
+            }
+        }
+    }
+    
+    expect(TokenType::RBRACE, "Expected '}' after context entries");
+    return context_node;
 }
 
     nlohmann::json Parser::eval_expression(std::string_view expression, const nlohmann::json& input, const EvaluationContext& eval_ctx)

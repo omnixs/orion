@@ -82,9 +82,11 @@ namespace orion::bre::feel {
         RPAREN,           ///< Right parenthesis )
         LBRACKET,         ///< Left bracket [
         RBRACKET,         ///< Right bracket ]
+        LBRACE,           ///< Left brace {
+        RBRACE,           ///< Right brace }
         COMMA,            ///< Comma ,
         DOT,              ///< Dot . (for property access)
-        COLON,            ///< Colon : (for named parameters)
+        COLON,            ///< Colon : (for named parameters and context entries)
         
         // Special
         END_OF_INPUT,     ///< End of token stream

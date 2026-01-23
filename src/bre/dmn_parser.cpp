@@ -408,6 +408,164 @@ namespace orion::bre
             model.namespace_uri = ns_attr->value();
         }
 
+        // Helper lambda to match element names with or without namespace prefix
+        auto matches_element = [](rapidxml::xml_node<>* node, const char* element_name) -> bool {
+            if (node == nullptr || node->name() == nullptr) return false;
+            std::string_view name = node->name();
+            // Match exact name or with any namespace prefix (e.g., "dmn:itemDefinition")
+            return name == element_name ||
+                   (name.find(':') != std::string_view::npos &&
+                    name.substr(name.find(':') + 1) == element_name);
+        };
+
+        // Parse ItemDefinitions (custom data types) - must happen before decisions
+        for (auto* item_def_node = root->first_node();
+             item_def_node != nullptr;
+             item_def_node = item_def_node->next_sibling())
+        {
+            if (!matches_element(item_def_node, "itemDefinition")) continue;
+            ItemDefinition item_def;
+
+            // Parse attributes
+            if (auto* attr = item_def_node->first_attribute("name"))
+            {
+                item_def.name = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("id"))
+            {
+                item_def.id = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("label"))
+            {
+                item_def.label = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("typeLanguage"))
+            {
+                item_def.typeLanguage = attr->value();
+            }
+            if (auto* attr = item_def_node->first_attribute("isCollection"))
+            {
+                std::string val = attr->value();
+                item_def.isCollection = (val == "true" || val == "1");
+            }
+
+            // Parse child elements
+            for (auto* child = item_def_node->first_node(); child != nullptr; child = child->next_sibling())
+            {
+                if (matches_element(child, "typeRef"))
+                {
+                    if (child->value() != nullptr)
+                    {
+                        item_def.typeRef = child->value();
+                    }
+                }
+                else if (matches_element(child, "label"))
+                {
+                    // Parse label element (DMN 1.5 optional)
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                    {
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                item_def.label = text_child->value();
+                            }
+                        }
+                    }
+                }
+                else if (matches_element(child, "description"))
+                {
+                    // Parse description element (DMN 1.5 optional)
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                    {
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                item_def.description = text_child->value();
+                            }
+                        }
+                    }
+                }
+                else if (matches_element(child, "allowedValues"))
+                {
+                    // Parse text element within allowedValues
+                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                    {
+                        if (matches_element(text_child, "text"))
+                        {
+                            if (text_child->value() != nullptr)
+                            {
+                                item_def.allowedValues = text_child->value();
+                            }
+                        }
+                    }
+                }
+                else if (matches_element(child, "itemComponent"))
+                {
+                    // Parse itemComponent for structured types
+                    ItemComponent component;
+
+                    // Parse component attributes
+                    if (auto* name_attr = child->first_attribute("name"))
+                    {
+                        component.name = name_attr->value();
+                    }
+                    if (auto* coll_attr = child->first_attribute("isCollection"))
+                    {
+                        std::string val = coll_attr->value();
+                        component.isCollection = (val == "true" || val == "1");
+                    }
+
+                    // Parse component child elements
+                    for (auto* comp_child = child->first_node(); comp_child != nullptr; comp_child = comp_child->next_sibling())
+                    {
+                        if (matches_element(comp_child, "typeRef"))
+                        {
+                            if (comp_child->value() != nullptr)
+                            {
+                                component.typeRef = comp_child->value();
+                            }
+                        }
+                        else if (matches_element(comp_child, "isCollection"))
+                        {
+                            if (comp_child->value() != nullptr)
+                            {
+                                std::string val = comp_child->value();
+                                component.isCollection = (val == "true" || val == "1");
+                            }
+                        }
+                        else if (matches_element(comp_child, "allowedValues"))
+                        {
+                            // Component-level constraints
+                            for (auto* text_child = comp_child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
+                            {
+                                if (matches_element(text_child, "text"))
+                                {
+                                    if (text_child->value() != nullptr)
+                                    {
+                                        component.allowedValues = text_child->value();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Add component to ItemDefinition
+                    if (!component.name.empty())
+                    {
+                        item_def.itemComponents.push_back(std::move(component));
+                    }
+                }
+            }
+
+            // Store ItemDefinition by name
+            if (!item_def.name.empty())
+            {
+                model.item_definitions[item_def.name] = std::move(item_def);
+            }
+        }
+
         // Parse all decisions in the model (handle both with and without dmn: namespace prefix)
         // Try prefixed first, then unprefixed (for DMN files with default namespace)
         auto* decision_node = find_node(root, "dmn:decision", "decision");
