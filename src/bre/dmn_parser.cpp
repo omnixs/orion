@@ -22,6 +22,7 @@
 #include "orion/bre/contract_violation.hpp"
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/type_validator.hpp>
 #include <rapidxml/rapidxml.hpp>  // Use RapidXML instead of TinyXML2
 
 using std::string;
@@ -206,35 +207,8 @@ namespace orion::bre
                 {
                     if (textNode->value() != nullptr)
                     {
-                        std::string valuesText = textNode->value();
-                        // Parse comma-separated quoted values like: "Approved", "Declined"
-                        std::vector<std::string> values;
-                        bool inQuote = false;
-                        std::string current;
-                        for (size_t i = 0; i < valuesText.length(); ++i)
-                        {
-                            char c = valuesText[i];
-                            if (c == '"')
-                            {
-                                if (inQuote)
-                                {
-                                    // End of quoted value
-                                    values.push_back(current);
-                                    current.clear();
-                                    inQuote = false;
-                                }
-                                else
-                                {
-                                    // Start of quoted value
-                                    inQuote = true;
-                                }
-                            }
-                            else if (inQuote)
-                            {
-                                current += c;
-                            }
-                        }
-                        oc.outputValues = values;
+                        // Reuse parse_allowed_values from type_validator
+                        oc.outputValues = parse_allowed_values(textNode->value());
                     }
                 }
             }
@@ -720,35 +694,8 @@ namespace orion::bre
                 auto* textNode = find_node(outputValuesNode, "dmn:text", "text");
                 if (textNode != nullptr && textNode->value() != nullptr)
                 {
-                    std::string valuesText = textNode->value();
-                    // Parse comma-separated quoted values like: "Approved", "Declined"
-                    std::vector<std::string> values;
-                    bool inQuote = false;
-                    std::string current;
-                    for (size_t i = 0; i < valuesText.length(); ++i)
-                    {
-                        char c = valuesText[i];
-                        if (c == '"')
-                        {
-                            if (inQuote)
-                            {
-                                // End of quoted value
-                                values.push_back(current);
-                                current.clear();
-                                inQuote = false;
-                            }
-                            else
-                            {
-                                // Start of quoted value
-                                inQuote = true;
-                            }
-                        }
-                        else if (inQuote)
-                        {
-                            current += c;
-                        }
-                    }
-                    oc.outputValues = values;
+                    // Reuse parse_allowed_values from type_validator
+                    oc.outputValues = parse_allowed_values(textNode->value());
                 }
             }
 

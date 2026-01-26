@@ -24,43 +24,41 @@
 
 namespace orion::bre
 {
+    namespace {
+        // Helper: Extract quoted value from position, returns (value, next_position)
+        [[nodiscard]] std::pair<std::string, size_t> extract_quoted_value(
+            std::string_view allowed_values, size_t start_quote_pos)
+        {
+            std::string value;
+            size_t i = start_quote_pos + 1; // Skip opening quote
+            
+            while (i < allowed_values.length() && allowed_values[i] != '"')
+            {
+                value += allowed_values[i];
+                ++i;
+            }
+            
+            // i now points at closing quote or end of string
+            return {value, i + 1};
+        }
+    } // anonymous namespace
+
     std::vector<std::string> parse_allowed_values(std::string_view allowed_values)
     {
         std::vector<std::string> values;
-
-        if (allowed_values.empty())
-        {
+        if (allowed_values.empty()) {
             return values;
         }
 
         // Parse comma-separated quoted strings: "Active", "Disabled", "Pending"
-        bool in_quote = false;
-        std::string current;
-
         for (size_t i = 0; i < allowed_values.length(); ++i)
         {
-            char c = allowed_values[i];
-
-            if (c == '"')
+            if (allowed_values[i] == '"')
             {
-                if (in_quote)
-                {
-                    // End of quoted value
-                    values.push_back(current);
-                    current.clear();
-                    in_quote = false;
-                }
-                else
-                {
-                    // Start of quoted value
-                    in_quote = true;
-                }
+                auto [value, next_pos] = extract_quoted_value(allowed_values, i);
+                values.push_back(value);
+                i = next_pos;
             }
-            else if (in_quote)
-            {
-                current += c;
-            }
-            // Ignore characters outside quotes (commas, whitespace, etc.)
         }
 
         return values;
@@ -87,21 +85,14 @@ namespace orion::bre
         // Handle collection types (validate each element)
         if (item_def.isCollection && value.is_array())
         {
-            for (const auto& element : value)
-            {
-                // Each element must match one of the allowed values
+            // Use ranges algorithm for expressive validation
+            return std::ranges::all_of(value, [&allowed](const nlohmann::json& element) {
                 if (!element.is_string())
                 {
                     return false; // Type mismatch
                 }
-
-                const std::string element_str = element.get<std::string>();
-                if (!std::ranges::contains(allowed, element_str))
-                {
-                    return false; // Element not in allowed values
-                }
-            }
-            return true;
+                return std::ranges::contains(allowed, element.get<std::string>());
+            });
         }
 
         // Handle single value

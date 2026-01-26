@@ -600,66 +600,68 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     return node;
 }
 
+std::string Parser::parse_context_key()
+{
+    // Parse key (must be identifier or string)
+    if (check(TokenType::IDENTIFIER))
+    {
+        return advance().text;
+    }
+    
+    if (check(TokenType::STRING))
+    {
+        std::string key = advance().text;
+        // Remove quotes if present
+        if (key.length() >= 2 && key.front() == '"' && key.back() == '"')
+        {
+            key = key.substr(1, key.length() - 2);
+        }
+        return key;
+    }
+    
+    std::ostringstream oss;
+    oss << "Expected identifier or string for context key at position " << peek().position;
+    throw std::runtime_error(oss.str());
+}
+
+void Parser::parse_context_entry(std::unique_ptr<ASTNode>& context_node)
+{
+    // Parse key and colon
+    std::string key = parse_context_key();
+    expect(TokenType::COLON, "Expected ':' after context key");
+    
+    // Parse value expression
+    auto value_expr = parse_logical_or();
+    
+    // Store key-value pair as child nodes
+    // Key is stored in a special LITERAL_STRING node
+    auto key_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, key);
+    context_node->children.push_back(std::move(key_node));
+    context_node->children.push_back(std::move(value_expr));
+}
+
 std::unique_ptr<ASTNode> Parser::parse_context_literal()
 {
     advance(); // consume '{'
-    
     auto context_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_CONTEXT, "");
     
-    // Parse context entries (if any)
     if (!check(TokenType::RBRACE))
     {
         while (true)
         {
-            // Parse key (must be identifier or string)
-            std::string key;
-            if (check(TokenType::IDENTIFIER))
-            {
-                key = advance().text;
-            }
-            else if (check(TokenType::STRING))
-            {
-                Token str_token = advance();
-                key = str_token.text;
-                // Remove quotes if present
-                if (key.length() >= 2 && key.front() == '"' && key.back() == '"')
-                {
-                    key = key.substr(1, key.length() - 2);
-                }
-            }
-            else
-            {
-                std::ostringstream oss;
-                oss << "Expected identifier or string for context key at position " << peek().position;
-                throw std::runtime_error(oss.str());
-            }
-            
-            // Expect colon
-            expect(TokenType::COLON, "Expected ':' after context key");
-            
-            // Parse value expression
-            auto value_expr = parse_logical_or();
-            
-            // Store key-value pair as child nodes
-            // Key is stored in a special LITERAL_STRING node
-            auto key_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, key);
-            context_node->children.push_back(std::move(key_node));
-            context_node->children.push_back(std::move(value_expr));
+            parse_context_entry(context_node);
             
             // Check for comma (more entries)
             if (check(TokenType::COMMA))
             {
                 advance(); // consume ','
                 // Allow trailing comma
-                if (check(TokenType::RBRACE))
+                if (!check(TokenType::RBRACE))
                 {
-                    break;
+                    continue;
                 }
             }
-            else
-            {
-                break; // No more entries
-            }
+            break;
         }
     }
     

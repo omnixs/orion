@@ -217,6 +217,11 @@ namespace orion::bre::feel {
     std::unique_ptr<ASTNode> parse_parenthesized_expression();
     std::unique_ptr<ASTNode> parse_list_literal();
     std::unique_ptr<ASTNode> parse_context_literal();
+    
+    // Context literal helpers
+    [[nodiscard]] std::string parse_context_key();
+    void parse_context_entry(std::unique_ptr<ASTNode>& context_node);
+    
     std::unique_ptr<ASTNode> parse_unary_minus();
 };
 } // namespace orion::bre
