@@ -37,13 +37,39 @@ namespace orion::bre
                 value += allowed_values[i];
                 ++i;
             }
-            
-            // i now points at closing quote or end of string
+
             return {value, i + 1};
+        }
+
+        // Helper: Check if value is in allowed list (uses std::ranges)
+        [[nodiscard]] bool is_value_allowed(
+            const nlohmann::json& value,
+            std::string_view allowed_values) noexcept
+        {
+            if (!value.is_string()) return true; // Lenient
+            const auto allowed = parse_allowed_values(allowed_values);
+            return allowed.empty() || 
+                   std::ranges::contains(allowed, value.get<std::string>());
+        }
+
+        // Helper: Check if array elements are in allowed list
+        [[nodiscard]] bool are_array_values_allowed(
+            const nlohmann::json& array,
+            std::string_view allowed_values) noexcept
+        {
+            if (!array.is_array()) return false;
+            const auto allowed = parse_allowed_values(allowed_values);
+            if (allowed.empty()) return true;
+
+            return std::ranges::all_of(array, 
+                [&allowed](const nlohmann::json& elem) {
+                    return elem.is_string() && 
+                           std::ranges::contains(allowed, elem.get<std::string>());
+                });
         }
     } // anonymous namespace
 
-    std::vector<std::string> parse_allowed_values(std::string_view allowed_values)
+    [[nodiscard]] std::vector<std::string> parse_allowed_values(std::string_view allowed_values)
     {
         std::vector<std::string> values;
         if (allowed_values.empty()) {
@@ -64,113 +90,60 @@ namespace orion::bre
         return values;
     }
 
-    bool validate_type_constraint(const nlohmann::json& value,
-                                  const ItemDefinition& item_def)
+    [[nodiscard]] bool validate_type_constraint(const nlohmann::json& value,
+                                                const ItemDefinition& item_def)
     {
         // No constraints means any value is valid
-        if (!item_def.has_constraints())
-        {
+        if (!item_def.has_constraints()) {
             return true;
         }
 
-        // Parse allowed values
-        auto allowed = parse_allowed_values(item_def.allowedValues);
-
-        if (allowed.empty())
-        {
-            // No specific values to check, constraint is satisfied
-            return true;
-        }
-
-        // Handle collection types (validate each element)
-        if (item_def.isCollection && value.is_array())
-        {
-            // Use ranges algorithm for expressive validation
-            return std::ranges::all_of(value, [&allowed](const nlohmann::json& element) {
-                if (!element.is_string())
-                {
-                    return false; // Type mismatch
-                }
-                return std::ranges::contains(allowed, element.get<std::string>());
-            });
-        }
-
-        // Handle single value
-        if (!value.is_string())
-        {
-            // For now, only support string enumeration validation
-            // Could extend to support number ranges, date ranges, etc.
-            return true; // Don't fail for non-string types (lenient)
-        }
-
-        const std::string value_str = value.get<std::string>();
-        return std::ranges::contains(allowed, value_str);
+        // Use helper functions for constraint validation
+        return item_def.isCollection 
+            ? are_array_values_allowed(value, item_def.allowedValues)
+            : is_value_allowed(value, item_def.allowedValues);
     }
 
-    std::expected<void, std::string> validate_component(
+    [[nodiscard]] std::expected<void, std::string> validate_component(
         const nlohmann::json& comp_value,
         const ItemComponent& component,
         const std::map<std::string, ItemDefinition>& all_definitions,
         int depth
     ) noexcept
     {
-        // Check component-level constraints
-        if (component.has_constraints())
+        // Validate component-level allowed values (if present)
+        if (component.has_constraints() && !is_value_allowed(comp_value, component.allowedValues))
         {
-            const auto allowed = parse_allowed_values(component.allowedValues);
-
-            if (!allowed.empty())
-            {
-                if (!comp_value.is_string())
-                {
-                    return std::unexpected(
-                        std::format("Component '{}' expected string value", component.name)
-                    );
-                }
-
-                const std::string value_str = comp_value.get<std::string>();
-                if (!std::ranges::contains(allowed, value_str))
-                {
-                    return std::unexpected(
-                        std::format("Component '{}' value '{}' not in allowed values",
-                                   component.name, value_str)
-                    );
-                }
-            }
+            return std::unexpected(
+                std::format("Component '{}' value not in allowed values", component.name)
+            );
         }
 
-        // Check if typeRef points to another ItemDefinition (complex type)
-        if (const auto it = all_definitions.find(component.typeRef); it != all_definitions.end())
+        // Validate against typeRef definition (if it references another ItemDefinition)
+        if (const auto it = all_definitions.find(component.typeRef); 
+            it != all_definitions.end())
         {
             const auto& nested_def = it->second;
-
+            
+            // Recursive validation for complex types
             if (nested_def.is_structured_type())
             {
-                // Recursive validation for nested complex type
-                if (auto result = validate_complex_type(comp_value, nested_def, all_definitions, depth + 1); !result)
-                {
-                    return result;
-                }
+                return validate_complex_type(comp_value, nested_def, all_definitions, depth + 1);
             }
-            else if (nested_def.has_constraints())
+            
+            // Validate against simple type constraints
+            if (nested_def.has_constraints() && !validate_type_constraint(comp_value, nested_def))
             {
-                // Validate against simple type constraints
-                if (!validate_type_constraint(comp_value, nested_def))
-                {
-                    return std::unexpected(
-                        std::format("Component '{}' failed type constraint validation",
-                                   component.name)
-                    );
-                }
+                return std::unexpected(
+                    std::format("Component '{}' failed type constraint", component.name)
+                );
             }
         }
 
-        // Basic type validation could be added here
-        // For now, accept any value if no constraints are violated
         return {};
     }
 
-    std::expected<void, std::string> validate_complex_type(
+    [[nodiscard]] std::expected<void, std::string> validate_complex_type(
         const nlohmann::json& value,
         const ItemDefinition& item_def,
         const std::map<std::string, ItemDefinition>& all_definitions,
@@ -182,17 +155,14 @@ namespace orion::bre
         {
             return std::unexpected(
                 std::format("Expected object for structured type '{}', got {}",
-                           item_def.name,
-                           value.type_name())
+                           item_def.name, value.type_name())
             );
         }
 
-        // Validate each component that is present (DMN fields are optional by default)
+        // Validate each component that is present (DMN fields are optional)
         for (const auto& component : item_def.itemComponents)
         {
-            // Only validate components that are actually present in the input
-            if (!value.contains(component.name))
-            {
+            if (!value.contains(component.name)) {
                 continue; // Skip missing fields - they are optional
             }
 
@@ -204,30 +174,27 @@ namespace orion::bre
                 if (!comp_value.is_array())
                 {
                     return std::unexpected(
-                        std::format("Component '{}' must be an array (isCollection=true)",
-                                   component.name)
+                        std::format("Component '{}' must be an array", component.name)
                     );
                 }
 
                 // Validate each element in collection
                 for (size_t i = 0; i < comp_value.size(); ++i)
                 {
-                    if (auto result = validate_component(comp_value[i], component, all_definitions, depth + 1); !result)
+                    if (auto result = validate_component(comp_value[i], component, 
+                                                        all_definitions, depth + 1); !result)
                     {
                         return std::unexpected(
-                            std::format("Component '{}[{}]': {}",
+                            std::format("Component '{}[{}]': {}", 
                                        component.name, i, result.error())
                         );
                     }
                 }
             }
-            else
+            else if (auto result = validate_component(comp_value, component, 
+                                                      all_definitions, depth + 1); !result)
             {
-                // Validate single value
-                if (auto result = validate_component(comp_value, component, all_definitions, depth + 1); !result)
-                {
-                    return result;
-                }
+                return result;
             }
         }
 

@@ -600,7 +600,7 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     return node;
 }
 
-std::string Parser::parse_context_key()
+[[nodiscard]] std::string Parser::parse_context_key()
 {
     // Parse key (must be identifier or string)
     if (check(TokenType::IDENTIFIER))
@@ -612,32 +612,29 @@ std::string Parser::parse_context_key()
     {
         std::string key = advance().text;
         // Remove quotes if present
-        if (key.length() >= 2 && key.front() == '"' && key.back() == '"')
+        if (key.size() >= 2 && key.front() == '"' && key.back() == '"')
         {
-            key = key.substr(1, key.length() - 2);
+            return key.substr(1, key.size() - 2);
         }
         return key;
     }
     
-    std::ostringstream oss;
-    oss << "Expected identifier or string for context key at position " << peek().position;
-    throw std::runtime_error(oss.str());
+    throw std::runtime_error(
+        std::format("Expected identifier or string for context key at position {}", 
+                   peek().position)
+    );
 }
 
 void Parser::parse_context_entry(std::unique_ptr<ASTNode>& context_node)
 {
-    // Parse key and colon
-    std::string key = parse_context_key();
+    // Parse key and colon, then value expression
+    const std::string key = parse_context_key();
     expect(TokenType::COLON, "Expected ':' after context key");
     
-    // Parse value expression
-    auto value_expr = parse_logical_or();
-    
     // Store key-value pair as child nodes
-    // Key is stored in a special LITERAL_STRING node
     auto key_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, key);
     context_node->children.push_back(std::move(key_node));
-    context_node->children.push_back(std::move(value_expr));
+    context_node->children.push_back(parse_logical_or());
 }
 
 std::unique_ptr<ASTNode> Parser::parse_context_literal()
@@ -647,7 +644,7 @@ std::unique_ptr<ASTNode> Parser::parse_context_literal()
     
     if (!check(TokenType::RBRACE))
     {
-        while (true)
+        while (!check(TokenType::RBRACE))
         {
             parse_context_entry(context_node);
             
@@ -655,13 +652,9 @@ std::unique_ptr<ASTNode> Parser::parse_context_literal()
             if (check(TokenType::COMMA))
             {
                 advance(); // consume ','
-                // Allow trailing comma
-                if (!check(TokenType::RBRACE))
-                {
-                    continue;
-                }
+                if (check(TokenType::RBRACE)) break; // Allow trailing comma
             }
-            break;
+            else break;
         }
     }
     

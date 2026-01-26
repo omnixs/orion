@@ -28,6 +28,8 @@
 #include <expected>
 #include <stdexcept>
 #include <set>
+#include <array>
+#include <algorithm>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
 #include <nlohmann/json.hpp>
@@ -222,45 +224,33 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
             return pimpl->namespace_uri_;
         }
 
-        vector<string> BusinessRulesEngine::validate_models() const
+        [[nodiscard]] vector<string> BusinessRulesEngine::validate_models() const
         {
             vector<string> errors;
             
-            // Validate ItemDefinitions (check for circular references, invalid type refs)
+            // Built-in DMN types - use constexpr array with std::ranges::contains
+            static constexpr std::array<std::string_view, 9> BUILTIN_TYPES = {{
+                "string", "number", "boolean", "date", "time", 
+                "dateTime", "duration", "dayTimeDuration", "yearMonthDuration"
+            }};
+
             for (const auto& [name, item_def] : pimpl->item_definitions_)
             {
-                // Check if typeRef references a valid ItemDefinition or built-in type
-                if (!item_def.typeRef.empty())
+                // Validate typeRef against built-in types or existing ItemDefinitions
+                if (!item_def.typeRef.empty() && 
+                    !std::ranges::contains(BUILTIN_TYPES, item_def.typeRef) &&
+                    pimpl->item_definitions_.find(item_def.typeRef) == pimpl->item_definitions_.end())
                 {
-                    // Check if typeRef is a built-in DMN type or references another ItemDefinition
-                    bool is_builtin = (item_def.typeRef == "string" || 
-                                      item_def.typeRef == "number" || 
-                                      item_def.typeRef == "boolean" || 
-                                      item_def.typeRef == "date" || 
-                                      item_def.typeRef == "time" || 
-                                      item_def.typeRef == "dateTime" ||
-                                      item_def.typeRef == "duration" ||
-                                      item_def.typeRef == "dayTimeDuration" ||
-                                      item_def.typeRef == "yearMonthDuration");
-                    
-                    if (!is_builtin && pimpl->item_definitions_.find(item_def.typeRef) == pimpl->item_definitions_.end())
-                    {
-                        errors.push_back("ItemDefinition '" + name + "' references unknown type '" + item_def.typeRef + "'");
-                    }
+                    errors.push_back(std::format("ItemDefinition '{}' references unknown type '{}'", 
+                                                 name, item_def.typeRef));
                 }
                 
                 // Check structured types have components
                 if (item_def.is_structured_type() && item_def.itemComponents.empty())
                 {
-                    errors.push_back("ItemDefinition '" + name + "' is structured but has no components");
+                    errors.push_back(std::format("ItemDefinition '{}' is structured but has no components", name));
                 }
             }
-            
-            // Future enhancement: Additional validations
-            // - Decision table structure validation
-            // - Hit policy validation
-            // - FEEL expression syntax validation
-            // - DRG circular dependency detection
             
             return errors;
         }
