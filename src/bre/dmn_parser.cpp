@@ -362,6 +362,100 @@ namespace orion::bre
         return node;
     }
 
+    /**
+     * @brief Extract text content from first text child element
+     * 
+     * Searches for a "text" child element and returns its value, or empty string if not found.
+     * Used by ItemDefinition parsers to extract label, description, and allowedValues text content.
+     * 
+     * @param parent Parent XML node to search for text element
+     * @param matches_element Helper function to match element names with namespace awareness
+     * @return Text content or empty string
+     */
+    [[nodiscard]] static std::string extract_text_from_element(
+        rapidxml::xml_node<>* parent,
+        const std::function<bool(rapidxml::xml_node<>*, const char*)>& matches_element)
+    {
+        if (parent == nullptr) return "";
+        for (auto* text_child = parent->first_node(); text_child != nullptr; text_child = text_child->next_sibling()) {
+            if (matches_element(text_child, "text") && text_child->value() != nullptr) {
+                return text_child->value();
+            }
+        }
+        return "";
+    }
+
+    /**
+     * @brief Parse ItemComponent child element with attributes and constraints
+     * 
+     * Extracts name, typeRef, isCollection, and allowedValues from itemComponent node.
+     * Follows DMN 1.5 complex type specification for structured ItemDefinitions.
+     * 
+     * @param comp_node XML node for itemComponent element
+     * @param matches_element Helper function for namespace-aware element matching
+     * @return Populated ItemComponent structure
+     */
+    [[nodiscard]] static ItemComponent parse_item_component(
+        rapidxml::xml_node<>* comp_node,
+        const std::function<bool(rapidxml::xml_node<>*, const char*)>& matches_element)
+    {
+        ItemComponent component;
+        
+        if (auto* name_attr = comp_node->first_attribute("name")) {
+            component.name = name_attr->value();
+        }
+        if (auto* coll_attr = comp_node->first_attribute("isCollection")) {
+            std::string val = coll_attr->value();
+            component.isCollection = (val == "true" || val == "1");
+        }
+
+        for (auto* child = comp_node->first_node(); child != nullptr; child = child->next_sibling()) {
+            if (matches_element(child, "typeRef") && child->value() != nullptr) {
+                component.typeRef = child->value();
+            } else if (matches_element(child, "isCollection") && child->value() != nullptr) {
+                std::string val = child->value();
+                component.isCollection = (val == "true" || val == "1");
+            } else if (matches_element(child, "allowedValues")) {
+                component.allowedValues = extract_text_from_element(child, matches_element);
+            }
+        }
+        
+        return component;
+    }
+
+    /**
+     * @brief Parse all child elements of ItemDefinition node
+     * 
+     * Processes typeRef, label, description, allowedValues, and itemComponent children
+     * following DMN 1.5 specification. Updates ItemDefinition structure in-place.
+     * 
+     * @param item_def_node XML node for itemDefinition element
+     * @param item_def ItemDefinition structure to populate
+     * @param matches_element Helper function for namespace-aware element matching
+     */
+    static void parse_item_definition_children(
+        rapidxml::xml_node<>* item_def_node,
+        ItemDefinition& item_def,
+        const std::function<bool(rapidxml::xml_node<>*, const char*)>& matches_element)
+    {
+        for (auto* child = item_def_node->first_node(); child != nullptr; child = child->next_sibling()) {
+            if (matches_element(child, "typeRef") && child->value() != nullptr) {
+                item_def.typeRef = child->value();
+            } else if (matches_element(child, "label")) {
+                item_def.label = extract_text_from_element(child, matches_element);
+            } else if (matches_element(child, "description")) {
+                item_def.description = extract_text_from_element(child, matches_element);
+            } else if (matches_element(child, "allowedValues")) {
+                item_def.allowedValues = extract_text_from_element(child, matches_element);
+            } else if (matches_element(child, "itemComponent")) {
+                auto component = parse_item_component(child, matches_element);
+                if (!component.name.empty()) {
+                    item_def.itemComponents.push_back(std::move(component));
+                }
+            }
+        }
+    }
+
     DmnModel DmnParser::parse(std::string_view xml)
     {
         rapidxml::xml_document<> doc;
@@ -400,142 +494,21 @@ namespace orion::bre
             if (!matches_element(item_def_node, "itemDefinition")) continue;
             ItemDefinition item_def;
 
-            // Parse attributes
-            if (auto* attr = item_def_node->first_attribute("name"))
-            {
-                item_def.name = attr->value();
-            }
-            if (auto* attr = item_def_node->first_attribute("id"))
-            {
-                item_def.id = attr->value();
-            }
-            if (auto* attr = item_def_node->first_attribute("label"))
-            {
-                item_def.label = attr->value();
-            }
-            if (auto* attr = item_def_node->first_attribute("typeLanguage"))
-            {
-                item_def.typeLanguage = attr->value();
-            }
-            if (auto* attr = item_def_node->first_attribute("isCollection"))
-            {
+            // Parse attributes: name, id, label, typeLanguage, isCollection
+            if (auto* attr = item_def_node->first_attribute("name")) item_def.name = attr->value();
+            if (auto* attr = item_def_node->first_attribute("id")) item_def.id = attr->value();
+            if (auto* attr = item_def_node->first_attribute("label")) item_def.label = attr->value();
+            if (auto* attr = item_def_node->first_attribute("typeLanguage")) item_def.typeLanguage = attr->value();
+            if (auto* attr = item_def_node->first_attribute("isCollection")) {
                 std::string val = attr->value();
                 item_def.isCollection = (val == "true" || val == "1");
             }
 
-            // Parse child elements
-            for (auto* child = item_def_node->first_node(); child != nullptr; child = child->next_sibling())
-            {
-                if (matches_element(child, "typeRef"))
-                {
-                    if (child->value() != nullptr)
-                    {
-                        item_def.typeRef = child->value();
-                    }
-                }
-                else if (matches_element(child, "label"))
-                {
-                    // Parse label element (DMN 1.5 optional)
-                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
-                    {
-                        if (matches_element(text_child, "text"))
-                        {
-                            if (text_child->value() != nullptr)
-                            {
-                                item_def.label = text_child->value();
-                            }
-                        }
-                    }
-                }
-                else if (matches_element(child, "description"))
-                {
-                    // Parse description element (DMN 1.5 optional)
-                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
-                    {
-                        if (matches_element(text_child, "text"))
-                        {
-                            if (text_child->value() != nullptr)
-                            {
-                                item_def.description = text_child->value();
-                            }
-                        }
-                    }
-                }
-                else if (matches_element(child, "allowedValues"))
-                {
-                    // Parse text element within allowedValues
-                    for (auto* text_child = child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
-                    {
-                        if (matches_element(text_child, "text"))
-                        {
-                            if (text_child->value() != nullptr)
-                            {
-                                item_def.allowedValues = text_child->value();
-                            }
-                        }
-                    }
-                }
-                else if (matches_element(child, "itemComponent"))
-                {
-                    // Parse itemComponent for structured types
-                    ItemComponent component;
-
-                    // Parse component attributes
-                    if (auto* name_attr = child->first_attribute("name"))
-                    {
-                        component.name = name_attr->value();
-                    }
-                    if (auto* coll_attr = child->first_attribute("isCollection"))
-                    {
-                        std::string val = coll_attr->value();
-                        component.isCollection = (val == "true" || val == "1");
-                    }
-
-                    // Parse component child elements
-                    for (auto* comp_child = child->first_node(); comp_child != nullptr; comp_child = comp_child->next_sibling())
-                    {
-                        if (matches_element(comp_child, "typeRef"))
-                        {
-                            if (comp_child->value() != nullptr)
-                            {
-                                component.typeRef = comp_child->value();
-                            }
-                        }
-                        else if (matches_element(comp_child, "isCollection"))
-                        {
-                            if (comp_child->value() != nullptr)
-                            {
-                                std::string val = comp_child->value();
-                                component.isCollection = (val == "true" || val == "1");
-                            }
-                        }
-                        else if (matches_element(comp_child, "allowedValues"))
-                        {
-                            // Component-level constraints
-                            for (auto* text_child = comp_child->first_node(); text_child != nullptr; text_child = text_child->next_sibling())
-                            {
-                                if (matches_element(text_child, "text"))
-                                {
-                                    if (text_child->value() != nullptr)
-                                    {
-                                        component.allowedValues = text_child->value();
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Add component to ItemDefinition
-                    if (!component.name.empty())
-                    {
-                        item_def.itemComponents.push_back(std::move(component));
-                    }
-                }
-            }
+            // Parse child elements (typeRef, label, description, allowedValues, itemComponent)
+            parse_item_definition_children(item_def_node, item_def, matches_element);
 
             // Store ItemDefinition by name
-            if (!item_def.name.empty())
-            {
+            if (!item_def.name.empty()) {
                 model.item_definitions[item_def.name] = std::move(item_def);
             }
         }
