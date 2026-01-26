@@ -27,6 +27,7 @@
 #include <orion/bre/type_validator.hpp>
 #include <expected>
 #include <stdexcept>
+#include <sstream>
 #include <set>
 #include <array>
 #include <algorithm>
@@ -241,14 +242,17 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
                     !std::ranges::contains(BUILTIN_TYPES, item_def.typeRef) &&
                     pimpl->item_definitions_.find(item_def.typeRef) == pimpl->item_definitions_.end())
                 {
-                    errors.push_back(std::format("ItemDefinition '{}' references unknown type '{}'", 
-                                                 name, item_def.typeRef));
+                    std::ostringstream oss;
+                    oss << "ItemDefinition '" << name << "' references unknown type '" << item_def.typeRef << "'";
+                    errors.push_back(oss.str());
                 }
                 
                 // Check structured types have components
                 if (item_def.is_structured_type() && item_def.itemComponents.empty())
                 {
-                    errors.push_back(std::format("ItemDefinition '{}' is structured but has no components", name));
+                    std::ostringstream oss;
+                    oss << "ItemDefinition '" << name << "' is structured but has no components";
+                    errors.push_back(oss.str());
                 }
             }
             

@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <ranges>
 #include <sstream>
-#include <format>
 
 namespace orion::bre
 {
@@ -114,9 +113,9 @@ namespace orion::bre
         // Validate component-level allowed values (if present)
         if (component.has_constraints() && !is_value_allowed(comp_value, component.allowedValues))
         {
-            return std::unexpected(
-                std::format("Component '{}' value not in allowed values", component.name)
-            );
+            std::ostringstream oss;
+            oss << "Component '" << component.name << "' value not in allowed values";
+            return std::unexpected(oss.str());
         }
 
         // Validate against typeRef definition (if it references another ItemDefinition)
@@ -134,9 +133,9 @@ namespace orion::bre
             // Validate against simple type constraints
             if (nested_def.has_constraints() && !validate_type_constraint(comp_value, nested_def))
             {
-                return std::unexpected(
-                    std::format("Component '{}' failed type constraint", component.name)
-                );
+                std::ostringstream oss;
+                oss << "Component '" << component.name << "' failed type constraint";
+                return std::unexpected(oss.str());
             }
         }
 
@@ -153,10 +152,9 @@ namespace orion::bre
         // Complex types must be JSON objects
         if (!value.is_object())
         {
-            return std::unexpected(
-                std::format("Expected object for structured type '{}', got {}",
-                           item_def.name, value.type_name())
-            );
+            std::ostringstream oss;
+            oss << "Expected object for structured type '" << item_def.name << "', got " << value.type_name();
+            return std::unexpected(oss.str());
         }
 
         // Validate each component that is present (DMN fields are optional)
@@ -173,9 +171,9 @@ namespace orion::bre
             {
                 if (!comp_value.is_array())
                 {
-                    return std::unexpected(
-                        std::format("Component '{}' must be an array", component.name)
-                    );
+                    std::ostringstream oss;
+                    oss << "Component '" << component.name << "' must be an array";
+                    return std::unexpected(oss.str());
                 }
 
                 // Validate each element in collection
@@ -184,10 +182,9 @@ namespace orion::bre
                     if (auto result = validate_component(comp_value[i], component, 
                                                         all_definitions, depth + 1); !result)
                     {
-                        return std::unexpected(
-                            std::format("Component '{}[{}]': {}", 
-                                       component.name, i, result.error())
-                        );
+                        std::ostringstream oss;
+                        oss << "Component '" << component.name << "[" << i << "]: " << result.error();
+                        return std::unexpected(oss.str());
                     }
                 }
             }

@@ -619,10 +619,9 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
         return key;
     }
     
-    throw std::runtime_error(
-        std::format("Expected identifier or string for context key at position {}", 
-                   peek().position)
-    );
+    std::ostringstream oss;
+    oss << "Expected identifier or string for context key at position " << peek().position;
+    throw std::runtime_error(oss.str());
 }
 
 void Parser::parse_context_entry(std::unique_ptr<ASTNode>& context_node)
