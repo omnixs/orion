@@ -92,6 +92,7 @@ namespace orion::bre
         LITERAL_NUMBER, ///< Numeric literal (e.g., 42, 3.14)
         LITERAL_STRING, ///< String literal (e.g., "Hello")
         LITERAL_LIST, ///< List literal (e.g., [1, 2, 3])
+        LITERAL_CONTEXT, ///< Context literal (e.g., {name: "John", age: 30})
         VARIABLE, ///< Variable reference (e.g., Full Name, age)
         BINARY_OP, ///< Binary operation (e.g., +, -, *, /)
         UNARY_OP, ///< Unary operation (e.g., -, not)

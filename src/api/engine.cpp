@@ -24,9 +24,13 @@
 #include <orion/bre/evaluation_context.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/contract_violation.hpp>
+#include <orion/bre/type_validator.hpp>
 #include <expected>
 #include <stdexcept>
+#include <sstream>
 #include <set>
+#include <array>
+#include <algorithm>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
 #include <nlohmann/json.hpp>
@@ -58,6 +62,7 @@ namespace orion
             std::vector<bre::Decision> decisions_; // Store parsed decisions for DRG
             std::string namespace_uri_; // Store namespace from DMN model
             bre::feel::RegexCache regex_cache_; // Regex cache for FEEL evaluation
+            std::map<std::string, bre::ItemDefinition> item_definitions_; // DMN 1.5 custom data types
 
             // Helper methods
             [[nodiscard]] nlohmann::json resolve_variable(std::string_view name, const nlohmann::json& input) const;
@@ -98,6 +103,9 @@ namespace orion
                 auto model = parser.parse(dmn_xml);
                 
                 pimpl->namespace_uri_ = model.namespace_uri;
+                
+                // Store ItemDefinitions (custom data types)
+                pimpl->item_definitions_ = std::move(model.item_definitions);
                 
                 // Process decisions into tables/literal decisions FIRST
                 // (extract/move decision tables before DRG analyzes structure)
@@ -208,6 +216,7 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
             pimpl->decision_tables_.clear();
             pimpl->bkm_manager_.clear();
             pimpl->literal_decisions_.clear();
+            pimpl->item_definitions_.clear();
             pimpl->namespace_uri_.clear();
         }
         
@@ -216,11 +225,38 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
             return pimpl->namespace_uri_;
         }
 
-        vector<string> BusinessRulesEngine::validate_models() const
+        [[nodiscard]] vector<string> BusinessRulesEngine::validate_models() const
         {
-            // Future enhancement: Implement DMN model validation
-            // Could validate: decision table structure, hit policies, expression syntax, etc.
-            return {}; // No validation errors
+            vector<string> errors;
+            
+            // Built-in DMN types - use constexpr array with std::ranges::contains
+            static constexpr std::array<std::string_view, 9> BUILTIN_TYPES = {{
+                "string", "number", "boolean", "date", "time", 
+                "dateTime", "duration", "dayTimeDuration", "yearMonthDuration"
+            }};
+
+            for (const auto& [name, item_def] : pimpl->item_definitions_)
+            {
+                // Validate typeRef against built-in types or existing ItemDefinitions
+                if (!item_def.typeRef.empty() && 
+                    !std::ranges::contains(BUILTIN_TYPES, item_def.typeRef) &&
+                    pimpl->item_definitions_.find(item_def.typeRef) == pimpl->item_definitions_.end())
+                {
+                    std::ostringstream oss;
+                    oss << "ItemDefinition '" << name << "' references unknown type '" << item_def.typeRef << "'";
+                    errors.push_back(oss.str());
+                }
+                
+                // Check structured types have components
+                if (item_def.is_structured_type() && item_def.itemComponents.empty())
+                {
+                    std::ostringstream oss;
+                    oss << "ItemDefinition '" << name << "' is structured but has no components";
+                    errors.push_back(oss.str());
+                }
+            }
+            
+            return errors;
         }
 
         // Impl helper methods implementation

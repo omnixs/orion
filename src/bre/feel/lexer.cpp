@@ -38,26 +38,26 @@ namespace orion::bre::feel {
     bool Lexer::starts_number_token(char current, const std::vector<Token>& tokens) const
     {
         // Regular digit
-        if (std::isdigit(current)) {
+        if (std::isdigit(static_cast<unsigned char>(current))) {
             return true;
         }
         
         // Negative number: '-' followed by digit (e.g., -42)
         if (current == '-' && is_unary_minus_context(tokens) && 
-            position_ + 1 < input_.length() && std::isdigit(input_[position_ + 1])) {
+            position_ + 1 < input_.length() && std::isdigit(static_cast<unsigned char>(input_[position_ + 1]))) {
             return true;
         }
         
         // Negative decimal: '-' followed by '.digit' (e.g., -.872)
         if (current == '-' && is_unary_minus_context(tokens) && 
             position_ + 2 < input_.length() && input_[position_ + 1] == '.' && 
-            std::isdigit(input_[position_ + 2])) {
+            std::isdigit(static_cast<unsigned char>(input_[position_ + 2]))) {
             return true;
         }
         
         // Leading-dot decimal: '.' followed by digit (e.g., .872)
         if (current == '.' && position_ + 1 < input_.length() && 
-            std::isdigit(input_[position_ + 1])) {
+            std::isdigit(static_cast<unsigned char>(input_[position_ + 1]))) {
             return true;
         }
         
@@ -73,6 +73,8 @@ namespace orion::bre::feel {
             case ')': type = TokenType::RPAREN; break;
             case '[': type = TokenType::LBRACKET; break;
             case ']': type = TokenType::RBRACKET; break;
+            case '{': type = TokenType::LBRACE; break;
+            case '}': type = TokenType::RBRACE; break;
             case ',': type = TokenType::COMMA; break;
             case ':': type = TokenType::COLON; break;
             case '.': type = TokenType::DOT; break;
@@ -109,13 +111,13 @@ namespace orion::bre::feel {
                 tokens.push_back(tokenize_string());
             }
             // Identifiers and keywords
-            else if (std::isalpha(current) || current == '_')
+            else if (std::isalpha(static_cast<unsigned char>(current)) || current == '_')
             {
                 tokens.push_back(tokenize_identifier());
             }
             // Single-character punctuation
             else if (current == '(' || current == ')' || current == '[' || current == ']' ||
-                     current == ',' || current == ':' || current == '.')
+                     current == '{' || current == '}' || current == ',' || current == ':' || current == '.')
             {
                 process_punctuation(current, tokens);
             }
@@ -165,7 +167,7 @@ namespace orion::bre::feel {
 
     void Lexer::skip_whitespace()
     {
-        while (position_ < input_.length() && std::isspace(input_[position_]))
+        while (position_ < input_.length() && std::isspace(static_cast<unsigned char>(input_[position_])))
         {
             position_++;
         }
@@ -183,7 +185,7 @@ namespace orion::bre::feel {
         }
 
         // Integer part (optional for leading-dot decimals like .872)
-        while (std::isdigit(peek()))
+        while (std::isdigit(static_cast<unsigned char>(peek())))
         {
             text += advance();
         }
@@ -192,7 +194,7 @@ namespace orion::bre::feel {
         if (peek() == '.')
         {
             text += advance();
-            while (std::isdigit(peek()))
+            while (std::isdigit(static_cast<unsigned char>(peek())))
             {
                 text += advance();
             }
@@ -206,7 +208,7 @@ namespace orion::bre::feel {
             {
                 text += advance();
             }
-            while (std::isdigit(peek()))
+            while (std::isdigit(static_cast<unsigned char>(peek())))
             {
                 text += advance();
             }
@@ -266,7 +268,7 @@ namespace orion::bre::feel {
     // Helper: Skip whitespace from given position and return first non-space position
     size_t Lexer::skip_whitespace_from(size_t pos) const
     {
-        while (pos < input_.length() && std::isspace(input_[pos]))
+        while (pos < input_.length() && std::isspace(static_cast<unsigned char>(input_[pos])))
         {
             pos++;
         }
@@ -278,7 +280,7 @@ namespace orion::bre::feel {
     {
         std::string word;
         while (pos < input_.length() && 
-               (std::isalnum(input_[pos]) || input_[pos] == '_'))
+               (std::isalnum(static_cast<unsigned char>(input_[pos])) || input_[pos] == '_'))
         {
             word += input_[pos];
             pos++;
@@ -322,7 +324,7 @@ namespace orion::bre::feel {
     // Helper: Trim trailing whitespace from string
     std::string Lexer::trim_trailing_spaces(std::string text) const
     {
-        while (!text.empty() && std::isspace(text.back()))
+        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())))
         {
             text.pop_back();
         }
@@ -340,7 +342,7 @@ namespace orion::bre::feel {
 
         // Subsequent characters (letters, digits, underscores, spaces)
         // FEEL allows spaces in identifiers (e.g., "Full Name", "Monthly Salary")
-        while (std::isalnum(peek()) || peek() == '_' || peek() == ' ')
+        while (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_' || peek() == ' ')
         {
             // Check if we should stop at this space
             if (peek() == ' ' && should_stop_at_space(text))

@@ -130,20 +130,102 @@ namespace orion::bre
     };
 
     /**
+     * @brief Component of a structured ItemDefinition
+     *
+     * Represents a named property within a complex type with its own type and constraints.
+     *
+     * @see DMN 1.5 Specification Section 7.3.3.1 "ItemDefinition components"
+     */
+    struct ItemComponent
+    {
+        std::string name; // Component name (e.g., "address")
+        std::string typeRef; // Type reference (e.g., "string" or "tAddress")
+        bool isCollection = false; // Whether this component is an array
+        std::string allowedValues; // Component-level enumeration constraint
+
+        /**
+         * @brief Check if this component has value constraints
+         */
+        [[nodiscard]] bool has_constraints() const noexcept
+        {
+            return !allowedValues.empty();
+        }
+    };
+
+    /**
      * @brief Item definition for DMN type system
-     * 
+     *
      * Defines reusable data types that can be used in decision variables.
-     * Supports both simple types and complex structures with collection attribute.
-     * 
-     * @see DMN 1.5 Specification Section 7.3.2 "ItemDefinition metamodel"
+     * Supports both simple types and complex structures with itemComponents.
+     *
+     * **Simple Type Example:**
+     * ```xml
+     * <itemDefinition name="tStatus">
+     *   <typeRef>string</typeRef>
+     *   <allowedValues><text>"Active", "Disabled"</text></allowedValues>
+     * </itemDefinition>
+     * ```
+     *
+     * **Complex Type Example:**
+     * ```xml
+     * <itemDefinition name="tCustomer">
+     *   <itemComponent name="name">
+     *     <typeRef>string</typeRef>
+     *   </itemComponent>
+     *   <itemComponent name="age">
+     *     <typeRef>number</typeRef>
+     *   </itemComponent>
+     * </itemDefinition>
+     * ```
+     *
+     * @see DMN 1.5 Specification Section 7.3.3 "ItemDefinition metamodel"
      */
     struct ItemDefinition
     {
-        std::string name; // Type name (e.g., "tApproval_1")
-        std::string label; // Human-readable label
-        std::string typeRef; // Base type reference (e.g., "string")
+        std::string name; // Type name (e.g., "tStatus")
+        std::string id; // Unique identifier
+        std::string label; // Human-readable label (DMN 1.5 optional)
+        std::string description; // Documentation text (DMN 1.5 optional)
+        std::string typeLanguage; // Type system language (DMN 1.5 optional, defaults to "FEEL")
+        std::string typeRef; // Base type reference (e.g., "string") - for simple types
+        std::string allowedValues; // Enumeration constraint (e.g., "\"Active\", \"Disabled\"")
         bool isCollection = false; // Whether this is a collection type
-        std::vector<ItemDefinition> itemComponents; // For complex types
+        std::vector<ItemComponent> itemComponents; // For complex/structured types
+
+        /**
+         * @brief Check if this ItemDefinition has value constraints
+         */
+        [[nodiscard]] bool has_constraints() const noexcept
+        {
+            return !allowedValues.empty();
+        }
+
+        /**
+         * @brief Check if this is a simple type (typeRef only)
+         */
+        [[nodiscard]] bool is_simple_type() const noexcept
+        {
+            return !typeRef.empty() && itemComponents.empty();
+        }
+
+        /**
+         * @brief Check if this is a structured type (has components)
+         */
+        [[nodiscard]] bool is_structured_type() const noexcept
+        {
+            return !itemComponents.empty();
+        }
+
+        /**
+         * @brief Get a component by name (for structured types)
+         * @return Pointer to component if found, nullptr otherwise
+         */
+        [[nodiscard]] const ItemComponent* get_component(std::string_view comp_name) const
+        {
+            auto it = std::find_if(itemComponents.begin(), itemComponents.end(),
+                                   [comp_name](const ItemComponent& c) { return c.name == comp_name; });
+            return (it != itemComponents.end()) ? &(*it) : nullptr;
+        }
     };
 
     /**

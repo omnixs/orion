@@ -72,7 +72,7 @@ if(USE_CLANG AND NOT CMAKE_CXX_COMPILER)
   message(STATUS "Using Clang compiler: ${CMAKE_CXX_COMPILER}")
 endif()
 
-project(orion VERSION 2.0.0 LANGUAGES CXX)
+project(orion VERSION 2.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -194,6 +194,7 @@ set(ORION_SRC
   src/bre/dmn_model.cpp
   src/bre/dmn_parser.cpp
   src/bre/drg_evaluator.cpp
+  src/bre/type_validator.cpp
   src/bre/feel/evaluator.cpp
   src/bre/feel/expr.cpp
   src/bre/feel/function_registry.cpp
@@ -274,6 +275,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/test_airline_ticketing.cpp
       tst/bre/test_namespace_support.cpp
       tst/bre/test_drg_compliance.cpp
+      tst/bre/test_item_definition.cpp
       # TCK-specific tests
       tst/bre/tck/test_tck_runner.cpp
       tst/bre/tck/test_tck_0112_comparison.cpp

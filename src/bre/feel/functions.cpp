@@ -25,7 +25,8 @@
 #include <stdexcept>
 #include <string>
 #include <algorithm>
-#include <format>
+#include <sstream>
+#include <iomanip>
 #include <iostream>
 
 namespace orion::bre::feel {
@@ -1350,7 +1351,11 @@ json evaluate_date_function(const std::vector<json>& args)
         }
         
         // Format as ISO 8601 string: YYYY-MM-DD
-        return std::format("{:04d}-{:02d}-{:02d}", year_num, month_num, day_num);
+        std::ostringstream oss;
+        oss << std::setw(4) << std::setfill('0') << year_num << '-'
+            << std::setw(2) << std::setfill('0') << month_num << '-'
+            << std::setw(2) << std::setfill('0') << day_num;
+        return oss.str();
     }
 
     // Invalid argument count

@@ -20,6 +20,7 @@
 #pragma once
 #include "dmn_model.hpp"
 #include <string>
+#include <map>
 
 // Forward declaration for rapidxml types
 namespace rapidxml
@@ -42,6 +43,7 @@ namespace orion::bre
     {
         std::string namespace_uri;  // DMN 1.5 namespace from definitions element
         std::vector<Decision> decisions;
+        std::map<std::string, ItemDefinition> item_definitions;  // Custom data types
     };
 
     // DMN Parser class
