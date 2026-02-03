@@ -18,6 +18,10 @@
 
 #include <orion/bre/feel/unary.hpp>
 #include <orion/bre/feel/types.hpp>
+#include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/evaluation_context.hpp>
 #include <ctre.hpp>
 #include <charconv>
 #include <iostream>
@@ -46,6 +50,44 @@ namespace orion::bre::feel {
             return true;
         }
         return false;
+    }
+
+    // Helper: Evaluate FEEL expressions (typically function calls)
+    // E.g., "duration(\"PT31H\")" -> "PT31H"
+    // Returns original expression if it's not a FEEL function call
+    static std::string evaluate_feel_functions(std::string_view expression)
+    {
+        // Check if expression looks like a FEEL function call
+        // FEEL functions have the pattern: function_name(args)
+        // If no parenthesis, it's a plain literal - return as-is
+        if (expression.find('(') == std::string_view::npos)
+        {
+            return std::string(expression);
+        }
+        
+        feel::Lexer lexer;
+        auto tokens = lexer.tokenize(std::string(expression));
+        
+        feel::Parser parser;
+        auto ast = parser.parse(tokens);
+        
+        feel::RegexCache regex_cache;
+        orion::bre::EvaluationContext eval_ctx(regex_cache);
+        nlohmann::json result = ast->evaluate(nlohmann::json::object(), eval_ctx);
+        
+        // Convert result to string representation
+        if (result.is_string()) {
+            return result.get<std::string>();
+        }
+        if (result.is_number()) {
+            return std::to_string(result.get<double>());
+        }
+        if (result.is_boolean()) {
+            return result.get<bool>() ? "true" : "false";
+        }
+        
+        // For other types (objects, arrays), use JSON representation
+        return result.dump();
     }
 
     static bool parse_number(std::string_view str, double& out)
@@ -162,9 +204,13 @@ namespace orion::bre::feel {
     // Main dispatcher: Try each type comparison in order
     static int cmp_values(std::string_view lhs, std::string_view rhs)
     {
+        // Evaluate any FEEL function calls first (e.g., duration("PT31H"))
+        std::string lhs_evaluated = evaluate_feel_functions(lhs);
+        std::string rhs_evaluated = evaluate_feel_functions(rhs);
+        
         // Unquote string literals for comparison
-        std::string lhs_unquoted = unquote(std::string(lhs));
-        std::string rhs_unquoted = unquote(std::string(rhs));
+        std::string lhs_unquoted = unquote(lhs_evaluated);
+        std::string rhs_unquoted = unquote(rhs_evaluated);
         
         // Try numeric comparison
         double num_lhs = 0.0;
@@ -308,6 +354,8 @@ namespace orion::bre::feel {
         {
             std::string oper = match.get<1>().to_string();
             std::string rhs = orion::common::trim(match.get<2>().to_string());
+            
+            // FEEL evaluation happens inside cmp_values()
             int cmp_result = cmp_values(candidate, rhs);
 
             if (oper == "<") { return cmp_result < 0;
