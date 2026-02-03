@@ -27,6 +27,7 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/feel/regex_cache.hpp>
+#include <orion/bre/feel/unary.hpp>
 #include <nlohmann/json.hpp>
 #include "test_helpers.hpp"
 
@@ -117,22 +118,26 @@ BOOST_AUTO_TEST_CASE(duration_null_propagation)
 }
 
 // ============================================================================
-// Duration Comparison Tests (via DMN Unary Tests)
+// Duration Comparison Tests
 // ============================================================================
-// Note: Direct function-to-function comparisons like duration("PT48H") = duration("P2D")
-// are not yet supported. Duration comparisons work in DMN decision tables via unary tests,
-// where the input is a duration string and the test expression is also a duration string.
-// This is the established pattern for date/time comparisons in the codebase.
-// See unary.cpp try_compare_durations() for the comparison implementation.
+// Note: Duration comparisons in unary test expressions (e.g., <= duration("PT31H"))
+// are tested in test_unary_feel_functions.cpp.
 //
-// Skipping these tests for now - will be tested via DMN decision table test case
+// Direct function-to-function comparisons like duration("PT48H") = duration("P2D")
+// are not yet supported in FEEL expressions. Duration comparisons work in DMN
+// decision tables via unary tests, where the input is a duration string and the
+// test expression contains a duration() function call.
+//
+// See:
+// - tst/bre/feel/test_unary_feel_functions.cpp for unary test comparison tests
+// - src/bre/feel/unary.cpp for the comparison implementation (try_compare_durations)
 
 BOOST_AUTO_TEST_CASE(duration_comparison_note)
 {
-    // This test documents that duration comparisons work differently
-    // They are designed for DMN unary tests, not FEEL expression comparisons
-    BOOST_TEST_MESSAGE("Duration comparisons tested in DMN decision table (see test case in tst/dmn/)");
-    BOOST_CHECK(true);  // Placeholder
+    // This test documents where duration comparisons are tested
+    BOOST_TEST_MESSAGE("Duration comparisons in unary tests: see test_unary_feel_functions.cpp");
+    BOOST_TEST_MESSAGE("Duration() function parsing: tested in this file");
+    BOOST_CHECK(true);  // Documentation placeholder
 }
 
 // ============================================================================

@@ -77,16 +77,9 @@ namespace orion::bre::feel {
         
         // Convert result to string representation
         if (result.is_string()) {
-            return result.get<std::string>();
+            return result.get<std::string>();  // Avoid quotes around strings
         }
-        if (result.is_number()) {
-            return std::to_string(result.get<double>());
-        }
-        if (result.is_boolean()) {
-            return result.get<bool>() ? "true" : "false";
-        }
-        
-        // For other types (objects, arrays), use JSON representation
+        // For all other types (int, float, bool, null, objects, arrays), dump() handles formatting correctly
         return result.dump();
     }
 
