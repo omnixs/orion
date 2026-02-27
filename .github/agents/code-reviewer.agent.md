@@ -116,7 +116,7 @@ double value = resolve_from_context(property_name, context);
 
 **For each modified file:**
 
-Apply the [Code Review Checklist](../instructions/code_review_checklist.md) systematically:
+Apply the [Code Review Checklist](../instructions/code_review_checklist.instructions.md) systematically:
 
 1. **Core Review Criteria** (all changes)
    - Naming & Style (clang-tidy enforced)
@@ -164,7 +164,7 @@ Apply the [Code Review Checklist](../instructions/code_review_checklist.md) syst
 
 ### Step 5: Provide Specific Feedback
 
-**Use the feedback format from [Code Review Checklist](../instructions/code_review_checklist.md):**
+**Use the feedback format from [Code Review Checklist](../instructions/code_review_checklist.instructions.md):**
 
 ```
 Issue: [Brief description]
@@ -208,7 +208,7 @@ CODING_STANDARDS.md "Modern C++ Features"
 
 ## Special Focus Areas
 
-Refer to [Code Review Checklist](../instructions/code_review_checklist.md) for detailed criteria:
+Refer to [Code Review Checklist](../instructions/code_review_checklist.instructions.md) for detailed criteria:
 
 - **String_view Changes** → Lifetime safety (critical)
 - **FEEL Evaluator** → DMN compliance, TCK validation

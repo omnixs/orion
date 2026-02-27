@@ -88,9 +88,9 @@ Brief one-sentence summary of what this task accomplishes.
 
 - [Template File](../prompts/<template-name>.md) - If using a standard template
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) - Project coding standards
-- [Build Instructions](../instructions/build.md) - Build and configuration
-- [Unit Test Instructions](../instructions/run_unit_tests.md) - Testing
-- [TCK Test Instructions](../instructions/run_tck_tests.md) - Compliance
+- [Build Instructions](../instructions/build.instructions.md) - Build and configuration
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md) - Testing
+- [TCK Test Instructions](../instructions/run_tck_tests.instructions.md) - Compliance
 - Other relevant docs...
 
 ## Retrospective

@@ -204,7 +204,7 @@ Similar implementation with bash syntax:
 
 #### 4.1 Update `run_tck_tests.md`
 
-Add new sections to `.github/instructions/run_tck_tests.md`:
+Add new sections to `.github/instructions/run_tck_tests.instructions.md`:
 
 **Regression Detection Options:**
 ```markdown
@@ -274,7 +274,7 @@ Add examples and troubleshooting for regression detection scenarios.
    - Verify error message is clear
 
 ### Phase 4: Documentation (1-2 hours)
-1. Update `.github/instructions/run_tck_tests.md` with:
+1. Update `.github/instructions/run_tck_tests.instructions.md` with:
    - New command-line options
    - Exit code meanings
    - Regression detection examples
@@ -333,7 +333,7 @@ echo $?  # Should be 2
 - `dat/tck-baselines/1.0.0/tck_results.properties`
 
 **Documentation Updates:**
-- `.github/instructions/run_tck_tests.md`
+- `.github/instructions/run_tck_tests.instructions.md`
 
 **Libraries Needed:**
 - CSV parsing (can use simple C++ string parsing or lightweight library)

@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
 
 ### Phase 5: Documentation (15 min)
 1. Update test file comments
-2. Update `.github/instructions/run_unit_tests.md`
+2. Update `.github/instructions/run_unit_tests.instructions.md`
 3. Document environment variable usage
 
 ## Files to Modify
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
 2. **`.github/workflows/ci-full.yml`** (optional)
    - Set `ORION_TCK_RUN_ALL=0` (or leave default) for faster CI
 
-3. **`.github/instructions/run_unit_tests.md`**
+3. **`.github/instructions/run_unit_tests.instructions.md`**
    - Document `ORION_TCK_RUN_ALL` environment variable
    - Explain selective vs comprehensive modes
 
@@ -313,7 +313,7 @@ Measure-Command { .\build\Debug\tst_orion.exe --run_test=dmn_tck_levels --log_le
 
 **Files Modified**:
 - `tst/bre/tck/test_tck_runner.cpp` - Added baseline parsing, filtering logic, environment variable check
-- `.github/instructions/run_unit_tests.md` - Documented selective vs comprehensive modes
+- `.github/instructions/run_unit_tests.instructions.md` - Documented selective vs comprehensive modes
 
 **Key Functions Added**:
 - `should_run_all_tests()` - Environment variable check
@@ -342,7 +342,7 @@ All success criteria met:
 - [x] Unit tests pass with selective mode (default) - 0.87s, 100% pass rate
 - [x] Unit tests pass with comprehensive mode (`ORION_TCK_RUN_ALL=1`) - 24.78s
 - [x] Execution time reduced by **96.5%** in selective mode (exceeded 50-70% target)
-- [x] Documentation updated in `.github/instructions/run_unit_tests.md`
+- [x] Documentation updated in `.github/instructions/run_unit_tests.instructions.md`
 
 **Bonus achievements**:
 - Clear test output with skip reasons

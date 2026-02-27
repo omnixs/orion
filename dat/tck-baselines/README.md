@@ -167,6 +167,6 @@ dat/tck-baselines/
 
 ## See Also
 
-- [TCK Test Instructions](../../.github/instructions/run_tck_tests.md) - How to run TCK tests
+- [TCK Test Instructions](../../.github/instructions/run_tck_tests.instructions.md) - How to run TCK tests
 - [CI Full Workflow](../../.github/workflows/ci-full.yml) - Regression detection in CI
 - [Release Workflow](../../.github/workflows/release.yml) - Automated baseline generation

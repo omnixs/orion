@@ -115,8 +115,8 @@ Add support for parsing and storing DMN namespace declarations from `<definition
 
 - [DMN Feature Template](../prompts/add_dmn_feature.md) - Standard DMN feature implementation process
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) - Project coding standards and naming conventions
-- [Build Instructions](../instructions/build.md) - Build and configuration
-- [Unit Test Instructions](../instructions/run_unit_tests.md) - Testing procedures
+- [Build Instructions](../instructions/build.instructions.md) - Build and configuration
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md) - Testing procedures
 - [DMN 1.5 Specification](../../docs/formal-24-01-01.txt) - Section 6.3.3 Import metamodel, namespace handling
 
 ## DMN 1.5 Specification References
