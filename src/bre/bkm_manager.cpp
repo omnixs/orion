@@ -89,7 +89,7 @@ namespace orion::bre
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty");
         }
 
-        auto bkm_iterator = bkms_.find(std::string(bkm_name));
+        auto bkm_iterator = bkms_.find(bkm_name);
         if (bkm_iterator == bkms_.end()) [[unlikely]]
         {
             throw std::runtime_error(std::string("BKM not found: ").append(bkm_name));
@@ -103,7 +103,7 @@ namespace orion::bre
 
     bool BKMManager::has_bkm(std::string_view bkm_name) const
     {
-        return bkms_.find(std::string(bkm_name)) != bkms_.end();
+        return bkms_.find(bkm_name) != bkms_.end();
     }
 
     const BusinessKnowledgeModel* BKMManager::get_bkm(std::string_view bkm_name) const
@@ -112,7 +112,7 @@ namespace orion::bre
         {
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty");
         }
-        auto bkm_iterator = bkms_.find(std::string(bkm_name));
+        auto bkm_iterator = bkms_.find(bkm_name);
         return (bkm_iterator != bkms_.end()) ? bkm_iterator->second.get() : nullptr;
     }
 
@@ -133,7 +133,10 @@ namespace orion::bre
         {
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty for removal");
         }
-        return bkms_.erase(std::string(bkm_name)) > 0;
+        auto it = bkms_.find(bkm_name);
+        if (it == bkms_.end()) return false;
+        bkms_.erase(it);
+        return true;
     }
 
     void BKMManager::clear()
@@ -141,21 +144,16 @@ namespace orion::bre
         bkms_.clear();
     }
 
-    map<string, BusinessKnowledgeModel> BKMManager::create_bkm_map() const
+    map<string, const BusinessKnowledgeModel*, std::less<>> BKMManager::create_bkm_map() const
     {
-        map<string, BusinessKnowledgeModel> bkm_map;
+        map<string, const BusinessKnowledgeModel*, std::less<>> bkm_map;
         for (const auto& bkm_pair : bkms_)
         {
             const string& name = bkm_pair.first;
             const auto& bkm_ptr = bkm_pair.second;
             if (bkm_ptr)
             {
-                // Copy BKM data (without unique_ptr to avoid copy issues)
-                BusinessKnowledgeModel bkm_copy;
-                bkm_copy.name = bkm_ptr->name;
-                bkm_copy.parameters = bkm_ptr->parameters;
-                bkm_copy.expression_text = bkm_ptr->expression_text;
-                bkm_map[name] = std::move(bkm_copy);
+                bkm_map[name] = bkm_ptr.get();
             }
         }
         return bkm_map;
@@ -207,17 +205,17 @@ namespace orion::bre
     static nlohmann::json process_bkm_call(std::string_view func_name,
                                             std::string_view args_str,
                                             const nlohmann::json& input,
-                                            const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                            const std::map<std::string, const BusinessKnowledgeModel*, std::less<>>& available_bkms,
                                             const EvaluationContext& eval_ctx)
     {
         // Check if this BKM exists
-        auto bkm_it = available_bkms.find(std::string(func_name));
+        auto bkm_it = available_bkms.find(func_name);
         if (bkm_it == available_bkms.end())
         {
             return feel::Evaluator::evaluate(std::string(func_name) + "(" + std::string(args_str) + ")", input, eval_ctx);
         }
 
-        const BusinessKnowledgeModel& bkm = bkm_it->second;
+        const BusinessKnowledgeModel& bkm = *bkm_it->second;
 
         // Parse arguments using existing utility function
         std::vector<std::string> args = orion::common::split(args_str, ',');
@@ -243,7 +241,7 @@ namespace orion::bre
     // BKM-specific expression evaluator  
     json evaluate_bkm_expression(std::string_view expression,
                                const json& input,
-                               const map<string, BusinessKnowledgeModel>& available_bkms,
+                               const map<string, const BusinessKnowledgeModel*, std::less<>>& available_bkms,
                                const EvaluationContext& eval_ctx)
     {
         // Pattern: PMT(Loan.amount, Loan.rate, Loan.term)+fee

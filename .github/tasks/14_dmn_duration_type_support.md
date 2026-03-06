@@ -295,8 +295,8 @@ BOOST_AUTO_TEST_CASE(duration_parsing) {
 - [DMN Feature Template](../prompts/add_dmn_feature.md) - Implementation workflow
 - [DMN 1.5 Specification](../../docs/formal-24-01-01.txt) - Section 10.3.2.3 (duration type)
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) - Naming conventions, error handling
-- [Build Instructions](../instructions/build.md) - Compilation and testing
-- [Unit Test Instructions](../instructions/run_unit_tests.md) - Running specific tests
+- [Build Instructions](../instructions/build.instructions.md) - Compilation and testing
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md) - Running specific tests
 - [ISO 8601 Duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) - Duration format reference
 
 ## Retrospective

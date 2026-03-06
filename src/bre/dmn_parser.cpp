@@ -636,6 +636,21 @@ namespace orion::bre
                 auto* txt = find_node(ie, "dmn:text", "text");
                 if ((txt != nullptr) && (txt->value() != nullptr)) { 
                     ic.inputExpression = txt->value();
+                    // Pre-parse inputExpression as AST for performance
+                    if (!ic.inputExpression.empty())
+                    {
+                        try
+                        {
+                            feel::Lexer lexer;
+                            auto tokens = lexer.tokenize(ic.inputExpression);
+                            feel::Parser parser;
+                            ic.inputExpression_ast = parser.parse(tokens);
+                        }
+                        catch (...)
+                        {
+                            ic.inputExpression_ast = nullptr;
+                        }
+                    }
 }
             }
             decision_table.inputs.push_back(std::move(ic));

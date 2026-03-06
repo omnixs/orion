@@ -82,11 +82,11 @@ for (auto& request : requests) {
 ## Quick Start Resources
 
 **Build & Test:**
-- [Build Instructions](./instructions/build.md) - CMake, vcpkg, compilation
-- [Unit Tests](./instructions/run_unit_tests.md) - Boost Test execution
-- [TCK Tests](./instructions/run_tck_tests.md) - DMN compliance validation
-- [Performance Tests](./instructions/run_perf_tests.md) - Benchmarking
-- [Adaptive CI Loop](./instructions/adaptive_ci_loop.md) - Intelligent testing for refactoring
+- [Build Instructions](./instructions/build.instructions.md) - CMake, vcpkg, compilation
+- [Unit Tests](./instructions/run_unit_tests.instructions.md) - Boost Test execution
+- [TCK Tests](./instructions/run_tck_tests.instructions.md) - DMN compliance validation
+- [Performance Tests](./instructions/run_perf_tests.instructions.md) - Benchmarking
+- [Adaptive CI Loop](./instructions/adaptive_ci_loop.instructions.md) - Intelligent testing for refactoring
 
 **Documentation:**
 - [Architecture Overview](../docs/architecture.md) - Components, data flow, repository structure
@@ -101,7 +101,7 @@ for (auto& request : requests) {
 
 **Standards:**
 - [CODING_STANDARDS.md](../CODING_STANDARDS.md) - Naming, error handling, memory management
-- [Code Review Checklist](./instructions/code_review_checklist.md) - Quality gates for all changes
+- [Code Review Checklist](./instructions/code_review_checklist.instructions.md) - Quality gates for all changes
 - DMN 1.5 Spec: `docs/formal-24-01-01.txt` - Official OMG specification
 
 ## Development Workflow
@@ -228,8 +228,8 @@ To prevent “process compliance” failures:
 
 **Completion checklist (must be true before marking complete):**
 - [ ] Code changes implemented (if Phase 2)
-- [ ] Build succeeded (per `.github/instructions/build.md`)
-- [ ] Tests succeeded (per `.github/instructions/run_unit_tests.md` and optionally TCK)
+- [ ] Build succeeded (per `.github/instructions/build.instructions.md`)
+- [ ] Tests succeeded (per `.github/instructions/run_unit_tests.instructions.md` and optionally TCK)
 - [ ] User feedback question asked AND answered
 - [ ] Retrospective updated with user feedback + agent analysis
 
@@ -275,5 +275,5 @@ To prevent “process compliance” failures:
 
 ## Reference Pointers
 
-- Dependencies: see `README.md`, `vcpkg.json`, and `.github/instructions/build.md`
+- Dependencies: see `README.md`, `vcpkg.json`, and `.github/instructions/build.instructions.md`
 - Scripts: see `tools/scripts/`

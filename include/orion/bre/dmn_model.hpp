@@ -257,6 +257,7 @@ namespace orion::bre
         std::string label;
         std::string typeRef;
         std::string inputExpression; // FEEL expression for input
+        std::unique_ptr<ASTNode> inputExpression_ast; // Pre-parsed AST for inputExpression
         std::vector<std::string> inputValues; // Allowed values constraint
     };
 
@@ -402,7 +403,7 @@ namespace orion::bre
         // Evaluate with context
         [[nodiscard]] nlohmann::json evaluate(
             const nlohmann::json& input,
-            const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+            const std::map<std::string, const BusinessKnowledgeModel*, std::less<>>& available_bkms,
             EvaluationContext& eval_ctx) const;
     };
 
@@ -485,46 +486,49 @@ namespace orion::bre
          * @param label Key or dotted path to resolve
          * @return JSON value at path, or empty JSON if not found
          */
-        inline nlohmann::json get_value_from_label(const nlohmann::json& ctx, std::string_view label)
+        inline const nlohmann::json* get_value_from_label(const nlohmann::json& ctx, std::string_view label)
         {
             if (!ctx.is_object()) {
-                return {};
+                return nullptr;
             }
 
+            // Convert string_view to string for find() (required for safe JSON lookup)
+            std::string label_str(label);
+
             // Direct key lookup
-            auto iter = ctx.find(label);
+            auto iter = ctx.find(label_str);
             if (iter != ctx.end()) {
-                return *iter;
+                return &(*iter);
             }
 
             // Support dotted path resolution (e.g., "object.property")
-            if (label.find('.') != std::string::npos)
+            if (label_str.find('.') != std::string::npos)
             {
                 const nlohmann::json* node = &ctx;
                 size_t start = 0;
 
-                while (start < label.size())
+                while (start < label_str.size())
                 {
-                    size_t dot = label.find('.', start);
-                    std::string part(label.substr(start, dot == std::string::npos ? std::string::npos : dot - start));
+                    size_t dot = label_str.find('.', start);
+                    std::string part(label_str.substr(start, dot == std::string::npos ? std::string::npos : dot - start));
 
                     if (node->is_object())
                     {
                         auto part_iter = node->find(part);
                         if (part_iter == node->end()) {
-                            return {};
+                            return nullptr;
                         }
 
                         if (dot == std::string::npos)
                         {
-                            return *part_iter; // Final part
+                            return &(*part_iter); // Final part
                         }
                         
-                        node = &*part_iter; // Continue traversal
+                        node = &(*part_iter); // Continue traversal
                     }
                     else
                     {
-                        return {};
+                        return nullptr;
                     }
 
                     if (dot == std::string::npos) {
@@ -534,7 +538,7 @@ namespace orion::bre
                 }
             }
 
-            return {};
+            return nullptr;
         }
 
         /**

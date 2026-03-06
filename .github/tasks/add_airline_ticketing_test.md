@@ -180,8 +180,8 @@ Add a comprehensive test case demonstrating the correctness of executing hierarc
 
 - [Template File](../prompts/add_dmn_feature.md) - DMN feature implementation template
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) - Project coding standards
-- [Build Instructions](../instructions/build.md) - Build and configuration
-- [Unit Test Instructions](../instructions/run_unit_tests.md) - Testing
+- [Build Instructions](../instructions/build.instructions.md) - Build and configuration
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md) - Testing
 - [DMN 1.5 Specification](../../docs/formal-24-01-01.txt) - DMN standard (Section 6: DRG)
 - [Architecture Overview](../../docs/architecture.md) - ORION architecture
 - [Testing Guide](../../docs/testing.md) - Testing methodology

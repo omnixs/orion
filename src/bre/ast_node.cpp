@@ -40,42 +40,62 @@ namespace orion::bre
          */
         json resolveVariable(std::string_view name, const json& context)
         {
-            // Try exact match first
-            if (context.contains(name))
+            // Try exact match first (hot path — avoids all string allocations)
+            if (auto it = context.find(name); it != context.end())
             {
-                return context[name];
+                return *it;
             }
             
-            // Try with underscores instead of spaces
-            std::string underscored(name);
-            std::replace(underscored.begin(), underscored.end(), ' ', '_');
-            if (context.contains(underscored))
+            // Try with underscores instead of spaces (only if name contains spaces)
+            if (name.find(' ') != std::string_view::npos)
             {
-                return context[underscored];
+                std::string underscored(name);
+                std::replace(underscored.begin(), underscored.end(), ' ', '_');
+                if (auto it = context.find(underscored); it != context.end())
+                {
+                    return *it;
+                }
+                
+                // Try lowercase with underscores
+                std::string lower_us = underscored;
+                std::transform(lower_us.begin(), lower_us.end(), lower_us.begin(), ::tolower);
+                if (lower_us != underscored)
+                {
+                    if (auto it = context.find(lower_us); it != context.end())
+                    {
+                        return *it;
+                    }
+                }
+                
+                // Try without spaces
+                std::string nospace(name);
+                nospace.erase(std::remove(nospace.begin(), nospace.end(), ' '), nospace.end());
+                if (auto it = context.find(nospace); it != context.end())
+                {
+                    return *it;
+                }
             }
             
-            // Try lowercase
-            std::string lower(name);
-            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-            if (context.contains(lower))
+            // Try lowercase (only if name has uppercase characters)
             {
-                return context[lower];
-            }
-            
-            // Try lowercase with underscores
-            std::string lower_us = underscored;
-            std::transform(lower_us.begin(), lower_us.end(), lower_us.begin(), ::tolower);
-            if (context.contains(lower_us))
-            {
-                return context[lower_us];
-            }
-            
-            // Try without spaces
-            std::string nospace(name);
-            nospace.erase(std::remove(nospace.begin(), nospace.end(), ' '), nospace.end());
-            if (context.contains(nospace))
-            {
-                return context[nospace];
+                bool has_upper = false;
+                for (char c : name)
+                {
+                    if (std::isupper(static_cast<unsigned char>(c)))
+                    {
+                        has_upper = true;
+                        break;
+                    }
+                }
+                if (has_upper)
+                {
+                    std::string lower(name);
+                    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                    if (auto it = context.find(lower); it != context.end())
+                    {
+                        return *it;
+                    }
+                }
             }
             
             // Variable not found
@@ -484,46 +504,66 @@ namespace orion::bre
                     throw std::runtime_error(oss.str());
                 }
                 
-                // Try exact property name first
-                if (obj.contains(propertyName))
+                // Try exact property name first (hot path — avoids all string allocations)
+                if (auto it = obj.find(propertyName); it != obj.end())
                 {
-                    return obj[propertyName];
+                    return *it;
                 }
                 
-                // Try with spaces replaced by underscores (DMN naming flexibility)
-                std::string underscored = propertyName;
-                std::replace(underscored.begin(), underscored.end(), ' ', '_');
-                if (underscored != propertyName && obj.contains(underscored))
+                // Try with spaces replaced by underscores (only if name contains spaces)
+                if (propertyName.find(' ') != std::string::npos)
                 {
-                    return obj[underscored];
-                }
-                
-                // Convert camelCase to snake_case
-                std::string snake_case;
-                for (size_t i = 0; i < propertyName.length(); ++i)
-                {
-                    char c = propertyName[i];
-                    if (std::isupper(c) && i > 0)
+                    std::string underscored = propertyName;
+                    std::replace(underscored.begin(), underscored.end(), ' ', '_');
+                    if (auto it = obj.find(underscored); it != obj.end())
                     {
-                        snake_case += '_';
-                        snake_case += std::tolower(c);
-                    }
-                    else
-                    {
-                        snake_case += std::tolower(c);
+                        return *it;
                     }
                 }
-                if (snake_case != propertyName && obj.contains(snake_case))
+                
+                // Convert camelCase to snake_case (only if name has uppercase)
+                bool has_upper = false;
+                for (char c : propertyName)
                 {
-                    return obj[snake_case];
+                    if (std::isupper(static_cast<unsigned char>(c)))
+                    {
+                        has_upper = true;
+                        break;
+                    }
                 }
                 
-                // Try lowercase
-                std::string lower = propertyName;
-                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                if (lower != propertyName && lower != snake_case && obj.contains(lower))
+                if (has_upper)
                 {
-                    return obj[lower];
+                    std::string snake_case;
+                    snake_case.reserve(propertyName.length() + 4);
+                    for (size_t i = 0; i < propertyName.length(); ++i)
+                    {
+                        char c = propertyName[i];
+                        if (std::isupper(c) && i > 0)
+                        {
+                            snake_case += '_';
+                            snake_case += static_cast<char>(std::tolower(c));
+                        }
+                        else
+                        {
+                            snake_case += static_cast<char>(std::tolower(c));
+                        }
+                    }
+                    if (auto it = obj.find(snake_case); it != obj.end())
+                    {
+                        return *it;
+                    }
+                    
+                    // Try lowercase (reuse first part of snake_case logic)
+                    std::string lower = propertyName;
+                    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                    if (lower != snake_case)
+                    {
+                        if (auto it = obj.find(lower); it != obj.end())
+                        {
+                            return *it;
+                        }
+                    }
                 }
                 
                 // Property not found - throw error

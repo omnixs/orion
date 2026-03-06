@@ -482,10 +482,10 @@ clang-tidy src\api\engine.cpp -p build\
 **Project Documentation:**
 - [DMN Feature Template](../prompts/add_dmn_feature.md)
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md)
-- [Build Instructions](../instructions/build.md)
-- [Unit Test Instructions](../instructions/run_unit_tests.md)
-- [TCK Test Instructions](../instructions/run_tck_tests.md)
-- [Code Review Checklist](../instructions/code_review_checklist.md)
+- [Build Instructions](../instructions/build.instructions.md)
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md)
+- [TCK Test Instructions](../instructions/run_tck_tests.instructions.md)
+- [Code Review Checklist](../instructions/code_review_checklist.instructions.md)
 
 **DMN Specifications:**
 - DMN 1.5 Specification Chapter 6: docs/formal-24-01-01.txt (local copy)

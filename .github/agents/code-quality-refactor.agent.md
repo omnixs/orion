@@ -61,21 +61,21 @@ You execute systematic code quality improvements with automated verification and
 ### Phase 1: Baseline Capture
 
 1. **Build in BOTH Debug and Release configurations**
-   - Follow [Build Instructions](../instructions/build.md)
+   - Follow [Build Instructions](../instructions/build.instructions.md)
    - Debug: `cmake --build build-debug -j$(nproc)` (runtime checks: asserts, UB detection)
    - Release: `cmake --build build-release -j$(nproc)` (performance-accurate tests)
    - **Strategy**: Debug for smoke tests (fast, catches UB), Release for full validation
    - Verify: Check for compilation errors
 
 2. **Execute TCK baseline (Release only)**
-   - Follow [TCK Test Instructions](../instructions/run_tck_tests.md)
+   - Follow [TCK Test Instructions](../instructions/run_tck_tests.instructions.md)
    - Command: `./build-release/orion_tck_runner --log_level=error`
    - Save output to: `dat/log/baseline_tck_YYYYMMDD_HHMMSS.txt`
    - Parse results: Extract "X/Y passed" from output
    - Report: "Baseline captured: X/Y TCK tests passing"
 
 3. **Execute unit tests baseline (Release)**
-   - Follow [Unit Test Instructions](../instructions/run_unit_tests.md)
+   - Follow [Unit Test Instructions](../instructions/run_unit_tests.instructions.md)
    - Command: `./build-release/tst_orion --log_level=test_suite`
    - Record: Any existing failures to exclude from regression detection
 
@@ -87,7 +87,7 @@ You execute systematic code quality improvements with automated verification and
 ### Phase 2: Analysis & Enumeration
 
 1. **Run clang-tidy to generate issue list**
-   - Follow [Build Instructions](../instructions/build.md) to ensure compile_commands.json exists
+   - Follow [Build Instructions](../instructions/build.instructions.md) to ensure compile_commands.json exists
    - Read task file for specific clang-tidy check category
    - The `.clang-tidy` file in project root is automatically used
    - Command: `clang-tidy <files> -p build/` (uses project .clang-tidy config)
@@ -152,7 +152,7 @@ You execute systematic code quality improvements with automated verification and
       - Preserve formatting and comments
    
    c. **Build in Debug configuration (incremental)**
-      - Follow [Build Instructions](../instructions/build.md)
+      - Follow [Build Instructions](../instructions/build.instructions.md)
       - Command: `cmake --build build-debug -j$(nproc)`
       - **Speed optimization**: Uses incremental compilation, only rebuilds changed files
       - Capture output
@@ -165,7 +165,7 @@ You execute systematic code quality improvements with automated verification and
         * **Break retry loop and continue to next issue**
    
    d. **Run Debug smoke test if build succeeded (fast runtime validation)**
-      - Follow [Unit Test Instructions](../instructions/run_unit_tests.md)
+      - Follow [Unit Test Instructions](../instructions/run_unit_tests.instructions.md)
       - Command: `./build-debug/tst_orion --run_test=*impacted* --log_level=error` (if impact analysis available)
       - **Fallback**: Run small representative suite (~10-20 tests, <1 second)
       - **Purpose**: Catch runtime UB, assertion failures, dangling references
@@ -188,7 +188,7 @@ You execute systematic code quality improvements with automated verification and
         * **After 20+ consecutive successes**: checkpoint_interval = min(30, current_interval * 1.5)
    
    e. **If build and tests pass: Run code review checks**
-      - **Review the change using [Code Review Checklist](../instructions/code_review_checklist.md)**
+      - **Review the change using [Code Review Checklist](../instructions/code_review_checklist.instructions.md)**
       - **Focus on checklist sections relevant to the change type:**
         * For string_view changes → Section "Special Focus Areas: String_view Changes"
         * For FEEL evaluator → Section "Special Focus Areas: FEEL Evaluator Changes"
@@ -215,12 +215,12 @@ You execute systematic code quality improvements with automated verification and
    **Trigger when `issues_since_last_check >= checkpoint_interval`:**
    
    a. **Build in Release configuration (incremental)**
-      - Follow [Build Instructions](../instructions/build.md)
+      - Follow [Build Instructions](../instructions/build.instructions.md)
       - Command: `cmake --build build-release -j$(nproc)`
       - **Purpose**: Performance-accurate builds for full test suite
    
    b. **Execute full unit test suite (Release)**
-      - Follow [Unit Test Instructions](../instructions/run_unit_tests.md)
+      - Follow [Unit Test Instructions](../instructions/run_unit_tests.instructions.md)
       - Command: `./build-release/tst_orion --log_level=error`
       - **Purpose**: Full regression detection across all 279 tests
       - Save output to: `dat/log/checkpoint_unit_YYYYMMDD_HHMMSS_issue_X.txt`
@@ -235,6 +235,7 @@ You execute systematic code quality improvements with automated verification and
         * Recent failure in last 10 issues
         * Checkpoint interval >= 30 (periodic long-horizon check)
       - Command: `./build-release/orion_tck_runner --log_level=error`
+      - Follow [TCK Test Instructions](../instructions/run_tck_tests.instructions.md)
       - Save output to: `dat/log/checkpoint_tck_YYYYMMDD_HHMMSS_issue_X.txt`
    
    d. **Compare with baseline**
@@ -325,17 +326,17 @@ You execute systematic code quality improvements with automated verification and
      * Report count: "X/N issues resolved, Y remaining (Z skipped)"
 
 2. **Build in Release configuration (incremental)**
-   - Follow [Build Instructions](../instructions/build.md)
+   - Follow [Build Instructions](../instructions/build.instructions.md)
    - Command: `cmake --build build-release -j$(nproc)`
    - **Optimization**: Ninja + ccache enabled for faster rebuilds
 
 3. **Execute full unit test suite (Release)**
-   - Follow [Unit Test Instructions](../instructions/run_unit_tests.md)
+   - Follow [Unit Test Instructions](../instructions/run_unit_tests.instructions.md)
    - Command: `./build-release/tst_orion --log_level=error`
    - Save output to: `dat/log/final_unit_YYYYMMDD_HHMMSS.txt`
 
 4. **Execute full TCK test suite (Release)**
-   - Follow [TCK Test Instructions](../instructions/run_tck_tests.md)
+   - Follow [TCK Test Instructions](../instructions/run_tck_tests.instructions.md)
    - Command: `./build-release/orion_tck_runner --log_level=error`
    - Save output to: `dat/log/final_tck_YYYYMMDD_HHMMSS.txt`
 
@@ -535,9 +536,9 @@ Progress: 17/47 completed (36%), 1 skipped, 29 remaining
 
 ## Reference Documentation
 
-- [Build Instructions](../instructions/build.md) - CMake commands, configurations
-- [Unit Test Instructions](../instructions/run_unit_tests.md) - Test execution, options
-- [TCK Test Instructions](../instructions/run_tck_tests.md) - Compliance testing
+- [Build Instructions](../instructions/build.instructions.md) - CMake commands, configurations
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md) - Test execution, options
+- [TCK Test Instructions](../instructions/run_tck_tests.instructions.md) - Compliance testing
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) - Complete coding standards
 
 ## Success Criteria

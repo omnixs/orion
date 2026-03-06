@@ -97,10 +97,10 @@ namespace orion::bre
 
         /**
          * @brief Get topologically sorted evaluation order for all decisions
-         * @return Vector of decision IDs in evaluation order
+         * @return Const reference to cached vector of decision names in evaluation order
          * @throws std::runtime_error if cycle detected
          */
-        [[nodiscard]] std::vector<std::string> get_evaluation_order() const;
+        [[nodiscard]] const std::vector<std::string>& get_evaluation_order() const;
 
         /**
          * @brief Check if model contains cycles
@@ -110,6 +110,10 @@ namespace orion::bre
 
     private:
         std::vector<Decision> decisions_; // Own copy of decisions
+        std::vector<std::string> cached_evaluation_order_; // Cached topological order (computed at construction)
+        
+        // Compute and cache evaluation order at construction time
+        void compute_evaluation_order();
         
         // Build adjacency list representation of dependency graph
         [[nodiscard]] std::unordered_map<std::string, std::vector<std::string>> 

@@ -34,6 +34,35 @@ namespace orion::bre
         {
             THROW_CONTRACT_VIOLATION("DRG contains cyclic dependencies");
         }
+        
+        // Pre-compute and cache the evaluation order (done once, used many times)
+        compute_evaluation_order();
+    }
+    
+    void DRGEvaluator::compute_evaluation_order()
+    {
+        try
+        {
+            auto graph = build_dependency_graph();
+            auto sorted_ids = topological_sort(graph);
+            
+            // Convert IDs to names for lookup in engine
+            cached_evaluation_order_.clear();
+            cached_evaluation_order_.reserve(sorted_ids.size());
+            for (const auto& id : sorted_ids)
+            {
+                const Decision* dec = find_decision(id);
+                if (dec)
+                {
+                    cached_evaluation_order_.push_back(dec->name);
+                }
+            }
+        }
+        catch (const std::runtime_error&)
+        {
+            // Should not happen since has_cycles() already passed
+            cached_evaluation_order_.clear();
+        }
     }
 
     std::string DRGEvaluator::detect_cycles() const
@@ -161,22 +190,9 @@ namespace orion::bre
         }
     }
 
-    std::vector<std::string> DRGEvaluator::get_evaluation_order() const
+    const std::vector<std::string>& DRGEvaluator::get_evaluation_order() const
     {
-        auto graph = build_dependency_graph();
-        auto sorted_ids = topological_sort(graph);
-        
-        // Convert IDs to names for lookup in engine
-        std::vector<std::string> sorted_names;
-        for (const auto& id : sorted_ids)
-        {
-            const Decision* dec = find_decision(id);
-            if (dec)
-            {
-                sorted_names.push_back(dec->name);
-            }
-        }
-        return sorted_names;
+        return cached_evaluation_order_;
     }
 
     std::vector<std::string> DRGEvaluator::get_evaluation_order(std::string_view decision_name) const
@@ -261,9 +277,9 @@ namespace orion::bre
         }
 
         // Check memoization
-        if (memo.find(id) != memo.end())
+        if (auto memo_it = memo.find(id); memo_it != memo.end())
         {
-            return memo[id];
+            return memo_it->second;
         }
 
         // Find decision
@@ -296,7 +312,7 @@ namespace orion::bre
                 if (req_decision)
                 {
                     // Use decision name as key in context (per DMN spec)
-                    augmented_context[req_decision->name] = dep_result;
+                    augmented_context[req_decision->name] = std::move(dep_result);
                 }
             }
             // requiredInputId: input data is already in context, no action needed
@@ -321,13 +337,13 @@ namespace orion::bre
             throw std::runtime_error("Decision has no logic: " + id);
         }
 
-        // Store in memo
-        memo[id] = result;
+        // Store in memo and return
+        auto [it, _] = memo.emplace(std::move(id), std::move(result));
 
         // Unmark visiting
-        visiting.erase(id);
+        visiting.erase(it->first);
 
-        return result;
+        return it->second;
     }
 
     nlohmann::json DRGEvaluator::evaluate_decision(

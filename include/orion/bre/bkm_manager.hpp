@@ -119,13 +119,13 @@ namespace orion::bre
         void clear();
 
         /**
-         * @brief Create a copyable map of BKMs for evaluation contexts
-         * @return Map of BKM name to BKM copy (without unique_ptr)
+         * @brief Create a pointer-view map of BKMs for evaluation contexts
+         * @return Map of BKM name to const BKM pointer (no deep copy)
          */
-        [[nodiscard]] std::map<std::string, BusinessKnowledgeModel> create_bkm_map() const;
+        [[nodiscard]] std::map<std::string, const BusinessKnowledgeModel*, std::less<>> create_bkm_map() const;
 
     private:
-        std::map<std::string, std::unique_ptr<BusinessKnowledgeModel>> bkms_;
+        std::map<std::string, std::unique_ptr<BusinessKnowledgeModel>, std::less<>> bkms_;
     };
 
     /**
@@ -150,6 +150,6 @@ namespace orion::bre
      */
     nlohmann::json evaluate_bkm_expression(std::string_view expression,
                                          const nlohmann::json& input,
-                                         const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                         const std::map<std::string, const BusinessKnowledgeModel*, std::less<>>& available_bkms,
                                          const EvaluationContext& eval_ctx);
 } // namespace orion::bre

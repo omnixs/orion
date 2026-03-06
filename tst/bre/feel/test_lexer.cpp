@@ -44,7 +44,9 @@ std::string tokensToString(const std::vector<Token>& tokens)
         result += typeStr;
         if (!token.text.empty() && token.type != TokenType::END_OF_INPUT)
         {
-            result += "[" + token.text + "]";
+            result += "[";
+            result += token.text;
+            result += "]";
         }
     }
     return result;

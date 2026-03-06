@@ -587,9 +587,9 @@ git commit -m "feat: ItemDefinition support - improves TCK Level 3 coverage"
 - [DMN 1.5 Specification](../../docs/formal-24-01-01.txt) - Section 7.3.3 ItemDefinition metamodel (lines 3761-3900)
 - [DMN Feature Template](../prompts/add_dmn_feature.md) - Standard feature workflow
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) - Project coding standards
-- [Build Instructions](../instructions/build.md) - Build and configuration
-- [Unit Test Instructions](../instructions/run_unit_tests.md) - Testing
-- [TCK Test Instructions](../instructions/run_tck_tests.md) - Compliance
+- [Build Instructions](../instructions/build.instructions.md) - Build and configuration
+- [Unit Test Instructions](../instructions/run_unit_tests.instructions.md) - Testing
+- [TCK Test Instructions](../instructions/run_tck_tests.instructions.md) - Compliance
 
 ## Implementation Notes
 

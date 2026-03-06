@@ -100,18 +100,18 @@ namespace orion::bre::feel {
      */
     struct Token
     {
-        TokenType type;      ///< The type of this token
-        std::string text;    ///< The original text of the token
-        size_t position;     ///< Position in source string (for error reporting)
+        TokenType type;           ///< The type of this token
+        std::string_view text;    ///< View into the source expression (zero-copy)
+        size_t position;          ///< Position in source string (for error reporting)
 
         /**
          * @brief Construct a new Token
          * @param token_type Token type
-         * @param token_text Token text
+         * @param token_text Token text (must reference storage that outlives this token)
          * @param pos Position in source string
          */
-        Token(TokenType token_type, std::string token_text, size_t pos = 0)
-            : type(token_type), text(std::move(token_text)), position(pos)
+        Token(TokenType token_type, std::string_view token_text, size_t pos = 0)
+            : type(token_type), text(token_text), position(pos)
         {
         }
     };
@@ -146,8 +146,8 @@ namespace orion::bre::feel {
         std::vector<Token> tokenize(std::string_view expression);
 
     private:
-        std::string input_;     ///< Current input expression
-        size_t position_;       ///< Current position in input
+        std::string_view input_;     ///< View into current input expression (zero-copy)
+        size_t position_;              ///< Current position in input
         
         /**
          * @brief Check if a string is a FEEL keyword
@@ -218,7 +218,7 @@ namespace orion::bre::feel {
          * @param pos Starting position
          * @return Extracted word (letters, digits, underscores)
          */
-        [[nodiscard]] std::string extract_next_word(size_t pos) const;
+        [[nodiscard]] std::string_view extract_next_word(size_t pos) const;
         
         /**
          * @brief Check if we should stop at current space during identifier tokenization
@@ -228,11 +228,12 @@ namespace orion::bre::feel {
         [[nodiscard]] bool should_stop_at_space(std::string_view current_text) const;
         
         /**
-         * @brief Trim trailing whitespace from string
-         * @param text String to trim
-         * @return Trimmed string
+         * @brief Trim trailing whitespace from a view
+         * @param start Start position in input_
+         * @param end End position in input_
+         * @return End position with trailing whitespace removed
          */
-        [[nodiscard]] std::string trim_trailing_spaces(std::string text) const;
+        [[nodiscard]] size_t trim_trailing_position(size_t start, size_t end) const;
         
         // Helper functions for tokenize()
         

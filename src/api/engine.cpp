@@ -55,9 +55,9 @@ namespace orion
         class BusinessRulesEngine::Impl
         {
         public:
-            std::map<std::string, std::unique_ptr<DecisionTable>> decision_tables_;
+            std::map<std::string, std::unique_ptr<DecisionTable>, std::less<>> decision_tables_;
             BKMManager bkm_manager_; // Use BKMManager instead of raw map
-            std::map<std::string, std::unique_ptr<LiteralDecision>> literal_decisions_;
+            std::map<std::string, std::unique_ptr<LiteralDecision>, std::less<>> literal_decisions_;
             std::unique_ptr<DRGEvaluator> drg_evaluator_; // Decision Requirement Graph evaluator (optional)
             std::vector<bre::Decision> decisions_; // Store parsed decisions for DRG
             std::string namespace_uri_; // Store namespace from DMN model
@@ -198,7 +198,10 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
 
         bool BusinessRulesEngine::remove_decision_table(string_view name)
         {
-            return pimpl->decision_tables_.erase(string(name)) > 0;
+            auto it = pimpl->decision_tables_.find(name);
+            if (it == pimpl->decision_tables_.end()) return false;
+            pimpl->decision_tables_.erase(it);
+            return true;
         }
 
         bool BusinessRulesEngine::remove_business_knowledge_model(string_view name)
@@ -208,7 +211,10 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
 
         bool BusinessRulesEngine::remove_literal_decision(string_view name)
         {
-            return pimpl->literal_decisions_.erase(string(name)) > 0;
+            auto it = pimpl->literal_decisions_.find(name);
+            if (it == pimpl->literal_decisions_.end()) return false;
+            pimpl->literal_decisions_.erase(it);
+            return true;
         }
 
         void BusinessRulesEngine::clear()
@@ -265,45 +271,49 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
             // Create augmented context for cascading evaluations (don't modify original data)
             json augmented_context = data;
             
-            // Get evaluation order for all decisions
-            std::vector<std::string> eval_order;
+            // Get evaluation order for all decisions (cached — zero allocations)
+            const std::vector<std::string>* eval_order_ptr = nullptr;
+            std::vector<std::string> fallback_order;
             try
             {
-                eval_order = drg_evaluator_->get_evaluation_order();
+                eval_order_ptr = &drg_evaluator_->get_evaluation_order();
             }
             catch (const std::exception&)
             {
                 // Fall back to independent evaluation
-                eval_order.clear();
                 for (const auto& [name, _] : decision_tables_)
-                    eval_order.push_back(name);
+                    fallback_order.push_back(name);
                 for (const auto& [name, _] : literal_decisions_)
-                    eval_order.push_back(name);
+                    fallback_order.push_back(name);
+                eval_order_ptr = &fallback_order;
             }
             
             // Evaluate decisions in order, augmenting context as we go
-            for (const auto& name : eval_order)
+            for (const auto& name : *eval_order_ptr)
             {
                 json result;
                 
                 // Try decision table first
                 if (try_evaluate_decision_table(name, augmented_context, eval_ctx, result))
                 {
-                    results[name] = result;
-                    augmented_context[name] = result;  // Add successful evaluations to context for dependent decisions
+                    augmented_context[name] = std::move(result);   // Move into context (avoids copy)
+                    results[name] = augmented_context[name];        // Copy from context to output
                     continue;
                 }
                 
                 // Try literal decision
                 bool literal_success = try_evaluate_literal_decision(name, augmented_context, eval_ctx, result);
                 
-                // Always add result to output (even if evaluation failed - DMN spec requires error results)
-                results[name] = result;
-                
                 // Only add successful evaluations to augmented context for dependent decisions
                 if (literal_success)
                 {
-                    augmented_context[name] = result;
+                    augmented_context[name] = std::move(result);   // Move into context
+                    results[name] = augmented_context[name];        // Copy from context to output
+                }
+                else
+                {
+                    // Always add result to output (even if evaluation failed - DMN spec requires error results)
+                    results[name] = std::move(result);
                 }
             }
         }
@@ -318,7 +328,7 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
                 {
                     result = json{};  // Set empty result on error
                 }
-                results[name] = result;
+                results[name] = std::move(result);
             }
             
             // Evaluate literal decisions
@@ -329,13 +339,13 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
                 {
                     result = json{};  // Set empty result on error
                 }
-                results[name] = result;
+                results[name] = std::move(result);
             }
         }
         
         bool BusinessRulesEngine::Impl::try_evaluate_decision_table(string_view name, const json& input, bre::EvaluationContext& eval_ctx, json& result) const
         {
-            auto it = decision_tables_.find(string(name));
+            auto it = decision_tables_.find(name);
             if (it == decision_tables_.end())
             {
                 return false;
@@ -355,7 +365,7 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
         
         bool BusinessRulesEngine::Impl::try_evaluate_literal_decision(string_view name, const json& input, bre::EvaluationContext& eval_ctx, json& result) const
         {
-            auto it = literal_decisions_.find(string(name));
+            auto it = literal_decisions_.find(name);
             if (it == literal_decisions_.end())
             {
                 return false;

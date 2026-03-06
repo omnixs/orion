@@ -72,7 +72,7 @@ if(USE_CLANG AND NOT CMAKE_CXX_COMPILER)
   message(STATUS "Using Clang compiler: ${CMAKE_CXX_COMPILER}")
 endif()
 
-project(orion VERSION 2.1.1 LANGUAGES CXX)
+project(orion VERSION 2.1.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -355,6 +355,20 @@ if(ORION_BUILD_TESTS)
     target_link_libraries(orion-bench PRIVATE orion_lib benchmark::benchmark spdlog::spdlog)
     set_property(TARGET orion-bench PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
     source_group(TREE ${CMAKE_SOURCE_DIR} FILES src/bench/orion_bench.cpp)
+
+    # Allocation-counting benchmark: uses benchmark::MemoryManager to report
+    # allocs/op alongside latency.  Self-contained — no spdlog dependency.
+    add_executable(orion-bench-allocs src/bench/orion_bench_allocs.cpp)
+    target_link_libraries(orion-bench-allocs PRIVATE orion_lib benchmark::benchmark
+        $<TARGET_NAME_IF_EXISTS:spdlog::spdlog>)
+    target_include_directories(orion-bench-allocs PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    # GCC 13 static-analysis false-positive: it inlines through operator new→malloc
+    # and operator delete(void*,size_t)→free and flags them as "mismatched".
+    # This is the intended pattern for globally overriding new/delete with malloc.
+    target_compile_options(orion-bench-allocs PRIVATE
+        $<$<CXX_COMPILER_ID:GNU>:-Wno-mismatched-new-delete>)
+    set_property(TARGET orion-bench-allocs PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
+    source_group(TREE ${CMAKE_SOURCE_DIR} FILES src/bench/orion_bench_allocs.cpp)
 
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/bench/orion_bench_bundle.cpp")
       add_executable(orion-bench-bundle src/bench/orion_bench_bundle.cpp src/api/spdlog_logger.cpp src/common/log.cpp)

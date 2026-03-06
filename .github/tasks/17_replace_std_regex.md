@@ -112,17 +112,17 @@ Add or extend tests to cover:
 
 ## Validation Steps
 
-1. Build Debug per `.github/instructions/build.md`.
-2. Run unit tests per `.github/instructions/run_unit_tests.md`.
-3. Run TCK runner per `.github/instructions/run_tck_tests.md`.
+1. Build Debug per `.github/instructions/build.instructions.md`.
+2. Run unit tests per `.github/instructions/run_unit_tests.instructions.md`.
+3. Run TCK runner per `.github/instructions/run_tck_tests.instructions.md`.
 4. If a baseline exists for the current version, run regression detection and confirm no regressions.
 
 ## Reference Documentation
 
 - Issue: https://github.com/omnixs/orion/issues/17
-- Build: `.github/instructions/build.md`
-- Unit tests: `.github/instructions/run_unit_tests.md`
-- TCK: `.github/instructions/run_tck_tests.md`
+- Build: `.github/instructions/build.instructions.md`
+- Unit tests: `.github/instructions/run_unit_tests.instructions.md`
+- TCK: `.github/instructions/run_tck_tests.instructions.md`
 - Coding standards: `CODING_STANDARDS.md`
 
 ## Retrospective
