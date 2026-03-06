@@ -66,7 +66,8 @@ namespace orion::bre::feel {
         }
         
         feel::Lexer lexer;
-        auto tokens = lexer.tokenize(std::string(expression));
+        std::string expression_str(expression);  // Store expression to keep string_view tokens valid
+        auto tokens = lexer.tokenize(expression_str);
         
         feel::Parser parser;
         auto ast = parser.parse(tokens);

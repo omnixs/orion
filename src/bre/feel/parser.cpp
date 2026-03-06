@@ -191,7 +191,7 @@ namespace orion::bre::feel {
         
         while (check(TokenType::OPERATOR))
         {
-            const std::string& oper = peek().text;
+            const std::string_view oper = peek().text;
             
             // Check if it's a comparison operator
             if (oper == "<" || oper == ">" || oper == "<=" || oper == ">=" || 
@@ -201,7 +201,7 @@ namespace orion::bre::feel {
                 auto right = parse_additive();
                 
                 // Normalize == to =
-                std::string normalized_op = (oper == "==") ? "=" : oper;
+                std::string normalized_op = (oper == "==") ? "=" : std::string(oper);
                 
                 // Create binary comparison node
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, normalized_op);
@@ -225,7 +225,7 @@ namespace orion::bre::feel {
         
         while (check(TokenType::OPERATOR))
         {
-            const std::string& oper = peek().text;
+            const std::string_view oper = peek().text;
             
             if (oper == "+" || oper == "-")
             {
@@ -233,7 +233,7 @@ namespace orion::bre::feel {
                 auto right = parse_multiplicative();
                 
                 // Create binary operator node
-                auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, oper);
+                auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, std::string(oper));
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(right));
                 left = std::move(node);
@@ -254,7 +254,7 @@ namespace orion::bre::feel {
         
         while (check(TokenType::OPERATOR))
         {
-            const std::string& oper = peek().text;
+            const std::string_view oper = peek().text;
             
             if (oper == "*" || oper == "/")
             {
@@ -262,7 +262,7 @@ namespace orion::bre::feel {
                 auto right = parse_exponentiation();
                 
                 // Create binary operator node
-                auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, oper);
+                auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, std::string(oper));
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(right));
                 left = std::move(node);
@@ -350,19 +350,19 @@ namespace orion::bre::feel {
 std::unique_ptr<ASTNode> Parser::parse_number_literal()
 {
     const Token& token = advance();
-    return std::make_unique<ASTNode>(ASTNodeType::LITERAL_NUMBER, token.text);
+    return std::make_unique<ASTNode>(ASTNodeType::LITERAL_NUMBER, std::string(token.text));
 }
 
 std::unique_ptr<ASTNode> Parser::parse_string_literal()
 {
     const Token& token = advance();
     // Remove surrounding quotes for storage
-    std::string text = token.text;
+    std::string_view text = token.text;
     if (text.length() >= 2 && text.front() == '"' && text.back() == '"')
     {
         text = text.substr(1, text.length() - 2);
     }
-    return std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, text);
+    return std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, std::string(text));
 }
 
 std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
@@ -373,7 +373,7 @@ std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
     if (token.text == "true" || token.text == "false" || token.text == "null")
     {
         advance();
-        return std::make_unique<ASTNode>(ASTNodeType::LITERAL_NUMBER, token.text);
+        return std::make_unique<ASTNode>(ASTNodeType::LITERAL_NUMBER, std::string(token.text));
     }
     
     // Special case: "not" can be a function name when followed by '('
@@ -442,7 +442,7 @@ void Parser::parse_function_parameters(ASTNode* func_node, std::string_view func
             {
                 // This is a named parameter
                 is_named_param = true;
-                param_name = ident_token.text;
+                param_name = std::string(ident_token.text);
                 advance(); // consume ':'
             }
             else
@@ -517,7 +517,7 @@ std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(std::string_view
         const Token& prop_token = advance();
         
         // Create property access node
-        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, prop_token.text);
+        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, std::string(prop_token.text));
         prop_access->children.push_back(std::move(node));
         node = std::move(prop_access);
     }
@@ -547,7 +547,7 @@ std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
         const Token& prop_token = advance();
         
         // Create property access node
-        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, prop_token.text);
+        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, std::string(prop_token.text));
         prop_access->children.push_back(std::move(expr));
         expr = std::move(prop_access);
     }
@@ -605,12 +605,12 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     // Parse key (must be identifier or string)
     if (check(TokenType::IDENTIFIER))
     {
-        return advance().text;
+        return std::string(advance().text);
     }
     
     if (check(TokenType::STRING))
     {
-        std::string key = advance().text;
+        std::string key(advance().text);
         // Remove quotes if present
         if (key.size() >= 2 && key.front() == '"' && key.back() == '"')
         {

@@ -87,7 +87,7 @@ private:
     FunctionRegistry();
     ~FunctionRegistry() = default;
     
-    std::map<std::string, FunctionSignature> functions_;
+    std::map<std::string, FunctionSignature, std::less<>> functions_;
 };
 
 } // namespace orion::bre::feel

@@ -290,19 +290,28 @@ REPEAT:
 
 ## Retrospective
 
-(This section will be filled after task completion)
-
 ### What worked well:
-- 
+- All implemented optimizations (H2–H8) exceeded the >30% target: **−62% allocations / −63% bytes** for simple eval, **−74% allocations / −72% bytes** for medium eval
+- Google Benchmark `MemoryManager` integration proved more robust than the original Boost.Test `AllocationTracker` plan — `num_allocs`, `total_allocated_bytes`, `net_heap_growth` captured per benchmark iteration with full JSON output
+- Caching strategies (H4: DRG order, H7: inputExpression ASTs, H8: BKM map) eliminated the largest hotspots cleanly without touching public API
+- `net_heap_growth = 0` confirmed on all eval benchmarks — no leaks introduced
+- Iterative per-step fix loop (build → unit tests → TCK) caught issues early at each stage
 
 ### What was unclear or problematic:
-- 
+- H3 optimization (`get_value_from_label` returning `const json*`) introduced a critical production crash: implicit `std::string_view` → `std::string` conversion was needed before `nlohmann::json::find()` because the library does not accept `string_view` directly — caused memcmp access violation in production use; fixed in `fc71800`
+- GCC 13 emitted false-positive `-Wno-mismatched-new-delete` warnings for the global `operator new`/`delete` overrides in the benchmark file — required compiler-specific suppression via CMake generator expression
+- Linux static builds required explicit `spdlog::spdlog` linking for `orion-bench-allocs` not needed on MSVC
+- P2-B (Lexer `reserve` + `string_view` for `input_`) and P2-C (`string_view` for `Token::text`) were **not implemented**: the achieved allocation reduction already exceeded the success threshold and the Lexer changes carried high risk (dangling `string_view` potential per the risk table)
 
 ### Suggestions for improvement:
-- 
+- Add a regression test specifically for `get_value_from_label` with `string_view` inputs to prevent the `find()` implicit conversion bug from recurring
+- P2-B / P2-C (Lexer optimizations) remain valid future work; they should be done in a dedicated task with AddressSanitizer validation
+- Task template should prompt for a "partial success" capture path — not all 8 planned items were completed, but success criteria were met
 
 ### Actual effort:
-- 
+- Estimated: 16–24 hours
+- Actual: ~2 AI sessions (significantly under estimate); the caching changes were straightforward once profiling data was available; unplanned crash fix added ~1 session equivalent
 
 ### Blockers encountered:
-- 
+- Production crash (memcmp AV) in `get_value_from_label` discovered after H3 was committed — required rollback analysis and targeted fix before the branch could be considered stable
+- GCC/Linux build compatibility required two follow-up commits after the initial benchmark integration

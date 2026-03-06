@@ -80,7 +80,7 @@ namespace orion::bre::feel {
             case '.': type = TokenType::DOT; break;
             default: return; // Not punctuation
         }
-        tokens.emplace_back(type, std::string(1, current), position_);
+        tokens.emplace_back(type, input_.substr(position_, 1), position_);
         advance();
     }
 
@@ -89,6 +89,7 @@ namespace orion::bre::feel {
         input_ = expression;
         position_ = 0;
         std::vector<Token> tokens;
+        tokens.reserve(expression.size() / 4 + 1);  // Heuristic: ~4 chars per token on average
 
         while (position_ < input_.length())
         {
@@ -136,7 +137,7 @@ namespace orion::bre::feel {
         }
 
         // Always end with END_OF_INPUT
-        tokens.emplace_back(TokenType::END_OF_INPUT, "", position_);
+        tokens.emplace_back(TokenType::END_OF_INPUT, std::string_view{}, position_);
         return tokens;
     }
 
@@ -176,73 +177,71 @@ namespace orion::bre::feel {
     Token Lexer::tokenize_number()
     {
         size_t start = position_;
-        std::string text;
 
         // Handle negative sign
         if (peek() == '-')
         {
-            text += advance();
+            advance();
         }
 
         // Integer part (optional for leading-dot decimals like .872)
         while (std::isdigit(static_cast<unsigned char>(peek())))
         {
-            text += advance();
+            advance();
         }
 
         // Decimal part
         if (peek() == '.')
         {
-            text += advance();
+            advance();
             while (std::isdigit(static_cast<unsigned char>(peek())))
             {
-                text += advance();
+                advance();
             }
         }
 
         // Scientific notation (e.g., 1e-5, 2.5E+10)
         if (peek() == 'e' || peek() == 'E')
         {
-            text += advance();
+            advance();
             if (peek() == '+' || peek() == '-')
             {
-                text += advance();
+                advance();
             }
             while (std::isdigit(static_cast<unsigned char>(peek())))
             {
-                text += advance();
+                advance();
             }
         }
 
-        return Token(TokenType::NUMBER, text, start);
+        return Token(TokenType::NUMBER, input_.substr(start, position_ - start), start);
     }
 
     Token Lexer::tokenize_string()
     {
         size_t start = position_;
-        std::string text;
 
         // Opening quote
         if (peek() != '"')
         {
             throw std::runtime_error("Expected opening quote for string literal");
         }
-        text += advance();
+        advance();
 
         // String content (with escape sequence support)
         while (peek() != '"' && peek() != '\0')
         {
             if (peek() == '\\')
             {
-                text += advance(); // Add backslash
+                advance(); // Skip backslash
                 if (peek() != '\0')
                 {
-                    text += advance(); // Add escaped character
+                    advance(); // Skip escaped character
                 }
             }
             else
             {
-                text += advance();
+                advance();
             }
         }
 
@@ -251,9 +250,9 @@ namespace orion::bre::feel {
         {
             throw std::runtime_error("Unterminated string literal");
         }
-        text += advance();
+        advance();
 
-        return Token(TokenType::STRING, text, start);
+        return Token(TokenType::STRING, input_.substr(start, position_ - start), start);
     }
 
     // Helper: Check if next character is an operator or punctuation
@@ -276,16 +275,15 @@ namespace orion::bre::feel {
     }
 
     // Helper: Extract next word starting from position
-    std::string Lexer::extract_next_word(size_t pos) const
+    std::string_view Lexer::extract_next_word(size_t pos) const
     {
-        std::string word;
+        size_t start = pos;
         while (pos < input_.length() && 
                (std::isalnum(static_cast<unsigned char>(input_[pos])) || input_[pos] == '_'))
         {
-            word += input_[pos];
             pos++;
         }
-        return word;
+        return input_.substr(start, pos - start);
     }
 
     // Helper: Check if we should stop at current space
@@ -312,7 +310,7 @@ namespace orion::bre::feel {
         }
 
         // Stop if next word is a keyword
-        std::string next_word = extract_next_word(lookahead);
+        std::string_view next_word = extract_next_word(lookahead);
         if (!next_word.empty() && is_keyword(next_word))
         {
             return true;
@@ -321,39 +319,39 @@ namespace orion::bre::feel {
         return false; // Continue including spaces
     }
 
-    // Helper: Trim trailing whitespace from string
-    std::string Lexer::trim_trailing_spaces(std::string text) const
+    // Helper: Trim trailing whitespace — returns adjusted end position
+    size_t Lexer::trim_trailing_position(size_t start, size_t end) const
     {
-        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())))
+        while (end > start && std::isspace(static_cast<unsigned char>(input_[end - 1])))
         {
-            text.pop_back();
+            end--;
         }
-        return text;
+        return end;
     }
 
     // Main tokenizer: Handle identifiers with potential spaces
     Token Lexer::tokenize_identifier()
     {
         size_t start = position_;
-        std::string text;
 
         // First character (letter or underscore)
-        text += advance();
+        advance();
 
         // Subsequent characters (letters, digits, underscores, spaces)
         // FEEL allows spaces in identifiers (e.g., "Full Name", "Monthly Salary")
         while (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_' || peek() == ' ')
         {
             // Check if we should stop at this space
-            if (peek() == ' ' && should_stop_at_space(text))
+            if (peek() == ' ' && should_stop_at_space(input_.substr(start, position_ - start)))
             {
                 break;
             }
-            text += advance();
+            advance();
         }
 
         // Trim trailing spaces from identifier
-        text = trim_trailing_spaces(text);
+        size_t end = trim_trailing_position(start, position_);
+        std::string_view text = input_.substr(start, end - start);
 
         // Check if it's a keyword
         TokenType type = is_keyword(text) ? TokenType::KEYWORD : TokenType::IDENTIFIER;
@@ -363,38 +361,36 @@ namespace orion::bre::feel {
     Token Lexer::tokenize_operator()
     {
         size_t start = position_;
-        std::string text;
 
         char current = advance();
-        text += current;
 
         // Two-character operators
         if (current == '*' && peek() == '*')
         {
             // Exponentiation **
-            text += advance();
+            advance();
         }
         else if (current == '<' && peek() == '=')
         {
             // Less than or equal <=
-            text += advance();
+            advance();
         }
         else if (current == '>' && peek() == '=')
         {
             // Greater than or equal >=
-            text += advance();
+            advance();
         }
         else if (current == '!' && peek() == '=')
         {
             // Not equal !=
-            text += advance();
+            advance();
         }
         else if (current == '=' && peek() == '=')
         {
             // Alternative equality ==  (treat as =)
-            text += advance();
+            advance();
         }
 
-        return Token(TokenType::OPERATOR, text, start);
+        return Token(TokenType::OPERATOR, input_.substr(start, position_ - start), start);
     }
 } // namespace orion::bre

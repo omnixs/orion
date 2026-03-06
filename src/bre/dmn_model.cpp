@@ -51,10 +51,11 @@ namespace orion::bre
         {
             if (!input.inputValues.empty())
             {
-                json input_value = detail::get_value_from_label(context, input.label);
+                const json* input_value_ptr = detail::get_value_from_label(context, input.label);
                 // Only check if value is present in context
-                if (!input_value.is_null())
+                if (input_value_ptr != nullptr && !input_value_ptr->is_null())
                 {
+                    const json& input_value = *input_value_ptr;
                     bool allowed = false;
                     for (const auto& allowed_val : input.inputValues)
                     {
@@ -109,11 +110,20 @@ namespace orion::bre
                     // Input has an expression - evaluate it as FEEL
                     try
                     {
-                        feel::Lexer lexer;
-                        auto tokens = lexer.tokenize(input_clause.inputExpression);
-                        feel::Parser parser;
-                        auto ast = parser.parse(tokens);
-                        input_value = ast->evaluate(input, eval_ctx);
+                        if (input_clause.inputExpression_ast)
+                        {
+                            // Use pre-parsed AST (fast path)
+                            input_value = input_clause.inputExpression_ast->evaluate(input, eval_ctx);
+                        }
+                        else
+                        {
+                            // Fallback: parse at runtime
+                            feel::Lexer lexer;
+                            auto tokens = lexer.tokenize(input_clause.inputExpression);
+                            feel::Parser parser;
+                            auto ast = parser.parse(tokens);
+                            input_value = ast->evaluate(input, eval_ctx);
+                        }
                     }
                     catch (...)
                     {
@@ -124,7 +134,8 @@ namespace orion::bre
                 else
                 {
                     // No expression - use label lookup (legacy behavior)
-                    input_value = detail::get_value_from_label(input, input_clause.label);
+                    const json* val_ptr = detail::get_value_from_label(input, input_clause.label);
+                    input_value = val_ptr ? *val_ptr : json{};
                 }
 
                 // Phase 3: Use cached AST if available, otherwise fall back to unary_test_matches
@@ -636,7 +647,7 @@ namespace orion::bre
 
     // Implementation of LiteralDecision::evaluate
     json LiteralDecision::evaluate(const json& input,
-                                   const std::map<std::string, BusinessKnowledgeModel>& available_bkms,
+                                   const std::map<std::string, const BusinessKnowledgeModel*, std::less<>>& available_bkms,
                                    EvaluationContext& eval_ctx) const
     {
         if (expression_text.empty())

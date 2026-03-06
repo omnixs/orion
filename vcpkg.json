@@ -1,6 +1,6 @@
 {
   "name": "orion-bre",
-  "version-string": "2.1.1",
+  "version-string": "2.1.2",
   "dependencies": [
     "nlohmann-json",
     "rapidxml",
