@@ -1407,5 +1407,247 @@ json evaluate_duration_function(const std::vector<json>& args)
     return nullptr;
 }
 
+// ========== PHASE 1: TRIVIAL FUNCTIONS ==========
+
+json evaluate_odd_function(const std::vector<json>& args)
+{
+    if (args.size() != 1)
+    {
+        return nullptr;
+    }
+
+    const auto& arg = args[0];
+
+    if (arg.is_null())
+    {
+        return nullptr;
+    }
+
+    if (!arg.is_number())
+    {
+        return nullptr;
+    }
+
+    double value = arg.get<double>();
+
+    // Must be an integer (no fractional part)
+    if (value != std::floor(value))
+    {
+        return nullptr;
+    }
+
+    long long int_val = static_cast<long long>(value);
+    return (int_val % 2 != 0);
+}
+
+json evaluate_even_function(const std::vector<json>& args)
+{
+    if (args.size() != 1)
+    {
+        return nullptr;
+    }
+
+    const auto& arg = args[0];
+
+    if (arg.is_null())
+    {
+        return nullptr;
+    }
+
+    if (!arg.is_number())
+    {
+        return nullptr;
+    }
+
+    double value = arg.get<double>();
+
+    // Must be an integer (no fractional part)
+    if (value != std::floor(value))
+    {
+        return nullptr;
+    }
+
+    long long int_val = static_cast<long long>(value);
+    return (int_val % 2 == 0);
+}
+
+json evaluate_number_function(const std::vector<json>& args)
+{
+    if (args.size() != 3)
+    {
+        return nullptr;
+    }
+
+    const auto& from = args[0];
+    const auto& grouping_sep = args[1];
+    const auto& decimal_sep = args[2];
+
+    // Null propagation
+    if (from.is_null())
+    {
+        return nullptr;
+    }
+
+    if (!from.is_string())
+    {
+        return nullptr;
+    }
+
+    std::string number_str = from.get<std::string>();
+
+    // Get separator strings (null means no separator used)
+    std::string group_sep_str;
+    std::string dec_sep_str;
+
+    if (!grouping_sep.is_null())
+    {
+        if (!grouping_sep.is_string())
+        {
+            return nullptr;
+        }
+        group_sep_str = grouping_sep.get<std::string>();
+        // Grouping separator must be space, comma, or period
+        if (group_sep_str != " " && group_sep_str != "," && group_sep_str != ".")
+        {
+            return nullptr;
+        }
+    }
+
+    if (!decimal_sep.is_null())
+    {
+        if (!decimal_sep.is_string())
+        {
+            return nullptr;
+        }
+        dec_sep_str = decimal_sep.get<std::string>();
+        // Decimal separator must be comma or period
+        if (dec_sep_str != "," && dec_sep_str != ".")
+        {
+            return nullptr;
+        }
+    }
+
+    // Grouping and decimal separators must be different
+    if (!group_sep_str.empty() && !dec_sep_str.empty() && group_sep_str == dec_sep_str)
+    {
+        return nullptr;
+    }
+
+    // Remove grouping separators
+    std::string cleaned;
+    cleaned.reserve(number_str.size());
+    for (size_t i = 0; i < number_str.size(); ++i)
+    {
+        std::string ch(1, number_str[i]);
+        if (!group_sep_str.empty() && ch == group_sep_str)
+        {
+            continue; // Skip grouping separator
+        }
+        if (!dec_sep_str.empty() && ch == dec_sep_str)
+        {
+            cleaned += '.'; // Replace decimal separator with standard '.'
+        }
+        else
+        {
+            cleaned += number_str[i];
+        }
+    }
+
+    // Parse the cleaned string as a number
+    try
+    {
+        size_t pos = 0;
+        double result = std::stod(cleaned, &pos);
+        if (pos != cleaned.size())
+        {
+            return nullptr; // Not all characters consumed
+        }
+        return result;
+    }
+    catch (const std::exception&)
+    {
+        return nullptr;
+    }
+}
+
+json evaluate_string_function(const std::vector<json>& args)
+{
+    if (args.size() != 1)
+    {
+        return nullptr;
+    }
+
+    const auto& arg = args[0];
+
+    if (arg.is_null())
+    {
+        return nullptr;
+    }
+
+    if (arg.is_string())
+    {
+        return arg; // Already a string
+    }
+
+    if (arg.is_boolean())
+    {
+        return arg.get<bool>() ? "true" : "false";
+    }
+
+    if (arg.is_number())
+    {
+        double value = arg.get<double>();
+        // Format integer values without decimal point
+        if (value == std::floor(value) && std::abs(value) < 1e15)
+        {
+            long long int_val = static_cast<long long>(value);
+            return std::to_string(int_val);
+        }
+        // Use ostringstream for proper formatting
+        std::ostringstream oss;
+        oss << value;
+        return oss.str();
+    }
+
+    if (arg.is_array() || arg.is_object())
+    {
+        return arg.dump();
+    }
+
+    return nullptr;
+}
+
+json evaluate_is_function(const std::vector<json>& args)
+{
+    if (args.size() != 2)
+    {
+        return nullptr;
+    }
+
+    const auto& val1 = args[0];
+    const auto& val2 = args[1];
+
+    // Both null → true
+    if (val1.is_null() && val2.is_null())
+    {
+        return true;
+    }
+
+    // One null, one not → false
+    if (val1.is_null() || val2.is_null())
+    {
+        return false;
+    }
+
+    // Different types → false
+    if (val1.type() != val2.type())
+    {
+        return false;
+    }
+
+    // Same type and value → compare
+    return val1 == val2;
+}
+
 } // namespace orion::bre
 
