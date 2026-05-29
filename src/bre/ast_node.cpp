@@ -777,6 +777,117 @@ namespace orion::bre
             {
                 return feel::evaluate_is_function(args);
             }
+            // Phase 2A: Aggregation functions
+            else if (funcName == "count")
+            {
+                return feel::evaluate_count_function(args);
+            }
+            else if (funcName == "sum")
+            {
+                return feel::evaluate_sum_function(args);
+            }
+            else if (funcName == "min")
+            {
+                return feel::evaluate_min_function(args);
+            }
+            else if (funcName == "max")
+            {
+                return feel::evaluate_max_function(args);
+            }
+            else if (funcName == "mean")
+            {
+                return feel::evaluate_mean_function(args);
+            }
+            else if (funcName == "product")
+            {
+                return feel::evaluate_product_function(args);
+            }
+            else if (funcName == "median")
+            {
+                return feel::evaluate_median_function(args);
+            }
+            else if (funcName == "stddev")
+            {
+                return feel::evaluate_stddev_function(args);
+            }
+            else if (funcName == "mode")
+            {
+                return feel::evaluate_mode_function(args);
+            }
+            // Phase 2B: List manipulation functions
+            else if (funcName == "list contains")
+            {
+                return feel::evaluate_list_contains_function(args);
+            }
+            else if (funcName == "append")
+            {
+                return feel::evaluate_append_function(args);
+            }
+            else if (funcName == "concatenate")
+            {
+                return feel::evaluate_concatenate_function(args);
+            }
+            else if (funcName == "insert before")
+            {
+                return feel::evaluate_insert_before_function(args);
+            }
+            else if (funcName == "remove")
+            {
+                return feel::evaluate_remove_function(args);
+            }
+            else if (funcName == "reverse")
+            {
+                return feel::evaluate_reverse_function(args);
+            }
+            else if (funcName == "index of")
+            {
+                return feel::evaluate_index_of_function(args);
+            }
+            else if (funcName == "sublist")
+            {
+                return feel::evaluate_sublist_function(args);
+            }
+            else if (funcName == "union")
+            {
+                return feel::evaluate_union_function(args);
+            }
+            else if (funcName == "distinct values")
+            {
+                return feel::evaluate_distinct_values_function(args);
+            }
+            else if (funcName == "flatten")
+            {
+                return feel::evaluate_flatten_function(args);
+            }
+            else if (funcName == "sort")
+            {
+                return feel::evaluate_sort_function(args);
+            }
+            else if (funcName == "list replace")
+            {
+                return feel::evaluate_list_replace_function(args);
+            }
+            // ========== PHASE 3: CONTEXT FUNCTIONS ==========
+            else if (funcName == "get value")
+            {
+                return feel::evaluate_get_value_function(args);
+            }
+            else if (funcName == "get entries")
+            {
+                return feel::evaluate_get_entries_function(args);
+            }
+            else if (funcName == "context")
+            {
+                return feel::evaluate_context_function(args);
+            }
+            else if (funcName == "context put")
+            {
+                return feel::evaluate_context_put_function(args);
+            }
+            else if (funcName == "context merge")
+            {
+                return feel::evaluate_context_merge_function(args);
+            }
             else
             {
                 std::ostringstream oss;

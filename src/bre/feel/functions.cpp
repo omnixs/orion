@@ -28,6 +28,8 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <map>
+#include <limits>
 
 namespace orion::bre::feel {
 
@@ -1647,6 +1649,752 @@ json evaluate_is_function(const std::vector<json>& args)
 
     // Same type and value → compare
     return val1 == val2;
+}
+
+// ========== PHASE 2A: AGGREGATION FUNCTIONS ==========
+
+// Helper: Normalize variadic args to a single flat list of numbers
+// min(1,2,3) or min([1,2,3]) → [1,2,3]
+static json normalize_to_list(const std::vector<json>& args)
+{
+    if (args.size() == 1)
+    {
+        const auto& arg = args[0];
+        if (arg.is_null()) return nullptr;
+        if (arg.is_array()) return arg;
+        // Single scalar → wrap in array
+        return json::array({arg});
+    }
+    // Multiple args → treat as list
+    json result = json::array();
+    for (const auto& a : args)
+    {
+        result.push_back(a);
+    }
+    return result;
+}
+
+json evaluate_count_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return json(1); // single element
+    return json(static_cast<double>(list.size()));
+}
+
+json evaluate_sum_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return json(0);
+
+    double total = 0.0;
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        total += item.get<double>();
+    }
+    return total;
+}
+
+json evaluate_min_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return nullptr;
+
+    double result = std::numeric_limits<double>::infinity();
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        double val = item.get<double>();
+        if (val < result) result = val;
+    }
+    return result;
+}
+
+json evaluate_max_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return nullptr;
+
+    double result = -std::numeric_limits<double>::infinity();
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        double val = item.get<double>();
+        if (val > result) result = val;
+    }
+    return result;
+}
+
+json evaluate_mean_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return nullptr;
+
+    double total = 0.0;
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        total += item.get<double>();
+    }
+    return total / static_cast<double>(list.size());
+}
+
+json evaluate_product_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return nullptr;
+
+    double result = 1.0;
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        result *= item.get<double>();
+    }
+    return result;
+}
+
+json evaluate_median_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return nullptr;
+
+    std::vector<double> values;
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        values.push_back(item.get<double>());
+    }
+
+    std::sort(values.begin(), values.end());
+    size_t n = values.size();
+    if (n % 2 == 1)
+    {
+        return values[n / 2];
+    }
+    return (values[n / 2 - 1] + values[n / 2]) / 2.0;
+}
+
+json evaluate_stddev_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.size() < 2) return nullptr;
+
+    // Calculate mean
+    double total = 0.0;
+    std::vector<double> values;
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        double val = item.get<double>();
+        values.push_back(val);
+        total += val;
+    }
+    double mean = total / static_cast<double>(values.size());
+
+    // Calculate sample standard deviation
+    double sum_sq_diff = 0.0;
+    for (double v : values)
+    {
+        double diff = v - mean;
+        sum_sq_diff += diff * diff;
+    }
+    // Sample stddev: divide by (N-1)
+    return std::sqrt(sum_sq_diff / static_cast<double>(values.size() - 1));
+}
+
+json evaluate_mode_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    auto list = normalize_to_list(args);
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return json::array();
+
+    // Count frequencies
+    std::vector<double> values;
+    for (const auto& item : list)
+    {
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        values.push_back(item.get<double>());
+    }
+
+    std::sort(values.begin(), values.end());
+    std::map<double, int> freq;
+    for (double v : values)
+    {
+        freq[v]++;
+    }
+
+    int max_freq = 0;
+    for (const auto& [val, count] : freq)
+    {
+        if (count > max_freq) max_freq = count;
+    }
+
+    json result = json::array();
+    for (const auto& [val, count] : freq)
+    {
+        if (count == max_freq)
+        {
+            result.push_back(val);
+        }
+    }
+    return result;
+}
+
+// ========== PHASE 2B: LIST MANIPULATION FUNCTIONS ==========
+
+json evaluate_list_contains_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    const auto& list = args[0];
+    const auto& element = args[1];
+
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+
+    for (const auto& item : list)
+    {
+        if (item == element) return true;
+    }
+    return false;
+}
+
+json evaluate_append_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    const auto& list = args[0];
+
+    json result;
+    if (list.is_null())
+    {
+        result = json::array();
+    }
+    else if (list.is_array())
+    {
+        result = list;
+    }
+    else
+    {
+        result = json::array({list});
+    }
+
+    for (size_t i = 1; i < args.size(); ++i)
+    {
+        result.push_back(args[i]);
+    }
+    return result;
+}
+
+json evaluate_concatenate_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+
+    json result = json::array();
+    for (const auto& arg : args)
+    {
+        if (arg.is_null()) continue;
+        if (arg.is_array())
+        {
+            for (const auto& item : arg)
+            {
+                result.push_back(item);
+            }
+        }
+        else
+        {
+            result.push_back(arg);
+        }
+    }
+    return result;
+}
+
+json evaluate_insert_before_function(const std::vector<json>& args)
+{
+    if (args.size() != 3) return nullptr;
+    const auto& list = args[0];
+    const auto& position = args[1];
+    const auto& new_item = args[2];
+
+    if (list.is_null() || !list.is_array()) return nullptr;
+    if (position.is_null() || !position.is_number()) return nullptr;
+
+    int pos = static_cast<int>(position.get<double>());
+    int size = static_cast<int>(list.size());
+
+    // FEEL uses 1-based indexing, negative from end
+    int idx;
+    if (pos > 0)
+    {
+        idx = pos - 1;
+    }
+    else if (pos < 0)
+    {
+        idx = size + pos;
+    }
+    else
+    {
+        return nullptr; // 0 is invalid
+    }
+
+    if (idx < 0 || idx > size) return nullptr;
+
+    json result = list;
+    result.insert(result.begin() + idx, new_item);
+    return result;
+}
+
+json evaluate_remove_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    const auto& list = args[0];
+    const auto& position = args[1];
+
+    if (list.is_null() || !list.is_array()) return nullptr;
+    if (position.is_null() || !position.is_number()) return nullptr;
+
+    int pos = static_cast<int>(position.get<double>());
+    int size = static_cast<int>(list.size());
+
+    int idx;
+    if (pos > 0)
+    {
+        idx = pos - 1;
+    }
+    else if (pos < 0)
+    {
+        idx = size + pos;
+    }
+    else
+    {
+        return nullptr;
+    }
+
+    if (idx < 0 || idx >= size) return nullptr;
+
+    json result = list;
+    result.erase(result.begin() + idx);
+    return result;
+}
+
+json evaluate_reverse_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    const auto& list = args[0];
+
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return json::array({list});
+
+    json result = json::array();
+    for (auto it = list.rbegin(); it != list.rend(); ++it)
+    {
+        result.push_back(*it);
+    }
+    return result;
+}
+
+json evaluate_index_of_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    const auto& list = args[0];
+    const auto& match = args[1];
+
+    if (list.is_null() || !list.is_array()) return nullptr;
+
+    json result = json::array();
+    for (size_t i = 0; i < list.size(); ++i)
+    {
+        if (list[i] == match)
+        {
+            result.push_back(static_cast<double>(i + 1)); // 1-based
+        }
+    }
+    return result;
+}
+
+json evaluate_sublist_function(const std::vector<json>& args)
+{
+    if (args.size() < 2 || args.size() > 3) return nullptr;
+    const auto& list = args[0];
+    const auto& start_pos = args[1];
+
+    if (list.is_null() || !list.is_array()) return nullptr;
+    if (start_pos.is_null() || !start_pos.is_number()) return nullptr;
+
+    int pos = static_cast<int>(start_pos.get<double>());
+    int size = static_cast<int>(list.size());
+
+    int start;
+    if (pos > 0)
+    {
+        start = pos - 1;
+    }
+    else if (pos < 0)
+    {
+        start = size + pos;
+    }
+    else
+    {
+        return nullptr;
+    }
+
+    if (start < 0 || start >= size) return nullptr;
+
+    int length = size - start; // default: rest of list
+    if (args.size() == 3 && !args[2].is_null())
+    {
+        if (!args[2].is_number()) return nullptr;
+        length = static_cast<int>(args[2].get<double>());
+        if (length < 0) return nullptr;
+    }
+
+    json result = json::array();
+    for (int i = start; i < start + length && i < size; ++i)
+    {
+        result.push_back(list[i]);
+    }
+    return result;
+}
+
+json evaluate_union_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+
+    json result = json::array();
+    for (const auto& arg : args)
+    {
+        if (arg.is_null()) continue;
+        if (arg.is_array())
+        {
+            for (const auto& item : arg)
+            {
+                // Add only if not already present
+                bool found = false;
+                for (const auto& existing : result)
+                {
+                    if (existing == item) { found = true; break; }
+                }
+                if (!found) result.push_back(item);
+            }
+        }
+        else
+        {
+            bool found = false;
+            for (const auto& existing : result)
+            {
+                if (existing == arg) { found = true; break; }
+            }
+            if (!found) result.push_back(arg);
+        }
+    }
+    return result;
+}
+
+json evaluate_distinct_values_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    const auto& list = args[0];
+
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return json::array({list});
+
+    json result = json::array();
+    for (const auto& item : list)
+    {
+        bool found = false;
+        for (const auto& existing : result)
+        {
+            if (existing == item) { found = true; break; }
+        }
+        if (!found) result.push_back(item);
+    }
+    return result;
+}
+
+static void flatten_recursive(const json& value, json& result)
+{
+    if (value.is_array())
+    {
+        for (const auto& item : value)
+        {
+            flatten_recursive(item, result);
+        }
+    }
+    else
+    {
+        result.push_back(value);
+    }
+}
+
+json evaluate_flatten_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    const auto& list = args[0];
+
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return json::array({list});
+
+    json result = json::array();
+    flatten_recursive(list, result);
+    return result;
+}
+
+json evaluate_sort_function(const std::vector<json>& args)
+{
+    if (args.empty()) return nullptr;
+    const auto& list = args[0];
+
+    if (list.is_null()) return nullptr;
+    if (!list.is_array()) return nullptr;
+    if (list.empty()) return json::array();
+
+    // Check if all elements are numbers
+    std::vector<double> numbers;
+    bool all_numbers = true;
+    bool all_strings = true;
+    std::vector<std::string> strings;
+
+    for (const auto& item : list)
+    {
+        if (item.is_number())
+        {
+            numbers.push_back(item.get<double>());
+            all_strings = false;
+        }
+        else if (item.is_string())
+        {
+            strings.push_back(item.get<std::string>());
+            all_numbers = false;
+        }
+        else
+        {
+            all_numbers = false;
+            all_strings = false;
+        }
+    }
+
+    if (all_numbers)
+    {
+        std::sort(numbers.begin(), numbers.end());
+        json result = json::array();
+        for (double v : numbers) result.push_back(v);
+        return result;
+    }
+    if (all_strings)
+    {
+        std::sort(strings.begin(), strings.end());
+        json result = json::array();
+        for (const auto& s : strings) result.push_back(s);
+        return result;
+    }
+
+    // Mixed types or unsupported: return null
+    // Full sort with precedes function requires Phase 7B (user-defined functions)
+    return nullptr;
+}
+
+json evaluate_list_replace_function(const std::vector<json>& args)
+{
+    if (args.size() != 3) return nullptr;
+    const auto& list = args[0];
+    const auto& position = args[1];
+    const auto& new_item = args[2];
+
+    if (list.is_null() || !list.is_array()) return nullptr;
+    if (position.is_null() || !position.is_number()) return nullptr;
+
+    int pos = static_cast<int>(position.get<double>());
+    int size = static_cast<int>(list.size());
+
+    int idx;
+    if (pos > 0)
+    {
+        idx = pos - 1;
+    }
+    else if (pos < 0)
+    {
+        idx = size + pos;
+    }
+    else
+    {
+        return nullptr;
+    }
+
+    if (idx < 0 || idx >= size) return nullptr;
+
+    json result = list;
+    result[idx] = new_item;
+    return result;
+}
+
+// ========== PHASE 3: CONTEXT FUNCTIONS ==========
+
+json evaluate_get_value_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    const auto& context = args[0];
+    const auto& key = args[1];
+
+    if (context.is_null() || key.is_null()) return nullptr;
+    if (!context.is_object()) return nullptr;
+    if (!key.is_string()) return nullptr;
+
+    std::string key_str = key.get<std::string>();
+    auto it = context.find(key_str);
+    if (it != context.end())
+    {
+        return *it;
+    }
+    return nullptr;
+}
+
+json evaluate_get_entries_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    const auto& context = args[0];
+
+    if (context.is_null()) return nullptr;
+    if (!context.is_object()) return nullptr;
+
+    json result = json::array();
+    for (auto it = context.begin(); it != context.end(); ++it)
+    {
+        json entry = json::object();
+        entry["key"] = it.key();
+        entry["value"] = it.value();
+        result.push_back(entry);
+    }
+    return result;
+}
+
+json evaluate_context_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    const auto& entries = args[0];
+
+    if (entries.is_null()) return nullptr;
+    if (!entries.is_array()) return nullptr;
+
+    json result = json::object();
+    for (const auto& entry : entries)
+    {
+        if (!entry.is_object()) return nullptr;
+
+        auto key_it = entry.find("key");
+        auto value_it = entry.find("value");
+        if (key_it == entry.end() || value_it == entry.end()) return nullptr;
+        if (!key_it->is_string()) return nullptr;
+
+        result[key_it->get<std::string>()] = *value_it;
+    }
+    return result;
+}
+
+json evaluate_context_put_function(const std::vector<json>& args)
+{
+    if (args.size() != 3) return nullptr;
+    const auto& context = args[0];
+    const auto& key = args[1];
+    const auto& value = args[2];
+
+    if (context.is_null()) return nullptr;
+    if (!context.is_object()) return nullptr;
+
+    // Key can be a string or a list of strings (nested path)
+    if (key.is_string())
+    {
+        json result = context;
+        result[key.get<std::string>()] = value;
+        return result;
+    }
+    else if (key.is_array())
+    {
+        if (key.empty()) return nullptr;
+
+        // Build nested path
+        json result = context;
+        json* current = &result;
+
+        for (size_t i = 0; i < key.size() - 1; ++i)
+        {
+            if (!key[i].is_string()) return nullptr;
+            std::string k = key[i].get<std::string>();
+
+            if (!current->is_object()) return nullptr;
+            auto it = current->find(k);
+            if (it == current->end())
+            {
+                (*current)[k] = json::object();
+            }
+            current = &(*current)[k];
+        }
+
+        if (!key.back().is_string()) return nullptr;
+        (*current)[key.back().get<std::string>()] = value;
+        return result;
+    }
+
+    return nullptr;
+}
+
+json evaluate_context_merge_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    const auto& contexts = args[0];
+
+    if (contexts.is_null()) return nullptr;
+
+    // Can accept a single context or a list of contexts
+    if (contexts.is_object())
+    {
+        return contexts; // Single context, return as-is
+    }
+
+    if (!contexts.is_array()) return nullptr;
+
+    json result = json::object();
+    for (const auto& ctx : contexts)
+    {
+        if (ctx.is_null()) continue;
+        if (!ctx.is_object()) return nullptr;
+
+        for (auto it = ctx.begin(); it != ctx.end(); ++it)
+        {
+            result[it.key()] = it.value(); // Later context wins
+        }
+    }
+    return result;
 }
 
 } // namespace orion::bre

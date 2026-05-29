@@ -489,5 +489,41 @@ namespace orion::bre::feel {
      */
     [[nodiscard]] json evaluate_is_function(const std::vector<json>& args);
 
+    // ========== PHASE 2A: AGGREGATION FUNCTIONS (DMN 1.5 §10.3.4.4) ==========
+
+    [[nodiscard]] json evaluate_count_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_sum_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_min_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_max_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_mean_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_product_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_median_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_stddev_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_mode_function(const std::vector<json>& args);
+
+    // ========== PHASE 2B: LIST MANIPULATION FUNCTIONS (DMN 1.5 §10.3.4.4) ==========
+
+    [[nodiscard]] json evaluate_list_contains_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_append_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_concatenate_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_insert_before_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_remove_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_reverse_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_index_of_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_sublist_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_union_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_distinct_values_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_flatten_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_sort_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_list_replace_function(const std::vector<json>& args);
+
+    // ========== PHASE 3: CONTEXT FUNCTIONS (DMN 1.5 §10.3.4.6) ==========
+
+    [[nodiscard]] json evaluate_get_value_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_get_entries_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_context_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_context_put_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_context_merge_function(const std::vector<json>& args);
+
 } // namespace orion::bre
 
