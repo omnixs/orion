@@ -2304,10 +2304,25 @@ json evaluate_context_function(const std::vector<json>& args)
     const auto& entries = args[0];
 
     if (entries.is_null()) return nullptr;
-    if (!entries.is_array()) return nullptr;
+
+    // Single entry coercion: if given a single context instead of a list, wrap it
+    json entry_list;
+    if (entries.is_object())
+    {
+        entry_list = json::array();
+        entry_list.push_back(entries);
+    }
+    else if (entries.is_array())
+    {
+        entry_list = entries;
+    }
+    else
+    {
+        return nullptr;
+    }
 
     json result = json::object();
-    for (const auto& entry : entries)
+    for (const auto& entry : entry_list)
     {
         if (!entry.is_object()) return nullptr;
 
@@ -2315,8 +2330,14 @@ json evaluate_context_function(const std::vector<json>& args)
         auto value_it = entry.find("value");
         if (key_it == entry.end() || value_it == entry.end()) return nullptr;
         if (!key_it->is_string()) return nullptr;
+        if (key_it->is_null()) return nullptr;
 
-        result[key_it->get<std::string>()] = *value_it;
+        std::string key_str = key_it->get<std::string>();
+
+        // Duplicate keys are not allowed per DMN spec
+        if (result.contains(key_str)) return nullptr;
+
+        result[key_str] = *value_it;
     }
     return result;
 }

@@ -624,6 +624,35 @@ static std::string extract_output_value(
         return "";
     }
     
+    // Try regular output first (by outputName)
+    auto it = actual.find(outputName);
+    if (it != actual.end())
+    {
+        try
+        {
+            nlohmann::json expectedObj = nlohmann::json::parse(expected);
+            
+            if (expectedObj.is_array() && it->is_array())
+            {
+                return it->dump();
+            }
+            else if (expectedObj.is_object() && it->is_object())
+            {
+                if (it->contains(outputName) && (*it)[outputName].is_object())
+                {
+                    return (*it)[outputName].dump();
+                }
+                return it->dump();
+            }
+            
+            return it->dump();
+        }
+        catch (const nlohmann::json::exception&)
+        {
+            return it->dump(); // JSON operation failed, return as-is
+        }
+    }
+    
     // Handle component-based outputs (like Approval_Status, Approval_Rate)
     if (outputId.find("_") != std::string::npos)
     {
@@ -656,36 +685,7 @@ static std::string extract_output_value(
         return "";
     }
     
-    // Regular output
-    auto it = actual.find(outputName);
-    if (it == actual.end())
-    {
-        return "";
-    }
-    
-    try
-    {
-        nlohmann::json expectedObj = nlohmann::json::parse(expected);
-        
-        if (expectedObj.is_array() && it->is_array())
-        {
-            return it->dump();
-        }
-        else if (expectedObj.is_object() && it->is_object())
-        {
-            if (it->contains(outputName) && (*it)[outputName].is_object())
-            {
-                return (*it)[outputName].dump();
-            }
-            return it->dump();
-        }
-        
-        return it->dump();
-    }
-    catch (const nlohmann::json::exception&)
-    {
-        return it->dump(); // JSON operation failed, return as-is
-    }
+    return "";
 }
 
 // Helper: Compare expected vs actual values with numeric tolerance
