@@ -756,6 +756,27 @@ namespace orion::bre
             {
                 return feel::evaluate_duration_function(args);
             }
+            // Phase 1: Trivial functions
+            else if (funcName == "odd")
+            {
+                return feel::evaluate_odd_function(args);
+            }
+            else if (funcName == "even")
+            {
+                return feel::evaluate_even_function(args);
+            }
+            else if (funcName == "number")
+            {
+                return feel::evaluate_number_function(args);
+            }
+            else if (funcName == "string")
+            {
+                return feel::evaluate_string_function(args);
+            }
+            else if (funcName == "is")
+            {
+                return feel::evaluate_is_function(args);
+            }
             else
             {
                 std::ostringstream oss;

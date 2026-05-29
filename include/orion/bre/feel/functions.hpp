@@ -442,5 +442,52 @@ namespace orion::bre::feel {
      */
     [[nodiscard]] json evaluate_duration_function(const std::vector<json>& args);
 
+    // ========== PHASE 1: TRIVIAL FUNCTIONS (DMN 1.5 §10.3.4) ==========
+
+    /**
+     * @brief Check if number is odd
+     * @param args Vector containing exactly 1 numeric argument
+     * @return true if number is an integer and odd, null otherwise
+     * 
+     * DMN 1.5 Section 10.3.4.5: odd(number)
+     */
+    [[nodiscard]] json evaluate_odd_function(const std::vector<json>& args);
+
+    /**
+     * @brief Check if number is even
+     * @param args Vector containing exactly 1 numeric argument
+     * @return true if number is an integer and even, null otherwise
+     * 
+     * DMN 1.5 Section 10.3.4.5: even(number)
+     */
+    [[nodiscard]] json evaluate_even_function(const std::vector<json>& args);
+
+    /**
+     * @brief Parse formatted number string
+     * @param args Vector containing 3 arguments [from, grouping separator, decimal separator]
+     * @return Parsed number, or null on error
+     * 
+     * DMN 1.5 Section 10.3.4.1: number(from, grouping separator, decimal separator)
+     */
+    [[nodiscard]] json evaluate_number_function(const std::vector<json>& args);
+
+    /**
+     * @brief Convert value to string representation
+     * @param args Vector containing exactly 1 argument
+     * @return String representation of the value
+     * 
+     * DMN 1.5 Section 10.3.4.1: string(from)
+     */
+    [[nodiscard]] json evaluate_string_function(const std::vector<json>& args);
+
+    /**
+     * @brief Semantic equality check
+     * @param args Vector containing exactly 2 arguments [value1, value2]
+     * @return true if values are semantically equal (same type and value)
+     * 
+     * DMN 1.5 Section 10.3.4.1: is(value1, value2)
+     */
+    [[nodiscard]] json evaluate_is_function(const std::vector<json>& args);
+
 } // namespace orion::bre
 
