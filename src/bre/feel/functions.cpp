@@ -213,9 +213,50 @@ json evaluate_abs_function(const std::vector<json>& args)
         return nullptr;
     }
 
-    // Type validation - must be numeric (return null per DMN spec, don't throw)
+    // Type validation - must be numeric or duration
     if (!arg.is_number())
     {
+        // Check if it's a duration string
+        if (arg.is_string()) {
+            std::string s = arg.get<std::string>();
+            auto parsed = parse_duration(s);
+            if (parsed) {
+                auto dur = parsed.value();
+                // Determine if YM or DT
+                bool has_time_part = s.find('T') != std::string::npos;
+                bool has_day = s.find('D') != std::string::npos;
+                bool is_ym = !has_time_part && !has_day;
+                
+                if (is_ym) {
+                    int months = std::abs(dur.total_months);
+                    int years = months / 12;
+                    months = months % 12;
+                    std::string result = "P";
+                    if (years > 0) result += std::to_string(years) + "Y";
+                    if (months > 0) result += std::to_string(months) + "M";
+                    if (years == 0 && months == 0) result = "P0M";
+                    return result;
+                } else {
+                    long long total = std::abs(dur.total_seconds);
+                    long long days = total / 86400;
+                    long long rem = total % 86400;
+                    long long hours = rem / 3600;
+                    rem %= 3600;
+                    long long mins = rem / 60;
+                    long long secs = rem % 60;
+                    std::string result = "P";
+                    if (days > 0) result += std::to_string(days) + "D";
+                    if (hours > 0 || mins > 0 || secs > 0) {
+                        result += "T";
+                        if (hours > 0) result += std::to_string(hours) + "H";
+                        if (mins > 0) result += std::to_string(mins) + "M";
+                        if (secs > 0) result += std::to_string(secs) + "S";
+                    }
+                    if (result == "P") result = "P0D";
+                    return result;
+                }
+            }
+        }
         return nullptr; // DMN spec: return null for invalid argument type
     }
 

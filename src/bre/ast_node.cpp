@@ -84,13 +84,15 @@ namespace orion::bre
 
         bool is_date_string(const std::string& s)
         {
-            // YYYY-MM-DD (exactly 10 chars, no T)
-            return s.size() >= 10 && s[4] == '-' && s[7] == '-' && s.find('T') == std::string::npos;
+            // [-]YYYY-MM-DD
+            size_t offset = (s.size() > 0 && s[0] == '-') ? 1 : 0;
+            return s.size() >= offset + 10 && s[offset + 4] == '-' && s[offset + 7] == '-' && s.find('T') == std::string::npos;
         }
         
         bool is_datetime_string(const std::string& s)
         {
-            return s.find('T') != std::string::npos && s.size() >= 19 && s[4] == '-';
+            size_t offset = (s.size() > 0 && s[0] == '-') ? 1 : 0;
+            return s.find('T') != std::string::npos && s.size() >= offset + 19 && s[offset + 4] == '-';
         }
         
         bool is_time_string(const std::string& s)
@@ -116,10 +118,9 @@ namespace orion::bre
             
             // Add months
             int y = date->y, m = date->m, d = date->d;
-            int total_m = (y * 12 + (m - 1)) + months;
-            y = total_m / 12;
-            m = (total_m % 12) + 1;
-            if (m <= 0) { m += 12; y--; }
+            m += months;
+            while (m > 12) { m -= 12; y++; }
+            while (m < 1) { m += 12; y--; }
             // Clamp day
             int max_d = days_in_month(y, m);
             if (d > max_d) d = max_d;
@@ -131,7 +132,11 @@ namespace orion::bre
             while (d < 1) { m--; if (m < 1) { m = 12; y--; } d += days_in_month(y, m); }
             
             char buf[32];
-            snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
+            if (y < 0) {
+                snprintf(buf, sizeof(buf), "-%04d-%02d-%02d", -y, m, d);
+            } else {
+                snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
+            }
             return buf;
         }
         
@@ -161,10 +166,9 @@ namespace orion::bre
             
             // Add months to date
             int y = date->y, mo = date->m, d = date->d;
-            int total_m = (y * 12 + (mo - 1)) + months;
-            y = total_m / 12;
-            mo = (total_m % 12) + 1;
-            if (mo <= 0) { mo += 12; y--; }
+            mo += months;
+            while (mo > 12) { mo -= 12; y++; }
+            while (mo < 1) { mo += 12; y--; }
             int max_d = days_in_month(y, mo);
             if (d > max_d) d = max_d;
             
@@ -187,7 +191,11 @@ namespace orion::bre
             while (d < 1) { mo--; if (mo < 1) { mo = 12; y--; } d += days_in_month(y, mo); }
             
             char buf[64];
-            snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02d", y, mo, d, h, mi, s);
+            if (y < 0) {
+                snprintf(buf, sizeof(buf), "-%04d-%02d-%02dT%02d:%02d:%02d", -y, mo, d, h, mi, s);
+            } else {
+                snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02d", y, mo, d, h, mi, s);
+            }
             return std::string(buf) + tz_suffix;
         }
         

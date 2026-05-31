@@ -30,11 +30,14 @@ namespace orion::bre::feel {
     }
     std::optional<Date> parse_date(std::string_view str)
     {
-        // CTRE compile-time regex for date pattern
-        if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2}))">(str))
+        // CTRE compile-time regex for date pattern (with optional negative year)
+        if (auto match = ctre::match<R"(-?(\d{4,})-(\d{2})-(\d{2}))">(str))
         {
             Date date;
-            date.y = parse_int(match.get<1>().to_view());
+            // Parse year including potential negative sign
+            auto year_str = std::string(match.get<1>().to_view());
+            date.y = parse_int(year_str);
+            if (str[0] == '-') date.y = -date.y;
             date.m = parse_int(match.get<2>().to_view());
             date.d = parse_int(match.get<3>().to_view());
             return date;
