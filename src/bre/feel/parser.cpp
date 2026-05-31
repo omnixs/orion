@@ -938,6 +938,17 @@ std::unique_ptr<ASTNode> Parser::parse_for_expression()
         // Parse the list expression
         auto list_expr = parse_additive();
         
+        // Check for bare range: expr..expr (without brackets)
+        if (check(TokenType::DOTDOT))
+        {
+            advance(); // consume ..
+            auto end_expr = parse_additive();
+            auto range_node = std::make_unique<ASTNode>(ASTNodeType::RANGE, ".."); // bare iteration range
+            range_node->children.push_back(std::move(list_expr));
+            range_node->children.push_back(std::move(end_expr));
+            list_expr = std::move(range_node);
+        }
+        
         // Store as: VARIABLE(name), list_expr pairs
         auto var_node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, var_name);
         node->children.push_back(std::move(var_node));

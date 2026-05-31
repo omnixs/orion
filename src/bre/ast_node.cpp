@@ -1765,16 +1765,25 @@ namespace orion::bre
                     {
                         auto& start = list_val["__start__"];
                         auto& end = list_val["__end__"];
+                        std::string range_type = list_val["__range__"].get<std::string>();
                         // Only numeric integer ranges can be expanded
                         if (start.is_number() && end.is_number())
                         {
                             auto s = start.get<double>();
                             auto e = end.get<double>();
-                            if (s != std::floor(s) || e != std::floor(e) || s > e)
+                            if (s != std::floor(s) || e != std::floor(e))
+                                return nullptr;
+                            // Bare iteration range ".." supports descending; bracketed intervals don't
+                            if (range_type != ".." && s > e)
                                 return nullptr;
                             json list = json::array();
-                            for (double v = s; v <= e; v += 1.0)
-                                list.push_back(v);
+                            if (s <= e) {
+                                for (double v = s; v <= e; v += 1.0)
+                                    list.push_back(v);
+                            } else {
+                                for (double v = s; v >= e; v -= 1.0)
+                                    list.push_back(v);
+                            }
                             json result = json::array();
                             json local_ctx = input;
                             for (const auto& item : list)
