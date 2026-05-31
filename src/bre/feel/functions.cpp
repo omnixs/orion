@@ -1801,6 +1801,20 @@ json evaluate_date_and_time_function(const std::vector<json>& args)
 {
     if (args.empty() || args.size() > 2) return nullptr;
 
+    // Helper to validate strict date format: [-]YYYY-MM-DD, no leading +, min 4-digit year
+    auto validate_date_strict = [](const std::string& ds) -> bool {
+        size_t pos = 0;
+        if (!ds.empty() && ds[0] == '-') pos = 1;
+        if (!ds.empty() && ds[0] == '+') return false;
+        auto dash1 = ds.find('-', pos);
+        if (dash1 == std::string::npos || dash1 == pos) return false;
+        std::string year_str = ds.substr(pos, dash1 - pos);
+        if (year_str.size() < 4) return false;
+        if (year_str.size() > 4 && year_str[0] == '0') return false;
+        for (char c : year_str) if (!std::isdigit(static_cast<unsigned char>(c))) return false;
+        return true;
+    };
+
     if (args.size() == 1) {
         // date and time(string)
         if (args[0].is_null()) return nullptr;
@@ -1810,14 +1824,17 @@ json evaluate_date_and_time_function(const std::vector<json>& args)
         auto tpos = s.find('T');
         if (tpos == std::string::npos) {
             // Date-only string: treat as midnight
+            if (!validate_date_strict(s)) return nullptr;
             auto dcomp = parse_date_components(s);
             if (!dcomp.valid) return nullptr;
             return s + "T00:00:00";
         }
-        auto dcomp = parse_date_components(s.substr(0, tpos));
+        std::string date_part = s.substr(0, tpos);
+        if (!validate_date_strict(date_part)) return nullptr;
+        auto dcomp = parse_date_components(date_part);
         auto tcomp = parse_time_components(s.substr(tpos + 1));
         if (!dcomp.valid || !tcomp.valid) return nullptr;
-        return s.substr(0, tpos) + "T" + normalize_time_string(s.substr(tpos + 1));
+        return date_part + "T" + normalize_time_string(s.substr(tpos + 1));
     }
 
     // date and time(date, time)

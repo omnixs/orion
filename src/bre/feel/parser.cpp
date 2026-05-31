@@ -501,6 +501,38 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
 {
     const Token& token = advance();
     
+    // Check for multi-word function names: "date and time", "years and months duration", "days and time duration"
+    if (token.text == "date" || token.text == "years" || token.text == "days")
+    {
+        size_t saved = position_;
+        if (check(TokenType::KEYWORD) && peek().text == "and")
+        {
+            advance(); // consume "and"
+            if (check(TokenType::IDENTIFIER))
+            {
+                std::string second_word(peek().text);
+                advance(); // consume second word
+                
+                std::string multi_name = std::string(token.text) + " and " + second_word;
+                
+                // "years and months duration" or "days and time duration"
+                if ((multi_name == "years and months" || multi_name == "days and time") && 
+                    check(TokenType::IDENTIFIER) && peek().text == "duration")
+                {
+                    advance(); // consume "duration"
+                    multi_name += " duration";
+                }
+                
+                if (check(TokenType::LPAREN))
+                {
+                    auto node = parse_function_call(multi_name);
+                    return parse_postfix(std::move(node));
+                }
+            }
+            position_ = saved; // backtrack
+        }
+    }
+    
     // Check if this is a function call (followed by left parenthesis)
     if (check(TokenType::LPAREN))
     {
