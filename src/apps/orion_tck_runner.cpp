@@ -688,9 +688,54 @@ static std::string extract_output_value(
     return "";
 }
 
+// Helper: Deep JSON comparison with numeric tolerance
+static bool json_values_equal(const nlohmann::json& expected, const nlohmann::json& actual)
+{
+    if (expected.is_number() && actual.is_number())
+    {
+        double e = expected.get<double>();
+        double a = actual.get<double>();
+        double tolerance = std::max(1e-10, std::abs(e) * 1e-10);
+        return std::abs(e - a) <= tolerance;
+    }
+    if (expected.is_array() && actual.is_array())
+    {
+        if (expected.size() != actual.size()) return false;
+        for (size_t i = 0; i < expected.size(); ++i)
+        {
+            if (!json_values_equal(expected[i], actual[i])) return false;
+        }
+        return true;
+    }
+    if (expected.is_object() && actual.is_object())
+    {
+        if (expected.size() != actual.size()) return false;
+        for (auto it = expected.begin(); it != expected.end(); ++it)
+        {
+            auto ait = actual.find(it.key());
+            if (ait == actual.end()) return false;
+            if (!json_values_equal(it.value(), *ait)) return false;
+        }
+        return true;
+    }
+    return expected == actual;
+}
+
 // Helper: Compare expected vs actual values with numeric tolerance
 static bool compare_values(std::string_view expected, std::string_view actual)
 {
+    // Try JSON-aware comparison first
+    try
+    {
+        auto expected_json = nlohmann::json::parse(expected);
+        auto actual_json = nlohmann::json::parse(actual);
+        return json_values_equal(expected_json, actual_json);
+    }
+    catch (const nlohmann::json::parse_error&)
+    {
+        // Fall through to legacy comparison
+    }
+
     try
     {
         double expected_num = std::stod(std::string(expected));
@@ -707,11 +752,9 @@ static bool compare_values(std::string_view expected, std::string_view actual)
     }
     catch (const std::invalid_argument&)
     {
-        // Not numeric values, fall through to string comparison
     }
     catch (const std::out_of_range&)
     {
-        // Out of range numeric values, fall through to string comparison
     }
     
     // String comparison fallback
