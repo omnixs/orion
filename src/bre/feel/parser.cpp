@@ -533,6 +533,30 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
         }
     }
     
+    // Check for multi-word function names: "day of year", "day of week", "month of year", "week of year"
+    if (token.text == "day" || token.text == "month" || token.text == "week")
+    {
+        size_t saved = position_;
+        if ((check(TokenType::IDENTIFIER) || check(TokenType::KEYWORD)) && peek().text == "of")
+        {
+            advance(); // consume "of"
+            if (check(TokenType::IDENTIFIER))
+            {
+                std::string third_word(peek().text);
+                advance(); // consume third word (year/week)
+                
+                std::string multi_name = std::string(token.text) + " of " + third_word;
+                
+                if (check(TokenType::LPAREN))
+                {
+                    auto node = parse_function_call(multi_name);
+                    return parse_postfix(std::move(node));
+                }
+            }
+            position_ = saved; // backtrack
+        }
+    }
+    
     // Check if this is a function call (followed by left parenthesis)
     if (check(TokenType::LPAREN))
     {
