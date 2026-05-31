@@ -108,6 +108,27 @@ namespace orion::bre::feel {
                 break;
             }
 
+            // Skip comments
+            if (peek() == '/' && position_ + 1 < input_.length())
+            {
+                if (input_[position_ + 1] == '/')
+                {
+                    // Line comment: skip to end of line
+                    while (position_ < input_.length() && input_[position_] != '\n')
+                        position_++;
+                    continue;
+                }
+                if (input_[position_ + 1] == '*')
+                {
+                    // Block comment: skip to */
+                    position_ += 2;
+                    while (position_ + 1 < input_.length() && !(input_[position_] == '*' && input_[position_ + 1] == '/'))
+                        position_++;
+                    if (position_ + 1 < input_.length()) position_ += 2; // skip */
+                    continue;
+                }
+            }
+
             char current = peek();
 
             // Numbers (including negative and leading-dot decimals)

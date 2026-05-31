@@ -61,14 +61,75 @@ namespace orion::bre::feel {
 
     std::optional<DateTime> parse_datetime(std::string_view str)
     {
-        // CTRE compile-time regex for datetime pattern
-        if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}))">(str))
-        {
-            Date date{parse_int(match.get<1>().to_view()), parse_int(match.get<2>().to_view()), parse_int(match.get<3>().to_view())};
-            Time time_val{parse_int(match.get<4>().to_view()), parse_int(match.get<5>().to_view()), parse_int(match.get<6>().to_view())};
-            return DateTime{date, time_val};
+        // Find 'T' separator
+        auto tpos = str.find('T');
+        if (tpos == std::string_view::npos) return std::nullopt;
+        
+        auto date_part = str.substr(0, tpos);
+        auto time_and_tz = str.substr(tpos + 1);
+        
+        // Parse date part (handles negative years, 4+ digit years)
+        auto date_opt = parse_date(date_part);
+        if (!date_opt) return std::nullopt;
+        
+        // Parse time part - extract HH:MM:SS (ignore fractional seconds and timezone for now)
+        int h = 0, m = 0, s = 0;
+        size_t pos = 0;
+        // Hours
+        if (pos + 2 > time_and_tz.size()) return std::nullopt;
+        h = parse_int(time_and_tz.substr(pos, 2));
+        pos += 2;
+        if (pos >= time_and_tz.size() || time_and_tz[pos] != ':') return std::nullopt;
+        pos++;
+        // Minutes
+        if (pos + 2 > time_and_tz.size()) return std::nullopt;
+        m = parse_int(time_and_tz.substr(pos, 2));
+        pos += 2;
+        if (pos >= time_and_tz.size() || time_and_tz[pos] != ':') return std::nullopt;
+        pos++;
+        // Seconds
+        if (pos + 2 > time_and_tz.size()) return std::nullopt;
+        s = parse_int(time_and_tz.substr(pos, 2));
+        pos += 2;
+        // Skip fractional seconds
+        if (pos < time_and_tz.size() && time_and_tz[pos] == '.') {
+            pos++;
+            while (pos < time_and_tz.size() && std::isdigit(static_cast<unsigned char>(time_and_tz[pos])))
+                pos++;
         }
-        return std::nullopt;
+        
+        // Parse timezone offset for adjustment
+        int tz_offset_seconds = 0;
+        bool has_tz = false;
+        if (pos < time_and_tz.size()) {
+            if (time_and_tz[pos] == 'Z') {
+                tz_offset_seconds = 0;
+                has_tz = true;
+            } else if (time_and_tz[pos] == '+' || time_and_tz[pos] == '-') {
+                has_tz = true;
+                bool neg = (time_and_tz[pos] == '-');
+                pos++;
+                if (pos + 2 > time_and_tz.size()) return std::nullopt;
+                int tzh = parse_int(time_and_tz.substr(pos, 2));
+                pos += 2;
+                int tzm = 0;
+                if (pos < time_and_tz.size() && time_and_tz[pos] == ':') {
+                    pos++;
+                    if (pos + 2 <= time_and_tz.size())
+                        tzm = parse_int(time_and_tz.substr(pos, 2));
+                }
+                tz_offset_seconds = (tzh * 3600 + tzm * 60) * (neg ? -1 : 1);
+            } else if (time_and_tz[pos] == '@') {
+                has_tz = true; // named timezone
+            }
+        }
+        
+        Date date{date_opt->y, date_opt->m, date_opt->d};
+        Time time_val{h, m, s};
+        DateTime dt{date, time_val};
+        dt.tz_offset_seconds = tz_offset_seconds;
+        dt.has_tz = has_tz;
+        return dt;
     }
 
     std::optional<Duration> parse_duration(std::string_view str)

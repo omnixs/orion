@@ -125,8 +125,10 @@ namespace orion::bre
             int max_d = days_in_month(y, m);
             if (d > max_d) d = max_d;
             
-            // Add days from seconds
+            // Add days from seconds (for dates, any partial day counts as a full day in that direction)
             long long total_days = secs / 86400;
+            long long remainder = secs % 86400;
+            if (remainder < 0) { total_days--; }  // e.g., -3600 secs = -1 day (floor division)
             d += static_cast<int>(total_days);
             while (d > days_in_month(y, m)) { d -= days_in_month(y, m); m++; if (m > 12) { m = 1; y++; } }
             while (d < 1) { m--; if (m < 1) { m = 12; y--; } d += days_in_month(y, m); }
@@ -478,7 +480,23 @@ namespace orion::bre
                 
                 if (value == "-")
                 {
-                    return -toNumber(operand, "unary minus");
+                    if (operand.is_null()) return nullptr;
+                    if (operand.is_number()) return -operand.get<double>();
+                    if (operand.is_string())
+                    {
+                        std::string s = operand.get<std::string>();
+                        if (is_duration_string(s))
+                        {
+                            // Negate duration: toggle leading '-'
+                            if (!s.empty() && s[0] == '-')
+                                return s.substr(1);
+                            else
+                                return "-" + s;
+                        }
+                        // date, time, datetime, plain string cannot be negated
+                        return nullptr;
+                    }
+                    return nullptr;
                 }
                 else if (value == "not")
                 {
@@ -653,9 +671,10 @@ namespace orion::bre
                             auto dt2 = feel::parse_datetime(rs);
                             if (dt1 && dt2)
                             {
-                                // Convert both to total seconds from epoch-ish
+                                // Both or neither must have timezone info
+                                if (dt1->has_tz != dt2->has_tz) return nullptr;
+                                // Convert both to total seconds from epoch-ish (UTC-normalized)
                                 auto to_secs = [](const feel::DateTime& dt) -> long long {
-                                    // Approximate: days since year 0
                                     long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
                                     for (int mm = 1; mm < dt.date.m; mm++)
                                     {
@@ -665,7 +684,7 @@ namespace orion::bre
                                     if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
                                         days++;
                                     days += dt.date.d;
-                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s;
+                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
                                 };
                                 long long diff = to_secs(*dt1) - to_secs(*dt2);
                                 feel::Duration dur;
@@ -694,6 +713,39 @@ namespace orion::bre
                                 long long diff = to_days(*d1) - to_days(*d2);
                                 feel::Duration dur;
                                 dur.total_seconds = diff * 86400LL;
+                                return format_duration(dur);
+                            }
+                        }
+                        // datetime - date or date - datetime: treat date as UTC midnight
+                        if ((is_datetime_string(ls) && is_date_string(rs)) || (is_date_string(ls) && is_datetime_string(rs)))
+                        {
+                            // The datetime must have timezone (date implies UTC)
+                            std::string dt_str = is_datetime_string(ls) ? ls : rs;
+                            auto dt_check = feel::parse_datetime(dt_str);
+                            if (!dt_check || !dt_check->has_tz) return nullptr;
+                            
+                            std::string ldt = ls, rdt = rs;
+                            if (is_date_string(ls)) ldt = ls + "T00:00:00Z";
+                            if (is_date_string(rs)) rdt = rs + "T00:00:00Z";
+                            auto dt1 = feel::parse_datetime(ldt);
+                            auto dt2 = feel::parse_datetime(rdt);
+                            if (dt1 && dt2)
+                            {
+                                auto to_secs = [](const feel::DateTime& dt) -> long long {
+                                    long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
+                                    for (int mm = 1; mm < dt.date.m; mm++)
+                                    {
+                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+                                        days += md[mm];
+                                    }
+                                    if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
+                                        days++;
+                                    days += dt.date.d;
+                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
+                                };
+                                long long diff = to_secs(*dt1) - to_secs(*dt2);
+                                feel::Duration dur;
+                                dur.total_seconds = diff;
                                 return format_duration(dur);
                             }
                         }
