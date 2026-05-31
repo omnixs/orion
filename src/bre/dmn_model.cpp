@@ -667,7 +667,6 @@ namespace orion::bre
             catch (const std::runtime_error&)
             {
                 // AST evaluation failed (FEEL error), fall back to legacy evaluation
-                // This handles BKM calls and complex expressions not yet supported by AST
             }
             catch (const nlohmann::json::exception&)
             {

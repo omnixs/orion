@@ -189,6 +189,75 @@ namespace orion::bre::feel {
     {
         auto left = parse_additive();
         
+        // Check for 'between', 'in', 'instance of' keywords
+        if (check(TokenType::KEYWORD))
+        {
+            if (check_text("between"))
+            {
+                advance(); // consume 'between'
+                auto lower = parse_additive();
+                if (!check(TokenType::KEYWORD) || !check_text("and"))
+                {
+                    throw std::runtime_error("Expected 'and' in 'between' expression");
+                }
+                advance(); // consume 'and'
+                auto upper = parse_additive();
+                
+                auto node = std::make_unique<ASTNode>(ASTNodeType::BETWEEN, "between");
+                node->children.push_back(std::move(left));
+                node->children.push_back(std::move(lower));
+                node->children.push_back(std::move(upper));
+                return node;
+            }
+            else if (check_text("instance"))
+            {
+                advance(); // consume 'instance'
+                if (!check(TokenType::KEYWORD) || !check_text("of"))
+                {
+                    throw std::runtime_error("Expected 'of' after 'instance'");
+                }
+                advance(); // consume 'of'
+                
+                // Parse type name - can be multi-word like "date and time" or "years and months duration"
+                std::string type_name;
+                if (check(TokenType::KEYWORD) || check(TokenType::IDENTIFIER))
+                {
+                    type_name = std::string(advance().text);
+                    // Handle multi-word type names
+                    while (check(TokenType::KEYWORD) && check_text("and"))
+                    {
+                        type_name += " and";
+                        advance(); // consume 'and'
+                        if (check(TokenType::IDENTIFIER) || check(TokenType::KEYWORD))
+                        {
+                            type_name += " " + std::string(advance().text);
+                        }
+                    }
+                }
+                else
+                {
+                    throw std::runtime_error("Expected type name after 'instance of'");
+                }
+                
+                auto node = std::make_unique<ASTNode>(ASTNodeType::INSTANCE_OF, type_name);
+                node->children.push_back(std::move(left));
+                return node;
+            }
+            else if (check_text("in"))
+            {
+                advance(); // consume 'in'
+                
+                // Parse the list/range after 'in'
+                // Can be: list literal [1,2,3], range (1..10), or unary tests
+                auto right = parse_additive();
+                
+                auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "in");
+                node->children.push_back(std::move(left));
+                node->children.push_back(std::move(right));
+                return node;
+            }
+        }
+        
         while (check(TokenType::OPERATOR))
         {
             const std::string_view oper = peek().text;
@@ -280,6 +349,19 @@ namespace orion::bre::feel {
     std::unique_ptr<ASTNode> Parser::parse_exponentiation()
     {
         auto left = parse_primary();
+        
+        // Check for filter expression: expr[condition] or expr[index]
+        while (check(TokenType::LBRACKET))
+        {
+            advance(); // consume '['
+            auto filter = parse_logical_or();
+            expect(TokenType::RBRACKET, "Expected ']' after filter expression");
+            
+            auto node = std::make_unique<ASTNode>(ASTNodeType::FILTER_EXPR, "filter");
+            node->children.push_back(std::move(left));
+            node->children.push_back(std::move(filter));
+            left = std::move(node);
+        }
         
         // Right-associative: 2**3**4 = 2**(3**4)
         if (check(TokenType::OPERATOR) && check_text("**"))
@@ -382,6 +464,18 @@ std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
     {
         advance(); // consume 'not'
         return parse_function_call("not");
+    }
+    
+    // Handle 'for' expression
+    if (token.text == "for")
+    {
+        return parse_for_expression();
+    }
+    
+    // Handle 'some' and 'every' quantified expressions
+    if (token.text == "some" || token.text == "every")
+    {
+        return parse_quantified_expression(token.text);
     }
     
     // Other keywords should not appear as primary expressions
@@ -666,4 +760,99 @@ std::unique_ptr<ASTNode> Parser::parse_context_literal()
         // Use the existing Evaluator which already provides this functionality
         return Evaluator::evaluate(expression, input, eval_ctx);
     }
+
+std::unique_ptr<ASTNode> Parser::parse_for_expression()
+{
+    advance(); // consume 'for'
+    
+    // for x in expr1 [, y in expr2 ...] return expr
+    auto node = std::make_unique<ASTNode>(ASTNodeType::FOR_EXPR, "for");
+    
+    // Parse iteration bindings: var in list [, var in list ...]
+    do
+    {
+        // Parse variable name
+        if (!check(TokenType::IDENTIFIER))
+        {
+            throw std::runtime_error("Expected variable name in 'for' expression");
+        }
+        auto var_name = std::string(advance().text);
+        
+        // Expect 'in'
+        if (!check(TokenType::KEYWORD) || !check_text("in"))
+        {
+            throw std::runtime_error("Expected 'in' after variable name in 'for' expression");
+        }
+        advance(); // consume 'in'
+        
+        // Parse the list expression
+        auto list_expr = parse_additive();
+        
+        // Store as: VARIABLE(name), list_expr pairs
+        auto var_node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, var_name);
+        node->children.push_back(std::move(var_node));
+        node->children.push_back(std::move(list_expr));
+        
+    } while (check(TokenType::COMMA) && (advance(), true)); // consume comma and continue
+    
+    // Expect 'return'
+    if (!check(TokenType::KEYWORD) || !check_text("return"))
+    {
+        throw std::runtime_error("Expected 'return' in 'for' expression");
+    }
+    advance(); // consume 'return'
+    
+    // Parse the return expression
+    auto return_expr = parse_logical_or();
+    node->children.push_back(std::move(return_expr));
+    
+    return node;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_quantified_expression(std::string_view quantifier)
+{
+    advance(); // consume 'some' or 'every'
+    
+    // some/every x in list [, y in list ...] satisfies condition
+    auto node = std::make_unique<ASTNode>(ASTNodeType::QUANTIFIED_EXPR, std::string(quantifier));
+    
+    // Parse iteration bindings
+    do
+    {
+        if (!check(TokenType::IDENTIFIER))
+        {
+            throw std::runtime_error("Expected variable name in quantified expression");
+        }
+        auto var_name = std::string(advance().text);
+        
+        if (!check(TokenType::KEYWORD) || !check_text("in"))
+        {
+            throw std::runtime_error("Expected 'in' after variable name in quantified expression");
+        }
+        advance(); // consume 'in'
+        
+        auto list_expr = parse_additive();
+        
+        auto var_node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, var_name);
+        node->children.push_back(std::move(var_node));
+        node->children.push_back(std::move(list_expr));
+        
+    } while (check(TokenType::COMMA) && (advance(), true));
+    
+    // Expect 'satisfies'
+    if (!check(TokenType::KEYWORD) || !check_text("satisfies"))
+    {
+        std::ostringstream oss;
+        oss << "Expected 'satisfies' in quantified expression at position " << peek().position;
+        throw std::runtime_error(oss.str());
+    }
+    advance(); // consume 'satisfies'
+    
+    // Parse the condition expression
+    auto condition = parse_logical_or();
+    node->children.push_back(std::move(condition));
+    
+    return node;
+}
+
 } // namespace orion::bre

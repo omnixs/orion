@@ -310,9 +310,9 @@ BOOST_AUTO_TEST_CASE(TestParseStringConcatenation)
 
 BOOST_AUTO_TEST_CASE(TestParseStringNumberConcatenation)
 {
+    // DMN spec: string + number is undefined, returns null
     auto result = parse_and_evaluate("\"Age: \" + 25", {});
-    BOOST_CHECK(result.is_string());
-    BOOST_CHECK_EQUAL(result.get<std::string>(), "Age: 25");
+    BOOST_CHECK(result.is_null());
 }
 
 // ============================================================================

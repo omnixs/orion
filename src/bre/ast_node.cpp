@@ -17,6 +17,7 @@
  */
 
 #include "orion/bre/ast_node.hpp"
+#include <orion/bre/business_knowledge_model.hpp>
 #include <orion/bre/feel/functions.hpp>
 #include <orion/bre/feel/parameter_binder.hpp>
 #include <stdexcept>
@@ -306,112 +307,125 @@ namespace orion::bre
                 json left = children[0]->evaluate(input, eval_ctx);
                 json right = children[1]->evaluate(input, eval_ctx);
                 
-                // Arithmetic operators - DMN null propagation
+                // Arithmetic operators - DMN strict type checking
                 if (value == "+")
                 {
-                    // Handle string concatenation
-                    if (left.is_string() || right.is_string())
-                    {
-                        return toString(left) + toString(right);
-                    }
                     // DMN: null in arithmetic returns null
                     if (left.is_null() || right.is_null())
                     {
                         return nullptr;
                     }
-                    return toNumber(left, "addition") + toNumber(right, "addition");
+                    // String concatenation: both must be strings
+                    if (left.is_string() && right.is_string())
+                    {
+                        return left.get<std::string>() + right.get<std::string>();
+                    }
+                    // Numeric addition: both must be numbers
+                    if (left.is_number() && right.is_number())
+                    {
+                        return left.get<double>() + right.get<double>();
+                    }
+                    // Invalid type combination
+                    return nullptr;
                 }
                 else if (value == "-")
                 {
-                    // DMN: null in arithmetic returns null
-                    if (left.is_null() || right.is_null())
-                    {
-                        return nullptr;
-                    }
-                    return toNumber(left, "subtraction") - toNumber(right, "subtraction");
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (!left.is_number() || !right.is_number()) return nullptr;
+                    return left.get<double>() - right.get<double>();
                 }
                 else if (value == "*")
                 {
-                    // DMN: null in arithmetic returns null
-                    if (left.is_null() || right.is_null())
-                    {
-                        return nullptr;
-                    }
-                    return toNumber(left, "multiplication") * toNumber(right, "multiplication");
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (!left.is_number() || !right.is_number()) return nullptr;
+                    return left.get<double>() * right.get<double>();
                 }
                 else if (value == "/")
                 {
-                    // DMN: null in arithmetic returns null
-                    if (left.is_null() || right.is_null())
-                    {
-                        return nullptr;
-                    }
-                    double divisor = toNumber(right, "division");
-                    // DMN: Division by zero returns null
-                    if (divisor == 0.0)
-                    {
-                        return nullptr;
-                    }
-                    return toNumber(left, "division") / divisor;
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (!left.is_number() || !right.is_number()) return nullptr;
+                    double divisor = right.get<double>();
+                    if (divisor == 0.0) return nullptr;
+                    return left.get<double>() / divisor;
                 }
                 else if (value == "**")
                 {
-                    // DMN: null in arithmetic returns null
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (!left.is_number() || !right.is_number()) return nullptr;
+                    return std::pow(left.get<double>(), right.get<double>());
+                }
+                
+                // Comparison operators - DMN strict type checking
+                else if (value == "<")
+                {
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (left.is_string() && right.is_string())
+                        return left.get<std::string>() < right.get<std::string>();
+                    if (left.is_number() && right.is_number())
+                        return left.get<double>() < right.get<double>();
+                    return nullptr;
+                }
+                else if (value == ">")
+                {
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (left.is_string() && right.is_string())
+                        return left.get<std::string>() > right.get<std::string>();
+                    if (left.is_number() && right.is_number())
+                        return left.get<double>() > right.get<double>();
+                    return nullptr;
+                }
+                else if (value == "<=")
+                {
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (left.is_string() && right.is_string())
+                        return left.get<std::string>() <= right.get<std::string>();
+                    if (left.is_number() && right.is_number())
+                        return left.get<double>() <= right.get<double>();
+                    return nullptr;
+                }
+                else if (value == ">=")
+                {
+                    if (left.is_null() || right.is_null()) return nullptr;
+                    if (left.is_string() && right.is_string())
+                        return left.get<std::string>() >= right.get<std::string>();
+                    if (left.is_number() && right.is_number())
+                        return left.get<double>() >= right.get<double>();
+                    return nullptr;
+                }
+                else if (value == "=" || value == "==")
+                {
+                    // DMN null handling: null = null → null, X = null → null
                     if (left.is_null() || right.is_null())
                     {
                         return nullptr;
                     }
-                    return std::pow(toNumber(left, "exponentiation"), toNumber(right, "exponentiation"));
-                }
-                
-                // Comparison operators
-                else if (value == "<")
-                {
-                    // Support string comparison for dates and other strings
-                    if (left.is_string() && right.is_string())
+                    // Numbers of different JSON sub-types are still comparable
+                    if (left.is_number() && right.is_number())
                     {
-                        return left.get<std::string>() < right.get<std::string>();
+                        return left == right;
                     }
-                    return toNumber(left, "less than") < toNumber(right, "less than");
-                }
-                else if (value == ">")
-                {
-                    // Support string comparison for dates and other strings
-                    if (left.is_string() && right.is_string())
-                    {
-                        return left.get<std::string>() > right.get<std::string>();
-                    }
-                    return toNumber(left, "greater than") > toNumber(right, "greater than");
-                }
-                else if (value == "<=")
-                {
-                    // Support string comparison for dates and other strings
-                    if (left.is_string() && right.is_string())
-                    {
-                        return left.get<std::string>() <= right.get<std::string>();
-                    }
-                    return toNumber(left, "less or equal") <= toNumber(right, "less or equal");
-                }
-                else if (value == ">=")
-                {
-                    // Support string comparison for dates and other strings
-                    if (left.is_string() && right.is_string())
-                    {
-                        return left.get<std::string>() >= right.get<std::string>();
-                    }
-                    return toNumber(left, "greater or equal") >= toNumber(right, "greater or equal");
-                }
-                else if (value == "=" || value == "==")
-                {
-                    // Handle different types
+                    // DMN spec: comparing incomparable non-null types returns null
                     if (left.type() != right.type())
                     {
-                        return false; // Different types are not equal
+                        return nullptr;
                     }
                     return left == right;
                 }
                 else if (value == "!=")
                 {
+                    if (left.is_null() || right.is_null())
+                    {
+                        return nullptr;
+                    }
+                    if (left.is_number() && right.is_number())
+                    {
+                        return left != right;
+                    }
+                    // DMN spec: comparing incomparable non-null types returns null
+                    if (left.type() != right.type())
+                    {
+                        return nullptr;
+                    }
                     return left != right;
                 }
                 
@@ -888,13 +902,271 @@ namespace orion::bre
             {
                 return feel::evaluate_context_merge_function(args);
             }
+            else if (eval_ctx.bkm_map)
+            {
+                auto bkm_it = eval_ctx.bkm_map->find(funcName);
+                if (bkm_it != eval_ctx.bkm_map->end())
+                {
+                    return bkm_it->second->invoke(args, input, *eval_ctx.bkm_map, eval_ctx);
+                }
+                std::ostringstream oss;
+                oss << "Unknown function: " << funcName;
+                throw std::runtime_error(oss.str());
+            }
             else
             {
                 std::ostringstream oss;
                 oss << "Unknown function: " << funcName;
                 throw std::runtime_error(oss.str());
             }
-        }           default:
+        }           case ASTNodeType::BETWEEN:
+            {
+                // x between a and b → x >= a and x <= b
+                if (children.size() != 3) return nullptr;
+                auto val = children[0]->evaluate(input, eval_ctx);
+                auto lower = children[1]->evaluate(input, eval_ctx);
+                auto upper = children[2]->evaluate(input, eval_ctx);
+                
+                if (val.is_null() || lower.is_null() || upper.is_null()) return nullptr;
+                if (!val.is_number() || !lower.is_number() || !upper.is_number())
+                {
+                    // Try string comparison
+                    if (val.is_string() && lower.is_string() && upper.is_string())
+                    {
+                        auto v = val.get<std::string>();
+                        return v >= lower.get<std::string>() && v <= upper.get<std::string>();
+                    }
+                    return nullptr;
+                }
+                double v = val.get<double>();
+                return v >= lower.get<double>() && v <= upper.get<double>();
+            }
+            case ASTNodeType::INSTANCE_OF:
+            {
+                if (children.size() != 1) return nullptr;
+                auto val = children[0]->evaluate(input, eval_ctx);
+                
+                const std::string& type_name = value;
+                
+                if (type_name == "Any") return true;
+                if (val.is_null()) return type_name == "Null" || type_name == "null";
+                if (type_name == "number") return val.is_number();
+                if (type_name == "string") return val.is_string();
+                if (type_name == "boolean") return val.is_boolean();
+                if (type_name == "list") return val.is_array();
+                if (type_name == "context") return val.is_object();
+                if (type_name == "null" || type_name == "Null") return val.is_null();
+                
+                // Temporal types - check string-encoded temporal values
+                // These would need proper type system (Phase 4) for full support
+                return false;
+            }
+            case ASTNodeType::FOR_EXPR:
+            {
+                // children: [var1, list1, var2, list2, ..., returnExpr]
+                // Last child is always the return expression
+                if (children.size() < 3) return nullptr;
+                
+                size_t num_bindings = (children.size() - 1) / 2;
+                auto return_expr = children.back().get();
+                
+                // For simplicity, handle single binding first
+                // for x in list return expr
+                if (num_bindings == 1)
+                {
+                    auto& var_node = children[0];
+                    auto list_val = children[1]->evaluate(input, eval_ctx);
+                    
+                    if (list_val.is_null()) return nullptr;
+                    
+                    // Auto-wrap non-list to list
+                    json list;
+                    if (list_val.is_array())
+                    {
+                        list = list_val;
+                    }
+                    else
+                    {
+                        list = json::array();
+                        list.push_back(list_val);
+                    }
+                    
+                    // Handle range: if list has two numbers, generate range
+                    // This is actually handled differently (range syntax), skip for now
+                    
+                    json result = json::array();
+                    json local_ctx = input;
+                    for (const auto& item : list)
+                    {
+                        local_ctx[var_node->value] = item;
+                        auto val = return_expr->evaluate(local_ctx, eval_ctx);
+                        result.push_back(val);
+                    }
+                    return result;
+                }
+                else
+                {
+                    // Multi-binding for loop - nested iteration
+                    // Recursive approach: iterate first binding, for each value recurse
+                    std::function<json(size_t, json&)> iterate;
+                    iterate = [&](size_t binding_idx, json& ctx) -> json {
+                        if (binding_idx >= num_bindings)
+                        {
+                            return return_expr->evaluate(ctx, eval_ctx);
+                        }
+                        
+                        auto& var_node = children[binding_idx * 2];
+                        auto list_val = children[binding_idx * 2 + 1]->evaluate(ctx, eval_ctx);
+                        
+                        if (list_val.is_null()) return json::array();
+                        
+                        json list = list_val.is_array() ? list_val : json::array({list_val});
+                        
+                        json results = json::array();
+                        for (const auto& item : list)
+                        {
+                            ctx[var_node->value] = item;
+                            auto inner = iterate(binding_idx + 1, ctx);
+                            if (inner.is_array() && binding_idx + 1 < num_bindings)
+                            {
+                                for (const auto& r : inner) results.push_back(r);
+                            }
+                            else
+                            {
+                                results.push_back(inner);
+                            }
+                        }
+                        return results;
+                    };
+                    
+                    json local_ctx = input;
+                    return iterate(0, local_ctx);
+                }
+            }
+            case ASTNodeType::QUANTIFIED_EXPR:
+            {
+                // children: [var1, list1, ..., condition]
+                if (children.size() < 3) return nullptr;
+                
+                size_t num_bindings = (children.size() - 1) / 2;
+                auto condition = children.back().get();
+                bool is_some = (value == "some");
+                
+                if (num_bindings == 1)
+                {
+                    auto& var_node = children[0];
+                    auto list_val = children[1]->evaluate(input, eval_ctx);
+                    
+                    if (list_val.is_null()) return nullptr;
+                    json list = list_val.is_array() ? list_val : json::array({list_val});
+                    
+                    json local_ctx = input;
+                    for (const auto& item : list)
+                    {
+                        local_ctx[var_node->value] = item;
+                        auto result = condition->evaluate(local_ctx, eval_ctx);
+                        
+                        if (result.is_boolean() && result.get<bool>())
+                        {
+                            if (is_some) return true;
+                        }
+                        else if (result.is_boolean() && !result.get<bool>())
+                        {
+                            if (!is_some) return false; // every: found false
+                        }
+                    }
+                    return !is_some; // some: all false → false; every: all true → true
+                }
+                else
+                {
+                    // Multi-binding: nested iteration with short-circuit
+                    std::function<json(size_t, json&)> iterate;
+                    bool found_true = false;
+                    bool found_false = false;
+                    
+                    iterate = [&](size_t binding_idx, json& ctx) -> json {
+                        if (binding_idx >= num_bindings)
+                        {
+                            auto result = condition->evaluate(ctx, eval_ctx);
+                            if (result.is_boolean())
+                            {
+                                if (result.get<bool>()) found_true = true;
+                                else found_false = true;
+                            }
+                            return result;
+                        }
+                        
+                        auto& var_node = children[binding_idx * 2];
+                        auto list_val = children[binding_idx * 2 + 1]->evaluate(ctx, eval_ctx);
+                        if (list_val.is_null()) return nullptr;
+                        json list = list_val.is_array() ? list_val : json::array({list_val});
+                        
+                        for (const auto& item : list)
+                        {
+                            ctx[var_node->value] = item;
+                            iterate(binding_idx + 1, ctx);
+                            if (is_some && found_true) return json(true);
+                            if (!is_some && found_false) return json(false);
+                        }
+                        return nullptr;
+                    };
+                    
+                    json local_ctx = input;
+                    iterate(0, local_ctx);
+                    
+                    if (is_some) return found_true;
+                    return !found_false;
+                }
+            }
+            case ASTNodeType::FILTER_EXPR:
+            {
+                // children[0] = list, children[1] = filter condition
+                if (children.size() != 2) return nullptr;
+                auto list_val = children[0]->evaluate(input, eval_ctx);
+                
+                if (list_val.is_null()) return nullptr;
+                if (!list_val.is_array()) return nullptr;
+                
+                auto& filter = children[1];
+                
+                // Check if filter is a numeric index
+                auto idx_val = filter->evaluate(input, eval_ctx);
+                if (idx_val.is_number())
+                {
+                    int idx = static_cast<int>(idx_val.get<double>());
+                    int size = static_cast<int>(list_val.size());
+                    
+                    if (idx > 0 && idx <= size) return list_val[idx - 1];
+                    if (idx < 0 && -idx <= size) return list_val[size + idx];
+                    return nullptr;
+                }
+                
+                // Filter by condition
+                json result = json::array();
+                json local_ctx = input;
+                for (size_t i = 0; i < list_val.size(); ++i)
+                {
+                    const auto& item = list_val[i];
+                    local_ctx["item"] = item;
+                    
+                    // If item is context, merge its keys into local scope
+                    if (item.is_object())
+                    {
+                        for (auto it = item.begin(); it != item.end(); ++it)
+                        {
+                            local_ctx[it.key()] = it.value();
+                        }
+                    }
+                    
+                    auto cond_result = filter->evaluate(local_ctx, eval_ctx);
+                    if (cond_result.is_boolean() && cond_result.get<bool>())
+                    {
+                        result.push_back(item);
+                    }
+                }
+                return result;
+            }
+            default:
             {
                 std::ostringstream oss;
                 oss << "Unknown AST node type: " << static_cast<int>(type);

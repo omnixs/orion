@@ -98,7 +98,12 @@ namespace orion::bre
         UNARY_OP, ///< Unary operation (e.g., -, not)
         FUNCTION_CALL, ///< Function call (e.g., sum(values))
         PROPERTY_ACCESS, ///< Property access (e.g., person.age)
-        CONDITIONAL ///< Conditional expression (e.g., if x > 10 then "high" else "low")
+        CONDITIONAL, ///< Conditional expression (e.g., if x > 10 then "high" else "low")
+        INSTANCE_OF, ///< Instance of check (e.g., x instance of number)
+        BETWEEN, ///< Between expression (e.g., x between 1 and 10)
+        FOR_EXPR, ///< For expression (e.g., for x in [1,2,3] return x+1)
+        QUANTIFIED_EXPR, ///< some/every expression (e.g., some x in list satisfies x > 0)
+        FILTER_EXPR ///< Filter expression (e.g., list[x > 0] or list[1])
     };
 
     // Forward declaration for FunctionParameter

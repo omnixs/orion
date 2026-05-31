@@ -33,6 +33,9 @@
 #include <algorithm>
 #include <orion/bre/bkm_manager.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/parser.hpp>
+#include <orion/bre/ast_node.hpp>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -126,6 +129,18 @@ namespace orion
                         auto literalDec = make_unique<LiteralDecision>();
                         literalDec->name = decision.name;
                         literalDec->expression_text = decision.expression;
+                        // Pre-parse expression as AST for performance
+                        try
+                        {
+                            bre::feel::Lexer lexer;
+                            auto tokens = lexer.tokenize(literalDec->expression_text);
+                            bre::feel::Parser parser;
+                            literalDec->expression_ast = parser.parse(tokens);
+                        }
+                        catch (const exception&)
+                        {
+                            // AST parsing failed - will use legacy path at evaluation time
+                        }
                         pimpl->add_literal_decision(std::move(literalDec));
                     }
                 }
@@ -157,6 +172,8 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
         {
             json results = json::object();
             bre::EvaluationContext eval_ctx{pimpl->regex_cache_};
+            auto bkm_map = pimpl->bkm_manager_.create_bkm_map();
+            eval_ctx.bkm_map = &bkm_map;
             
             if (pimpl->drg_evaluator_)
             {

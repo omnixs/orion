@@ -78,144 +78,82 @@ json evaluate_not_function(const std::vector<json>& args)
 
 json evaluate_all_function(const std::vector<json>& args)
 {
-    // Validate argument count
-    if (args.size() != 1)
+    // DMN spec: all(list) or all(b1, b2, ..., bN)
+    // Build flat list of items from args
+    json items = json::array();
+    if (args.size() == 1 && args[0].is_array())
     {
-        throw std::runtime_error("Function 'all' requires exactly 1 argument, got " + 
-                                 std::to_string(args.size()));
+        items = args[0];
     }
-
-    const auto& list = args[0];
-
-    // DMN null propagation
-    if (list.is_null())
+    else if (args.size() == 1 && args[0].is_null())
     {
         return nullptr;
     }
-
-    // Type validation - argument must be array
-    if (!list.is_array())
+    else if (args.size() == 1)
     {
-        throw std::runtime_error("Function 'all' requires array argument, got " + 
-                                 std::string(list.type_name()));
+        // Single non-list arg: treat as single boolean
+        items.push_back(args[0]);
+    }
+    else
+    {
+        for (const auto& a : args) items.push_back(a);
     }
 
-    // Empty list case: all([]) = true (vacuous truth)
-    if (list.empty())
+    if (items.empty()) return true; // vacuous truth
+
+    bool has_null = false;
+    for (const auto& elem : items)
     {
-        return true;
-    }
-
-    // Check all elements
-    for (const auto& elem : list)
-    {
-        // Skip null elements (they don't affect result)
-        if (elem.is_null())
+        if (elem.is_null()) { has_null = true; continue; }
+        if (elem.is_boolean())
         {
-            continue;
+            if (!elem.get<bool>()) return false;
         }
-
-        // Type validation for each element
-        if (!elem.is_boolean())
+        else
         {
-            // Try to convert string representations
-            if (elem.is_string())
-            {
-                std::string str = elem.get<std::string>();
-                if (str == "false") { return false;
-}
-                if (str != "true")
-                {
-                    throw std::runtime_error("Function 'all' requires array of booleans, got string: " + str);
-                }
-                continue; // "true" doesn't affect all() result
-            }
-            
-            throw std::runtime_error("Function 'all' requires array of booleans, got " + 
-                                     std::string(elem.type_name()));
-        }
-
-        // If any element is false, return false
-        if (!elem.get<bool>())
-        {
-            return false;
+            return nullptr; // non-boolean element
         }
     }
-
-    // All elements are true
-    return true;
+    return has_null ? json(nullptr) : json(true);
 }
 
 json evaluate_any_function(const std::vector<json>& args)
 {
-    // Validate argument count
-    if (args.size() != 1)
+    // DMN spec: any(list) or any(b1, b2, ..., bN)
+    json items = json::array();
+    if (args.size() == 1 && args[0].is_array())
     {
-        throw std::runtime_error("Function 'any' requires exactly 1 argument, got " + 
-                                 std::to_string(args.size()));
+        items = args[0];
     }
-
-    const auto& list = args[0];
-
-    // DMN null propagation
-    if (list.is_null())
+    else if (args.size() == 1 && args[0].is_null())
     {
         return nullptr;
     }
-
-    // Type validation - argument must be array
-    if (!list.is_array())
+    else if (args.size() == 1)
     {
-        throw std::runtime_error("Function 'any' requires array argument, got " + 
-                                 std::string(list.type_name()));
+        items.push_back(args[0]);
+    }
+    else
+    {
+        for (const auto& a : args) items.push_back(a);
     }
 
-    // Empty list case: any([]) = false
-    if (list.empty())
+    if (items.empty()) return false;
+
+    bool has_null = false;
+    for (const auto& elem : items)
     {
-        return false;
-    }
-
-    // Check any element
-    for (const auto& elem : list)
-    {
-        // Skip null elements
-        if (elem.is_null())
+        if (elem.is_null()) { has_null = true; continue; }
+        if (elem.is_boolean())
         {
-            continue;
+            if (elem.get<bool>()) return true;
         }
-
-        // Type validation for each element
-        if (!elem.is_boolean())
+        else
         {
-            // Try to convert string representations
-            if (elem.is_string())
-            {
-                std::string str = elem.get<std::string>();
-                if (str == "true")
-                {
-                    return true;
-                }
-                if (str != "false")
-                {
-                    throw std::runtime_error("Function 'any' requires array of booleans, got string: " + str);
-                }
-                continue; // "false" doesn't affect any() result
-            }
-            
-            throw std::runtime_error("Function 'any' requires array of booleans, got " + 
-                                     std::string(elem.type_name()));
-        }
-
-        // If any element is true, return true
-        if (elem.get<bool>())
-        {
-            return true;
+            return nullptr; // non-boolean element
         }
     }
-
-    // No elements are true
-    return false;
+    return has_null ? json(nullptr) : json(false);
 }
 
 json evaluate_contains_function(const std::vector<json>& args)
@@ -1229,51 +1167,34 @@ json evaluate_string_join_function(const std::vector<json>& args)
         }
     }
 
-    // Join the list elements
+    // Join the list elements - DMN spec requires all elements to be strings or null
+    // First validate all non-null elements are strings
+    for (const auto& element : list)
+    {
+        if (!element.is_null() && !element.is_string())
+        {
+            return nullptr; // Non-string, non-null element in list
+        }
+    }
+
     std::string result;
     bool first = true;
 
     for (const auto& element : list)
     {
+        if (element.is_null())
+        {
+            // Skip null elements per DMN spec
+            continue;
+        }
+
         if (!first)
         {
             result += delimiter;
         }
         first = false;
 
-        // Convert element to string
-        if (element.is_string())
-        {
-            result += element.get<std::string>();
-        }
-        else if (element.is_number())
-        {
-            // Convert number to string
-            double num = element.get<double>();
-            // Check if it's an integer
-            if (num == static_cast<int>(num))
-            {
-                result += std::to_string(static_cast<int>(num));
-            }
-            else
-            {
-                result += std::to_string(num);
-            }
-        }
-        else if (element.is_boolean())
-        {
-            result += element.get<bool>() ? "true" : "false";
-        }
-        else if (element.is_null())
-        {
-            // Skip null elements or treat as empty string
-            // DMN spec is unclear here, using empty string
-        }
-        else
-        {
-            // For complex types, use JSON representation
-            result += element.dump();
-        }
+        result += element.get<std::string>();
     }
 
     return result;
@@ -2352,41 +2273,17 @@ json evaluate_context_put_function(const std::vector<json>& args)
     if (context.is_null()) return nullptr;
     if (!context.is_object()) return nullptr;
 
-    // Key can be a string or a list of strings (nested path)
-    if (key.is_string())
+    // DMN spec: key must be a string
+    // The list-of-keys (nested path) variant uses the 'keys' parameter name,
+    // which is not currently supported
+    if (!key.is_string())
     {
-        json result = context;
-        result[key.get<std::string>()] = value;
-        return result;
-    }
-    else if (key.is_array())
-    {
-        if (key.empty()) return nullptr;
-
-        // Build nested path
-        json result = context;
-        json* current = &result;
-
-        for (size_t i = 0; i < key.size() - 1; ++i)
-        {
-            if (!key[i].is_string()) return nullptr;
-            std::string k = key[i].get<std::string>();
-
-            if (!current->is_object()) return nullptr;
-            auto it = current->find(k);
-            if (it == current->end())
-            {
-                (*current)[k] = json::object();
-            }
-            current = &(*current)[k];
-        }
-
-        if (!key.back().is_string()) return nullptr;
-        (*current)[key.back().get<std::string>()] = value;
-        return result;
+        return nullptr;
     }
 
-    return nullptr;
+    json result = context;
+    result[key.get<std::string>()] = value;
+    return result;
 }
 
 json evaluate_context_merge_function(const std::vector<json>& args)

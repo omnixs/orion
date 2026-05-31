@@ -758,7 +758,7 @@ static void write_csv_result(
 }
 
 static bool execute_single_test_case(
-    const std::string& dmn_xml, 
+    orion::api::BusinessRulesEngine& engine, 
     const ParsedCase& test_case,
     const std::string& test_dir,
     const std::string& test_case_id,
@@ -780,12 +780,6 @@ static bool execute_single_test_case(
     std::string errMsg;
     
     try {
-        // Use proper BusinessRulesEngine API
-        orion::api::BusinessRulesEngine engine;
-        auto load_result = engine.load_dmn_model(dmn_xml);
-        if (!load_result) {
-            throw std::runtime_error("Failed to load DMN model: " + load_result.error());
-        }
         actual = engine.evaluate(test_case.input);
         result = actual.dump();
         if (config.verbose) {
@@ -882,6 +876,20 @@ static TestStats execute_test_directory_set(
             continue; // File read error, skip this test
         }
         
+        // Load DMN model ONCE per test directory (load-once, evaluate-many pattern)
+        orion::api::BusinessRulesEngine engine;
+        try {
+            auto load_result = engine.load_dmn_model(dmn_xml);
+            if (!load_result) {
+                spdlog::warn("Failed to load DMN model for {}: {}", di.dir.string(), load_result.error());
+                continue;
+            }
+        }
+        catch (const std::exception& ex) {
+            spdlog::warn("Exception loading DMN model for {}: {}", di.dir.string(), ex.what());
+            continue;
+        }
+        
         bool feature_passed = true;
         std::size_t feature_cases_passed = 0;
         std::size_t feature_total_cases = 0;
@@ -914,7 +922,7 @@ static TestStats execute_test_directory_set(
                 int outputs_before = stats.total_outputs;
                 int ok_before = stats.ok;
                 
-                bool case_passed = execute_single_test_case(dmn_xml, c, test_dir, test_case_id, config, csv, stats);
+                bool case_passed = execute_single_test_case(engine, c, test_dir, test_case_id, config, csv, stats);
                 
                 // Update total test cases based on outputs processed
                 int outputs_processed = stats.total_outputs - outputs_before;

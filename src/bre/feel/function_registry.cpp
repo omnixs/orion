@@ -92,8 +92,8 @@ void register_list_functions(FunctionRegistry& reg) {
     reg.register_function({"max", {{"list"}}});
     reg.register_function({"sum", {{"list"}}});
     reg.register_function({"mean", {{"list"}}});
-    reg.register_function({"all", {{"list"}}});
-    reg.register_function({"any", {{"list"}}});
+    reg.register_function({"all", {{"list"}}, true});
+    reg.register_function({"any", {{"list"}}, true});
     
     reg.register_function({"sublist", {
         {"list"},

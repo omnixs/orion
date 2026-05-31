@@ -128,6 +128,12 @@ namespace orion::bre::feel {
             {
                 tokens.push_back(tokenize_operator());
             }
+            // At-literals: @"..." → parse as string value (temporal/duration literal)
+            else if (current == '@' && position_ + 1 < input_.length() && input_[position_ + 1] == '"')
+            {
+                position_++; // skip '@'
+                tokens.push_back(tokenize_string());
+            }
             else
             {
                 // Unknown character
@@ -147,7 +153,8 @@ namespace orion::bre::feel {
                text == "and" || text == "or" || text == "not" ||
                text == "if" || text == "then" || text == "else" ||
                text == "in" || text == "for" || text == "some" || text == "every" ||
-               text == "return" || text == "between" || text == "instance" || text == "of";
+               text == "return" || text == "between" || text == "instance" || text == "of" ||
+               text == "satisfies";
     }
 
     char Lexer::peek() const

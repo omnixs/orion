@@ -18,12 +18,17 @@
 
 #pragma once
 
+#include <map>
+#include <string>
+
 namespace orion::bre::feel {
     class RegexCache; // Forward declaration
 }
 
 namespace orion::bre
 {
+    struct BusinessKnowledgeModel; // Forward declaration
+
     /**
      * @brief Evaluation context containing engine resources and runtime state
      * 
@@ -31,22 +36,13 @@ namespace orion::bre
      * and decision evaluation. Currently contains only regex caching, but designed
      * as an extensible container for future evaluation-time context.
      * 
-     * @par Potential Future Extensions:
-     * - Performance profiling/metrics collection
-     * - Debug/trace logging context  
-     * - Memory allocation limits or quotas
-     * - Custom function registry
-     * - Variable resolution caching
-     * - Evaluation depth tracking (recursion limits)
-     * - Timezone/locale settings for date/time operations
-     * - Audit trail/execution history
-     * 
      * @note Non-owning reference semantics - the context does not own the resources
      *       it references. The engine instance owns the actual RegexCache.
      */
     struct EvaluationContext
     {
         feel::RegexCache& regex_cache; ///< Non-owning reference to engine's regex cache
+        const std::map<std::string, const BusinessKnowledgeModel*, std::less<>>* bkm_map = nullptr;
 
         /**
          * @brief Construct evaluation context with required resources

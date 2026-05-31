@@ -223,5 +223,9 @@ namespace orion::bre::feel {
     void parse_context_entry(std::unique_ptr<ASTNode>& context_node);
     
     std::unique_ptr<ASTNode> parse_unary_minus();
+
+    // Language construct helpers
+    std::unique_ptr<ASTNode> parse_for_expression();
+    std::unique_ptr<ASTNode> parse_quantified_expression(std::string_view quantifier);
 };
 } // namespace orion::bre
