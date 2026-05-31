@@ -55,7 +55,7 @@ namespace orion::bre
                 int m = months % 12;
                 if (y > 0) result += std::to_string(y) + "Y";
                 if (m > 0) result += std::to_string(m) + "M";
-                if (y == 0 && m == 0) result += "0M";
+                if (y == 0 && m == 0) result += "0Y";
             }
             else
             {
@@ -602,7 +602,20 @@ namespace orion::bre
                                 }
                             }
                         }
+                        // If either side is a temporal/duration type, it's an invalid combination
+                        if (is_date_string(left) || is_datetime_string(left) || is_time_string(left) || is_duration_string(left) ||
+                            is_date_string(right) || is_datetime_string(right) || is_time_string(right) || is_duration_string(right))
+                        {
+                            return nullptr;
+                        }
                         return ls + rs;
+                    }
+                    // Number + string-encoded number (should not happen in well-typed FEEL)
+                    // String + non-string or non-string + string: invalid
+                    if (left.is_string() || right.is_string())
+                    {
+                        // One is string, other is number — invalid
+                        return nullptr;
                     }
                     // Numeric addition: both must be numbers
                     if (left.is_number() && right.is_number())
