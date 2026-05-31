@@ -31,6 +31,7 @@
 #include <chrono>
 #include <map>
 #include <limits>
+#include <regex>
 
 namespace orion::bre::feel {
 
@@ -1026,19 +1027,88 @@ json evaluate_replace_function(const std::vector<json>& args)
     std::string pattern_val = pattern.get<std::string>();
     std::string replacement_val = replacement.get<std::string>();
 
-    // For now, implement simple string replacement (not regex)
-    // TODO: Add regex support when flags parameter is used
-    std::string result = input_val;
-    size_t pos = 0;
-    
-    // Replace all occurrences
-    while ((pos = result.find(pattern_val, pos)) != std::string::npos)
+    // Handle optional flags parameter
+    std::string flags_val;
+    if (args.size() == 4)
     {
-        result.replace(pos, pattern_val.length(), replacement_val);
-        pos += replacement_val.length();
+        const auto& flags = args[3];
+        if (!flags.is_null())
+        {
+            if (!flags.is_string()) return nullptr;
+            flags_val = flags.get<std::string>();
+        }
     }
 
-    return result;
+    // Convert XPath/FEEL replacement syntax ($1, $2) to std::regex syntax ($1, $2) - same
+    // But FEEL uses $0 for whole match - std::regex uses $& or $0 depending on implementation
+    // Actually std::regex_replace uses $1, $2 etc. which matches FEEL spec
+
+    // Build regex flags
+    std::regex_constants::syntax_option_type regex_flags = std::regex_constants::ECMAScript;
+    for (char f : flags_val)
+    {
+        switch (f)
+        {
+            case 'i': regex_flags |= std::regex_constants::icase; break;
+            case 's': // dot matches newline - handled by modifying pattern
+                break;
+            case 'm': regex_flags |= std::regex_constants::multiline; break;
+            case 'x': // extended - ignore whitespace in pattern
+                break;
+            default: return nullptr; // Invalid flag
+        }
+    }
+
+    // Handle 's' flag: make '.' match newline by replacing unescaped '.' with [\s\S]
+    std::string effective_pattern = pattern_val;
+    if (flags_val.find('s') != std::string::npos)
+    {
+        // Simple approach: replace . with [\s\S] (but not \. or [.])
+        std::string new_pat;
+        for (size_t i = 0; i < effective_pattern.size(); ++i)
+        {
+            if (effective_pattern[i] == '.' && (i == 0 || effective_pattern[i-1] != '\\'))
+            {
+                new_pat += "[\\s\\S]";
+            }
+            else
+            {
+                new_pat += effective_pattern[i];
+            }
+        }
+        effective_pattern = new_pat;
+    }
+
+    // Handle 'x' flag: strip unescaped whitespace from pattern
+    if (flags_val.find('x') != std::string::npos)
+    {
+        std::string new_pat;
+        for (size_t i = 0; i < effective_pattern.size(); ++i)
+        {
+            if (effective_pattern[i] == '\\' && i + 1 < effective_pattern.size())
+            {
+                new_pat += effective_pattern[i];
+                new_pat += effective_pattern[i + 1];
+                ++i;
+            }
+            else if (!std::isspace(static_cast<unsigned char>(effective_pattern[i])))
+            {
+                new_pat += effective_pattern[i];
+            }
+        }
+        effective_pattern = new_pat;
+    }
+
+    try
+    {
+        std::regex re(effective_pattern, regex_flags);
+        std::string result = std::regex_replace(input_val, re, replacement_val);
+        return result;
+    }
+    catch (const std::regex_error&)
+    {
+        return nullptr; // Invalid regex pattern
+    }
 }
 
 json evaluate_matches_function(const std::vector<json>& args, const EvaluationContext& eval_ctx)
