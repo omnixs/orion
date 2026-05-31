@@ -32,6 +32,10 @@ namespace orion::common
                 {
                     return json::array();
                 }
+                if (xsiType.find("string") != std::string::npos)
+                {
+                    return json("");
+                }
                 return json{};
             }
 
