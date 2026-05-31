@@ -1579,9 +1579,13 @@ static std::string normalize_time_string(const std::string& s)
         oss << '.' << frac;
     }
 
-    // Normalize timezone: keep Z as-is, keep offsets as-is
+    // Normalize timezone: +00:00 and -00:00 → Z
     if (!tc.offset.empty()) {
-        oss << tc.offset;
+        if (tc.offset == "+00:00" || tc.offset == "-00:00") {
+            oss << "Z";
+        } else {
+            oss << tc.offset;
+        }
     }
 
     return oss.str();
