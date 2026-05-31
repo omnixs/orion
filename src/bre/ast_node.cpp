@@ -850,11 +850,9 @@ namespace orion::bre
                 }
                 else if (value == "=" || value == "==")
                 {
-                    // DMN null handling: null = null → null, X = null → null
-                    if (left.is_null() || right.is_null())
-                    {
-                        return nullptr;
-                    }
+                    // DMN/TCK: null = null → true, X = null → false, null = X → false
+                    if (left.is_null() && right.is_null()) return true;
+                    if (left.is_null() || right.is_null()) return false;
                     // Numbers of different JSON sub-types are still comparable
                     if (left.is_number() && right.is_number())
                     {
@@ -869,15 +867,13 @@ namespace orion::bre
                 }
                 else if (value == "!=")
                 {
-                    if (left.is_null() || right.is_null())
-                    {
-                        return nullptr;
-                    }
+                    // DMN/TCK: null != null → false, X != null → true, null != X → true
+                    if (left.is_null() && right.is_null()) return false;
+                    if (left.is_null() || right.is_null()) return true;
                     if (left.is_number() && right.is_number())
                     {
                         return left != right;
                     }
-                    // DMN spec: comparing incomparable non-null types returns null
                     if (left.type() != right.type())
                     {
                         return nullptr;
