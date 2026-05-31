@@ -1357,12 +1357,56 @@ json evaluate_duration_function(const std::vector<json>& args)
             return nullptr;
         }
         
-        // Return the validated duration string
-        // Note: We return the string (not a Duration object) because:
-        // 1. Duration comparisons in unary.cpp work with string_view
-        // 2. Consistent with date() which returns ISO string
-        // 3. Keeps JSON representation simple
-        return duration_string;
+        // Return the validated duration string in normalized form
+        auto dur = parsed.value();
+        // Determine if YM or DT based on string content
+        // YM: only has Y/M components (no D, no T section)
+        // DT: has D, H, or time components (T section)
+        bool has_time_part = duration_string.find('T') != std::string::npos;
+        bool has_day = duration_string.find('D') != std::string::npos;
+        bool has_ym = (duration_string.find('Y') != std::string::npos || 
+                       (duration_string.find('M') != std::string::npos && !has_time_part));
+        bool is_ym = !has_time_part && !has_day;
+        
+        // Mixed durations (both YM and DT parts): return as-is
+        if (has_ym && (has_time_part || has_day)) {
+            return duration_string;
+        }
+        
+        if (is_ym) {
+            // YM duration: normalize to years and months
+            int total_months = dur.total_months;
+            bool negative = total_months < 0;
+            if (negative) total_months = -total_months;
+            int years = total_months / 12;
+            int months = total_months % 12;
+            std::string result = (negative && (years > 0 || months > 0)) ? "-P" : "P";
+            if (years > 0) result += std::to_string(years) + "Y";
+            if (months > 0) result += std::to_string(months) + "M";
+            if (years == 0 && months == 0) result = "P0M";
+            return result;
+        } else {
+            // DT duration: normalize to days/hours/minutes/seconds
+            long long total = dur.total_seconds;
+            bool negative = total < 0;
+            if (negative) total = -total;
+            long long days = total / 86400;
+            long long rem = total % 86400;
+            long long hours = rem / 3600;
+            rem %= 3600;
+            long long mins = rem / 60;
+            long long secs = rem % 60;
+            std::string result = (negative && (days > 0 || hours > 0 || mins > 0 || secs > 0)) ? "-P" : "P";
+            if (days > 0) result += std::to_string(days) + "D";
+            if (hours > 0 || mins > 0 || secs > 0) {
+                result += "T";
+                if (hours > 0) result += std::to_string(hours) + "H";
+                if (mins > 0) result += std::to_string(mins) + "M";
+                if (secs > 0) result += std::to_string(secs) + "S";
+            }
+            if (result == "P" || result == "-P") result = has_time_part ? "PT0S" : "P0D";
+            return result;
+        }
     }
 
     // Invalid argument count
@@ -1509,6 +1553,38 @@ static TimeComponents parse_time_components(const std::string& s)
         return tc;
     }
     return tc;
+}
+
+// Normalize a time string to canonical form: strip fractional zeros, normalize Z to +00:00
+static std::string normalize_time_string(const std::string& s)
+{
+    auto tc = parse_time_components(s);
+    if (!tc.valid) return s;
+
+    std::ostringstream oss;
+    oss << std::setw(2) << std::setfill('0') << tc.hour << ':'
+        << std::setw(2) << std::setfill('0') << tc.minute << ':'
+        << std::setw(2) << std::setfill('0') << tc.second;
+
+    // Only add fractional part if non-zero
+    if (tc.nanosecond > 0) {
+        // Format nanoseconds, trimming trailing zeros
+        std::string frac = std::to_string(tc.nanosecond);
+        while (frac.size() < 9) frac = "0" + frac;
+        // Remove trailing zeros
+        size_t last_nonzero = frac.find_last_not_of('0');
+        if (last_nonzero != std::string::npos) {
+            frac = frac.substr(0, last_nonzero + 1);
+        }
+        oss << '.' << frac;
+    }
+
+    // Normalize timezone: keep Z as-is, keep offsets as-is
+    if (!tc.offset.empty()) {
+        oss << tc.offset;
+    }
+
+    return oss.str();
 }
 
 // Parse duration components
@@ -1690,7 +1766,7 @@ json evaluate_time_function(const std::vector<json>& args)
             // Validate it parses as a time
             auto tc = parse_time_components(s);
             if (!tc.valid) return nullptr;
-            return s;
+            return normalize_time_string(s);
         }
         return nullptr;
     }
@@ -1732,11 +1808,16 @@ json evaluate_date_and_time_function(const std::vector<json>& args)
         std::string s = args[0].get<std::string>();
         // Validate it has both date and time parts
         auto tpos = s.find('T');
-        if (tpos == std::string::npos) return nullptr;
+        if (tpos == std::string::npos) {
+            // Date-only string: treat as midnight
+            auto dcomp = parse_date_components(s);
+            if (!dcomp.valid) return nullptr;
+            return s + "T00:00:00";
+        }
         auto dcomp = parse_date_components(s.substr(0, tpos));
         auto tcomp = parse_time_components(s.substr(tpos + 1));
         if (!dcomp.valid || !tcomp.valid) return nullptr;
-        return s;
+        return s.substr(0, tpos) + "T" + normalize_time_string(s.substr(tpos + 1));
     }
 
     // date and time(date, time)
@@ -1752,7 +1833,7 @@ json evaluate_date_and_time_function(const std::vector<json>& args)
         date_str = date_str.substr(0, tpos);
     }
 
-    return date_str + "T" + time_str;
+    return date_str + "T" + normalize_time_string(time_str);
 }
 
 json evaluate_years_and_months_duration_function(const std::vector<json>& args)

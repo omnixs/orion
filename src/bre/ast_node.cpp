@@ -863,6 +863,21 @@ namespace orion::bre
                     {
                         return nullptr;
                     }
+                    // Temporal string normalization: Z ↔ +00:00
+                    if (left.is_string() && right.is_string())
+                    {
+                        std::string ls = left.get<std::string>();
+                        std::string rs = right.get<std::string>();
+                        // Normalize Z to +00:00 for comparison
+                        auto normalize_tz = [](std::string& s) {
+                            if (!s.empty() && s.back() == 'Z') {
+                                s = s.substr(0, s.size() - 1) + "+00:00";
+                            }
+                        };
+                        normalize_tz(ls);
+                        normalize_tz(rs);
+                        return ls == rs;
+                    }
                     return left == right;
                 }
                 else if (value == "!=")
@@ -877,6 +892,20 @@ namespace orion::bre
                     if (left.type() != right.type())
                     {
                         return nullptr;
+                    }
+                    // Temporal string normalization: Z ↔ +00:00
+                    if (left.is_string() && right.is_string())
+                    {
+                        std::string ls = left.get<std::string>();
+                        std::string rs = right.get<std::string>();
+                        auto normalize_tz = [](std::string& s) {
+                            if (!s.empty() && s.back() == 'Z') {
+                                s = s.substr(0, s.size() - 1) + "+00:00";
+                            }
+                        };
+                        normalize_tz(ls);
+                        normalize_tz(rs);
+                        return ls != rs;
                     }
                     return left != right;
                 }
@@ -1853,7 +1882,11 @@ namespace orion::bre
                 auto list_val = children[0]->evaluate(input, eval_ctx);
                 
                 if (list_val.is_null()) return nullptr;
-                if (!list_val.is_array()) return nullptr;
+                // DMN: singleton coercion - non-list value treated as [value]
+                if (!list_val.is_array())
+                {
+                    list_val = json::array({list_val});
+                }
                 
                 auto& filter = children[1];
                 
