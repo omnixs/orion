@@ -77,7 +77,16 @@ namespace orion::bre::feel {
             case '}': type = TokenType::RBRACE; break;
             case ',': type = TokenType::COMMA; break;
             case ':': type = TokenType::COLON; break;
-            case '.': type = TokenType::DOT; break;
+            case '.':
+                // Check for '..' (range operator)
+                if (position_ + 1 < input_.size() && input_[position_ + 1] == '.') {
+                    tokens.emplace_back(TokenType::DOTDOT, input_.substr(position_, 2), position_);
+                    advance();
+                    advance();
+                    return;
+                }
+                type = TokenType::DOT;
+                break;
             default: return; // Not punctuation
         }
         tokens.emplace_back(type, input_.substr(position_, 1), position_);
@@ -197,8 +206,8 @@ namespace orion::bre::feel {
             advance();
         }
 
-        // Decimal part
-        if (peek() == '.')
+        // Decimal part - but NOT if it's a range operator (..)
+        if (peek() == '.' && (position_ + 1 >= input_.length() || input_[position_ + 1] != '.'))
         {
             advance();
             while (std::isdigit(static_cast<unsigned char>(peek())))

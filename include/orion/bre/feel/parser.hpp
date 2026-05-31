@@ -227,5 +227,8 @@ namespace orion::bre::feel {
     // Language construct helpers
     std::unique_ptr<ASTNode> parse_for_expression();
     std::unique_ptr<ASTNode> parse_quantified_expression(std::string_view quantifier);
+    std::unique_ptr<ASTNode> parse_in_tests();
+    std::unique_ptr<ASTNode> parse_single_unary_test();
+    std::unique_ptr<ASTNode> parse_range(TokenType open_bracket);
 };
 } // namespace orion::bre

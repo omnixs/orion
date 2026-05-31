@@ -70,6 +70,18 @@ namespace orion::bre::feel {
 
     std::optional<Duration> parse_duration(std::string_view str)
     {
+        if (str.empty())
+        {
+            return std::nullopt;
+        }
+        
+        bool negative = false;
+        if (str[0] == '-')
+        {
+            negative = true;
+            str = str.substr(1);
+        }
+        
         if (str.empty() || str[0] != 'P')
         {
             return std::nullopt;
@@ -161,6 +173,12 @@ namespace orion::bre::feel {
         total_sec += static_cast<long long>(minutes) * 60LL;
         total_sec += seconds;
         duration.total_seconds = total_sec;
+
+        if (negative)
+        {
+            duration.total_months = -duration.total_months;
+            duration.total_seconds = -duration.total_seconds;
+        }
 
         return duration;
     }

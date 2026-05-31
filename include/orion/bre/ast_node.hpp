@@ -103,7 +103,9 @@ namespace orion::bre
         BETWEEN, ///< Between expression (e.g., x between 1 and 10)
         FOR_EXPR, ///< For expression (e.g., for x in [1,2,3] return x+1)
         QUANTIFIED_EXPR, ///< some/every expression (e.g., some x in list satisfies x > 0)
-        FILTER_EXPR ///< Filter expression (e.g., list[x > 0] or list[1])
+        FILTER_EXPR, ///< Filter expression (e.g., list[x > 0] or list[1])
+        RANGE, ///< Range expression (e.g., [1..10], (1..10), [1..10), (1..10])
+        UNARY_TEST ///< Unary test (e.g., <= 10, > 5, used in 'in' expressions)
     };
 
     // Forward declaration for FunctionParameter

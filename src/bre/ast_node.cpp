@@ -20,6 +20,7 @@
 #include <orion/bre/business_knowledge_model.hpp>
 #include <orion/bre/feel/functions.hpp>
 #include <orion/bre/feel/parameter_binder.hpp>
+#include <orion/bre/feel/types.hpp>
 #include <stdexcept>
 #include <sstream>
 #include <cmath>
@@ -29,6 +30,190 @@ namespace orion::bre
 {
     namespace
     {
+        // Duration arithmetic helpers
+        bool is_duration_string(const json& val)
+        {
+            if (!val.is_string()) return false;
+            auto s = val.get<std::string>();
+            if (s.empty()) return false;
+            return s[0] == 'P' || (s[0] == '-' && s.size() > 1 && s[1] == 'P');
+        }
+        
+        std::string format_duration(const feel::Duration& d, bool is_ym = false)
+        {
+            bool negative = (d.total_months < 0 || d.total_seconds < 0);
+            int months = std::abs(d.total_months);
+            long long secs = std::abs(d.total_seconds);
+            
+            std::string result;
+            if (negative) result += "-";
+            result += "P";
+            
+            if (months > 0 || is_ym)
+            {
+                int y = months / 12;
+                int m = months % 12;
+                if (y > 0) result += std::to_string(y) + "Y";
+                if (m > 0) result += std::to_string(m) + "M";
+                if (y == 0 && m == 0) result += "0M";
+            }
+            else
+            {
+                long long days = secs / 86400;
+                long long rem = secs % 86400;
+                long long hrs = rem / 3600;
+                rem %= 3600;
+                long long mins = rem / 60;
+                long long s = rem % 60;
+                
+                if (days > 0) result += std::to_string(days) + "D";
+                if (hrs > 0 || mins > 0 || s > 0)
+                {
+                    result += "T";
+                    if (hrs > 0) result += std::to_string(hrs) + "H";
+                    if (mins > 0) result += std::to_string(mins) + "M";
+                    if (s > 0) result += std::to_string(s) + "S";
+                }
+                else if (days == 0)
+                {
+                    result += "0D";
+                }
+            }
+            return result;
+        }
+
+        bool is_date_string(const std::string& s)
+        {
+            // YYYY-MM-DD (exactly 10 chars, no T)
+            return s.size() >= 10 && s[4] == '-' && s[7] == '-' && s.find('T') == std::string::npos;
+        }
+        
+        bool is_datetime_string(const std::string& s)
+        {
+            return s.find('T') != std::string::npos && s.size() >= 19 && s[4] == '-';
+        }
+        
+        bool is_time_string(const std::string& s)
+        {
+            // HH:MM:SS
+            return s.size() >= 8 && s[2] == ':' && s[5] == ':' && s[0] != 'P' && s[0] != '-';
+        }
+        
+        int days_in_month(int y, int m)
+        {
+            static const int days[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+            if (m == 2 && ((y%4==0 && y%100!=0) || y%400==0)) return 29;
+            return days[m];
+        }
+        
+        std::string add_duration_to_date(const std::string& date_str, const feel::Duration& dur, bool subtract = false)
+        {
+            auto date = feel::parse_date(date_str);
+            if (!date) return {};
+            
+            int months = subtract ? -dur.total_months : dur.total_months;
+            long long secs = subtract ? -dur.total_seconds : dur.total_seconds;
+            
+            // Add months
+            int y = date->y, m = date->m, d = date->d;
+            int total_m = (y * 12 + (m - 1)) + months;
+            y = total_m / 12;
+            m = (total_m % 12) + 1;
+            if (m <= 0) { m += 12; y--; }
+            // Clamp day
+            int max_d = days_in_month(y, m);
+            if (d > max_d) d = max_d;
+            
+            // Add days from seconds
+            long long total_days = secs / 86400;
+            d += static_cast<int>(total_days);
+            while (d > days_in_month(y, m)) { d -= days_in_month(y, m); m++; if (m > 12) { m = 1; y++; } }
+            while (d < 1) { m--; if (m < 1) { m = 12; y--; } d += days_in_month(y, m); }
+            
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
+            return buf;
+        }
+        
+        std::string add_duration_to_datetime(const std::string& dt_str, const feel::Duration& dur, bool subtract = false)
+        {
+            // Split at T
+            auto t_pos = dt_str.find('T');
+            if (t_pos == std::string::npos) return {};
+            std::string date_part = dt_str.substr(0, t_pos);
+            std::string time_suffix = dt_str.substr(t_pos); // includes T
+            
+            auto date = feel::parse_date(date_part);
+            if (!date) return {};
+            
+            int months = subtract ? -dur.total_months : dur.total_months;
+            long long secs = subtract ? -dur.total_seconds : dur.total_seconds;
+            
+            // Parse time part (after T)
+            int h = 0, mi = 0, s = 0;
+            std::string tz_suffix;
+            if (time_suffix.size() >= 9) {
+                h = std::stoi(time_suffix.substr(1, 2));
+                mi = std::stoi(time_suffix.substr(4, 2));
+                s = std::stoi(time_suffix.substr(7, 2));
+                if (time_suffix.size() > 9) tz_suffix = time_suffix.substr(9);
+            }
+            
+            // Add months to date
+            int y = date->y, mo = date->m, d = date->d;
+            int total_m = (y * 12 + (mo - 1)) + months;
+            y = total_m / 12;
+            mo = (total_m % 12) + 1;
+            if (mo <= 0) { mo += 12; y--; }
+            int max_d = days_in_month(y, mo);
+            if (d > max_d) d = max_d;
+            
+            // Add seconds to time
+            long long total_secs = h * 3600LL + mi * 60LL + s + secs;
+            long long day_offset = 0;
+            if (total_secs < 0) {
+                day_offset = (total_secs - 86399) / 86400;
+                total_secs -= day_offset * 86400;
+            } else {
+                day_offset = total_secs / 86400;
+                total_secs %= 86400;
+            }
+            h = static_cast<int>(total_secs / 3600);
+            mi = static_cast<int>((total_secs % 3600) / 60);
+            s = static_cast<int>(total_secs % 60);
+            
+            d += static_cast<int>(day_offset);
+            while (d > days_in_month(y, mo)) { d -= days_in_month(y, mo); mo++; if (mo > 12) { mo = 1; y++; } }
+            while (d < 1) { mo--; if (mo < 1) { mo = 12; y--; } d += days_in_month(y, mo); }
+            
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02d", y, mo, d, h, mi, s);
+            return std::string(buf) + tz_suffix;
+        }
+        
+        std::string add_duration_to_time(const std::string& time_str, const feel::Duration& dur, bool subtract = false)
+        {
+            // Parse HH:MM:SS[+offset]
+            if (time_str.size() < 8) return {};
+            int h = std::stoi(time_str.substr(0, 2));
+            int m = std::stoi(time_str.substr(3, 2));
+            int s = std::stoi(time_str.substr(6, 2));
+            std::string suffix;
+            if (time_str.size() > 8) suffix = time_str.substr(8);
+            
+            long long secs = subtract ? -dur.total_seconds : dur.total_seconds;
+            long long total = h * 3600LL + m * 60LL + s + secs;
+            // Wrap around 24h
+            total = ((total % 86400) + 86400) % 86400;
+            h = static_cast<int>(total / 3600);
+            m = static_cast<int>((total % 3600) / 60);
+            s = static_cast<int>(total % 60);
+            
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%02d:%02d:%02d", h, m, s);
+            return std::string(buf) + suffix;
+        }
+
         /**
          * @brief Resolve a variable from context with multiple naming variants
          * 
@@ -318,7 +503,80 @@ namespace orion::bre
                     // String concatenation: both must be strings
                     if (left.is_string() && right.is_string())
                     {
-                        return left.get<std::string>() + right.get<std::string>();
+                        auto ls = left.get<std::string>();
+                        auto rs = right.get<std::string>();
+                        // Duration + Duration
+                        if (is_duration_string(left) && is_duration_string(right))
+                        {
+                            auto dl = feel::parse_duration(ls);
+                            auto dr = feel::parse_duration(rs);
+                            if (dl && dr)
+                            {
+                                bool l_ym = (dl->total_months != 0);
+                                bool r_ym = (dr->total_months != 0);
+                                bool l_dt = (dl->total_seconds != 0);
+                                bool r_dt = (dr->total_seconds != 0);
+                                // Both must be same type
+                                if (l_ym && r_dt) return nullptr;
+                                if (l_dt && r_ym) return nullptr;
+                                bool is_ym = l_ym || r_ym;
+                                feel::Duration result;
+                                result.total_months = dl->total_months + dr->total_months;
+                                result.total_seconds = dl->total_seconds + dr->total_seconds;
+                                return format_duration(result, is_ym);
+                            }
+                        }
+                        // date/datetime/time + duration
+                        if (is_duration_string(right))
+                        {
+                            auto dur = feel::parse_duration(rs);
+                            if (dur)
+                            {
+                                bool dur_is_ym = (dur->total_months != 0);
+                                if (is_datetime_string(ls))
+                                {
+                                    auto r = add_duration_to_datetime(ls, *dur);
+                                    if (!r.empty()) return r;
+                                }
+                                else if (is_date_string(ls))
+                                {
+                                    auto r = add_duration_to_date(ls, *dur);
+                                    if (!r.empty()) return r;
+                                }
+                                else if (is_time_string(ls))
+                                {
+                                    if (dur_is_ym) return nullptr;
+                                    auto r = add_duration_to_time(ls, *dur);
+                                    if (!r.empty()) return r;
+                                }
+                            }
+                        }
+                        // duration + date/datetime/time (commutative)
+                        if (is_duration_string(left))
+                        {
+                            auto dur = feel::parse_duration(ls);
+                            if (dur)
+                            {
+                                bool dur_is_ym = (dur->total_months != 0);
+                                if (is_datetime_string(rs))
+                                {
+                                    auto r = add_duration_to_datetime(rs, *dur);
+                                    if (!r.empty()) return r;
+                                }
+                                else if (is_date_string(rs))
+                                {
+                                    auto r = add_duration_to_date(rs, *dur);
+                                    if (!r.empty()) return r;
+                                }
+                                else if (is_time_string(rs))
+                                {
+                                    if (dur_is_ym) return nullptr;
+                                    auto r = add_duration_to_time(rs, *dur);
+                                    if (!r.empty()) return r;
+                                }
+                            }
+                        }
+                        return ls + rs;
                     }
                     // Numeric addition: both must be numbers
                     if (left.is_number() && right.is_number())
@@ -331,18 +589,216 @@ namespace orion::bre
                 else if (value == "-")
                 {
                     if (left.is_null() || right.is_null()) return nullptr;
+                    if (left.is_string() && right.is_string())
+                    {
+                        auto ls = left.get<std::string>();
+                        auto rs = right.get<std::string>();
+                        // Duration - Duration
+                        if (is_duration_string(left) && is_duration_string(right))
+                        {
+                            auto dl = feel::parse_duration(ls);
+                            auto dr = feel::parse_duration(rs);
+                            if (dl && dr)
+                            {
+                                bool l_ym = (dl->total_months != 0);
+                                bool r_ym = (dr->total_months != 0);
+                                bool l_dt = (dl->total_seconds != 0);
+                                bool r_dt = (dr->total_seconds != 0);
+                                if (l_ym && r_dt) return nullptr;
+                                if (l_dt && r_ym) return nullptr;
+                                bool is_ym = l_ym || r_ym;
+                                feel::Duration result;
+                                result.total_months = dl->total_months - dr->total_months;
+                                result.total_seconds = dl->total_seconds - dr->total_seconds;
+                                return format_duration(result, is_ym);
+                            }
+                        }
+                        // date/datetime/time - duration
+                        if (is_duration_string(right))
+                        {
+                            auto dur = feel::parse_duration(rs);
+                            if (dur)
+                            {
+                                bool dur_is_ym = (dur->total_months != 0);
+                                if (is_datetime_string(ls))
+                                {
+                                    auto r = add_duration_to_datetime(ls, *dur, true);
+                                    if (!r.empty()) return r;
+                                }
+                                else if (is_date_string(ls))
+                                {
+                                    auto r = add_duration_to_date(ls, *dur, true);
+                                    if (!r.empty()) return r;
+                                }
+                                else if (is_time_string(ls))
+                                {
+                                    if (dur_is_ym) return nullptr; // time ± ymDuration is invalid
+                                    auto r = add_duration_to_time(ls, *dur, true);
+                                    if (!r.empty()) return r;
+                                }
+                            }
+                        }
+                        // date - date = duration, datetime - datetime = duration, time - time = duration
+                        if (is_datetime_string(ls) && is_datetime_string(rs))
+                        {
+                            auto dt1 = feel::parse_datetime(ls);
+                            auto dt2 = feel::parse_datetime(rs);
+                            if (dt1 && dt2)
+                            {
+                                // Convert both to total seconds from epoch-ish
+                                auto to_secs = [](const feel::DateTime& dt) -> long long {
+                                    // Approximate: days since year 0
+                                    long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
+                                    for (int mm = 1; mm < dt.date.m; mm++)
+                                    {
+                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+                                        days += md[mm];
+                                    }
+                                    if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
+                                        days++;
+                                    days += dt.date.d;
+                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s;
+                                };
+                                long long diff = to_secs(*dt1) - to_secs(*dt2);
+                                feel::Duration dur;
+                                dur.total_seconds = diff;
+                                return format_duration(dur);
+                            }
+                        }
+                        if (is_date_string(ls) && is_date_string(rs))
+                        {
+                            auto d1 = feel::parse_date(ls);
+                            auto d2 = feel::parse_date(rs);
+                            if (d1 && d2)
+                            {
+                                auto to_days = [](const feel::Date& d) -> long long {
+                                    long long days = d.y * 365LL + d.y/4 - d.y/100 + d.y/400;
+                                    for (int mm = 1; mm < d.m; mm++)
+                                    {
+                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+                                        days += md[mm];
+                                    }
+                                    if (d.m > 2 && ((d.y%4==0 && d.y%100!=0) || d.y%400==0))
+                                        days++;
+                                    days += d.d;
+                                    return days;
+                                };
+                                long long diff = to_days(*d1) - to_days(*d2);
+                                feel::Duration dur;
+                                dur.total_seconds = diff * 86400LL;
+                                return format_duration(dur);
+                            }
+                        }
+                        if (is_time_string(ls) && is_time_string(rs))
+                        {
+                            int h1 = std::stoi(ls.substr(0,2)), m1 = std::stoi(ls.substr(3,2)), s1 = std::stoi(ls.substr(6,2));
+                            int h2 = std::stoi(rs.substr(0,2)), m2 = std::stoi(rs.substr(3,2)), s2 = std::stoi(rs.substr(6,2));
+                            long long diff = (h1*3600+m1*60+s1) - (h2*3600+m2*60+s2);
+                            feel::Duration dur;
+                            dur.total_seconds = diff;
+                            return format_duration(dur);
+                        }
+                        return nullptr;
+                    }
                     if (!left.is_number() || !right.is_number()) return nullptr;
                     return left.get<double>() - right.get<double>();
                 }
                 else if (value == "*")
                 {
                     if (left.is_null() || right.is_null()) return nullptr;
+                    // number * duration or duration * number
+                    if (left.is_number() && is_duration_string(right))
+                    {
+                        auto dr = feel::parse_duration(right.get<std::string>());
+                        if (dr)
+                        {
+                            double n = left.get<double>();
+                            bool is_ym = (dr->total_months != 0 || dr->total_seconds == 0);
+                            feel::Duration result;
+                            if (is_ym)
+                            {
+                                result.total_months = static_cast<int>(dr->total_months * n);
+                            }
+                            else
+                            {
+                                result.total_seconds = static_cast<long long>(std::round(dr->total_seconds * n));
+                            }
+                            return format_duration(result, is_ym);
+                        }
+                    }
+                    if (is_duration_string(left) && right.is_number())
+                    {
+                        auto dl = feel::parse_duration(left.get<std::string>());
+                        if (dl)
+                        {
+                            double n = right.get<double>();
+                            bool is_ym = (dl->total_months != 0 || dl->total_seconds == 0);
+                            feel::Duration result;
+                            if (is_ym)
+                            {
+                                result.total_months = static_cast<int>(dl->total_months * n);
+                            }
+                            else
+                            {
+                                result.total_seconds = static_cast<long long>(std::round(dl->total_seconds * n));
+                            }
+                            return format_duration(result, is_ym);
+                        }
+                    }
                     if (!left.is_number() || !right.is_number()) return nullptr;
                     return left.get<double>() * right.get<double>();
                 }
                 else if (value == "/")
                 {
                     if (left.is_null() || right.is_null()) return nullptr;
+                    // duration / number
+                    if (is_duration_string(left) && right.is_number())
+                    {
+                        double n = right.get<double>();
+                        if (n == 0.0) return nullptr;
+                        auto dl = feel::parse_duration(left.get<std::string>());
+                        if (dl)
+                        {
+                            bool is_ym = (dl->total_months != 0 || dl->total_seconds == 0);
+                            feel::Duration result;
+                            if (is_ym)
+                            {
+                                result.total_months = static_cast<int>(dl->total_months / n);
+                            }
+                            else
+                            {
+                                result.total_seconds = static_cast<long long>(std::round(dl->total_seconds / n));
+                            }
+                            return format_duration(result, is_ym);
+                        }
+                    }
+                    // duration / duration = number
+                    if (is_duration_string(left) && is_duration_string(right))
+                    {
+                        auto dl = feel::parse_duration(left.get<std::string>());
+                        auto dr = feel::parse_duration(right.get<std::string>());
+                        if (dl && dr)
+                        {
+                            bool l_ym = (dl->total_months != 0);
+                            bool r_ym = (dr->total_months != 0);
+                            bool l_dt = (dl->total_seconds != 0);
+                            bool r_dt = (dr->total_seconds != 0);
+                            // Cross-type division is an error
+                            if (l_ym && r_dt) return nullptr;
+                            if (l_dt && r_ym) return nullptr;
+                            // Zero numerator
+                            if (!l_ym && !l_dt) {
+                                if (r_ym || r_dt) return 0.0;
+                                return nullptr; // 0/0
+                            }
+                            if (l_ym && r_ym) {
+                                if (dr->total_months == 0) return nullptr;
+                                return static_cast<double>(dl->total_months) / dr->total_months;
+                            }
+                            if (dr->total_seconds == 0) return nullptr;
+                            return static_cast<double>(dl->total_seconds) / dr->total_seconds;
+                        }
+                    }
                     if (!left.is_number() || !right.is_number()) return nullptr;
                     double divisor = right.get<double>();
                     if (divisor == 0.0) return nullptr;
@@ -481,6 +937,191 @@ namespace orion::bre
                     }
                     // Regular boolean OR for non-null values
                     return toBoolean(left) || toBoolean(right);
+                }
+                else if (value == "in")
+                {
+                    // FEEL 'in' operator: check if left is in right
+                    // right can be: list, range, unary test, or single value
+                    if (left.is_null()) return nullptr;
+                    
+                    // Don't evaluate right as a value - it's a test/range/list
+                    // The right child is already evaluated above as `right`
+                    
+                    // Right is a list: check membership
+                    if (right.is_array()) {
+                        for (const auto& item : right) {
+                            if (item.is_object() && item.contains("__range__")) {
+                                // Range object: check bounds
+                                std::string type = item["__range__"].get<std::string>();
+                                auto start_val = item["__start__"];
+                                auto end_val = item["__end__"];
+                                bool start_incl = (type[0] == '[');
+                                bool end_incl = (type[1] == ']');
+                                
+                                if (left.is_number() && start_val.is_number() && end_val.is_number()) {
+                                    double v = left.get<double>();
+                                    double s = start_val.get<double>();
+                                    double e = end_val.get<double>();
+                                    bool in_range = (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
+                                    if (in_range) return true;
+                                } else if (left.is_string() && start_val.is_string() && end_val.is_string()) {
+                                    auto v = left.get<std::string>();
+                                    auto s = start_val.get<std::string>();
+                                    auto e = end_val.get<std::string>();
+                                    bool in_range = (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
+                                    if (in_range) return true;
+                                }
+                            } else if (item.is_object() && item.contains("__unary_test__")) {
+                                // Unary test object
+                                std::string op = item["__unary_test__"].get<std::string>();
+                                if (op == "not") {
+                                    // not(tests) - negate the result of checking item list
+                                    auto& tests = item["__operand__"];
+                                    bool matched = false;
+                                    if (tests.is_array()) {
+                                        for (const auto& t : tests) {
+                                            if (t.is_object() && t.contains("__unary_test__")) {
+                                                std::string top = t["__unary_test__"].get<std::string>();
+                                                auto topnd = t["__operand__"];
+                                                if (top == "=") { if (left == topnd) matched = true; }
+                                                else if (top == "!=") { if (left != topnd) matched = true; }
+                                                else if (left.is_number() && topnd.is_number()) {
+                                                    double v2 = left.get<double>(), o2 = topnd.get<double>();
+                                                    if (top == "<" && v2 < o2) matched = true;
+                                                    else if (top == ">" && v2 > o2) matched = true;
+                                                    else if (top == "<=" && v2 <= o2) matched = true;
+                                                    else if (top == ">=" && v2 >= o2) matched = true;
+                                                }
+                                            } else if (t.is_object() && t.contains("__range__")) {
+                                                // range check inside not
+                                                if (left.is_number() && t["__start__"].is_number() && t["__end__"].is_number()) {
+                                                    double v2 = left.get<double>(), s2 = t["__start__"].get<double>(), e2 = t["__end__"].get<double>();
+                                                    std::string rt = t["__range__"].get<std::string>();
+                                                    bool si = rt[0] == '[', ei = rt[1] == ']';
+                                                    if ((si ? v2 >= s2 : v2 > s2) && (ei ? v2 <= e2 : v2 < e2)) matched = true;
+                                                }
+                                            } else {
+                                                if (left == t) matched = true;
+                                            }
+                                        }
+                                    }
+                                    if (!matched) return true;
+                                } else {
+                                auto operand = item["__operand__"];
+                                if (op == "=") {
+                                    if (left == operand) return true;
+                                } else if (op == "!=") {
+                                    if (left != operand) return true;
+                                } else if (left.is_number() && operand.is_number()) {
+                                    double v = left.get<double>();
+                                    double o = operand.get<double>();
+                                    bool result = false;
+                                    if (op == "<") result = v < o;
+                                    else if (op == ">") result = v > o;
+                                    else if (op == "<=") result = v <= o;
+                                    else if (op == ">=") result = v >= o;
+                                    if (result) return true;
+                                } else if (left.is_string() && operand.is_string()) {
+                                    auto v = left.get<std::string>();
+                                    auto o = operand.get<std::string>();
+                                    bool result = false;
+                                    if (op == "<") result = v < o;
+                                    else if (op == ">") result = v > o;
+                                    else if (op == "<=") result = v <= o;
+                                    else if (op == ">=") result = v >= o;
+                                    if (result) return true;
+                                }
+                                }
+                            } else {
+                                // Plain value: equality check
+                                if (left == item) return true;
+                            }
+                        }
+                        return false;
+                    }
+                    
+                    // Right is a range object
+                    if (right.is_object() && right.contains("__range__")) {
+                        std::string type = right["__range__"].get<std::string>();
+                        auto start_val = right["__start__"];
+                        auto end_val = right["__end__"];
+                        bool start_incl = (type[0] == '[');
+                        bool end_incl = (type[1] == ']');
+                        
+                        if (left.is_number() && start_val.is_number() && end_val.is_number()) {
+                            double v = left.get<double>();
+                            double s = start_val.get<double>();
+                            double e = end_val.get<double>();
+                            return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
+                        }
+                        if (left.is_string() && start_val.is_string() && end_val.is_string()) {
+                            auto v = left.get<std::string>();
+                            auto s = start_val.get<std::string>();
+                            auto e = end_val.get<std::string>();
+                            return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
+                        }
+                        return nullptr;
+                    }
+                    
+                    // Right is a unary test object
+                    if (right.is_object() && right.contains("__unary_test__")) {
+                        std::string op = right["__unary_test__"].get<std::string>();
+                        if (op == "not") {
+                            // not(tests) - check if left is NOT in the test list
+                            auto& tests = right["__operand__"];
+                            if (tests.is_array()) {
+                                for (const auto& t : tests) {
+                                    if (t.is_object() && t.contains("__unary_test__")) {
+                                        std::string top = t["__unary_test__"].get<std::string>();
+                                        auto topnd = t["__operand__"];
+                                        if (top == "=") { if (left == topnd) return false; }
+                                        else if (top == "!=") { if (left != topnd) return false; }
+                                        else if (left.is_number() && topnd.is_number()) {
+                                            double v = left.get<double>(), o = topnd.get<double>();
+                                            if (top == "<" && v < o) return false;
+                                            if (top == ">" && v > o) return false;
+                                            if (top == "<=" && v <= o) return false;
+                                            if (top == ">=" && v >= o) return false;
+                                        }
+                                    } else if (t.is_object() && t.contains("__range__")) {
+                                        if (left.is_number() && t["__start__"].is_number() && t["__end__"].is_number()) {
+                                            double v = left.get<double>(), s = t["__start__"].get<double>(), e = t["__end__"].get<double>();
+                                            std::string rt = t["__range__"].get<std::string>();
+                                            bool si = rt[0] == '[', ei = rt[1] == ']';
+                                            if ((si ? v >= s : v > s) && (ei ? v <= e : v < e)) return false;
+                                        }
+                                    } else {
+                                        if (left == t) return false;
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                        auto operand = right["__operand__"];
+                        if (op == "=") return left == operand;
+                        if (op == "!=") return left != operand;
+                        if (left.is_number() && operand.is_number()) {
+                            double v = left.get<double>();
+                            double o = operand.get<double>();
+                            if (op == "<") return v < o;
+                            if (op == ">") return v > o;
+                            if (op == "<=") return v <= o;
+                            if (op == ">=") return v >= o;
+                        }
+                        if (left.is_string() && operand.is_string()) {
+                            auto v = left.get<std::string>();
+                            auto o = operand.get<std::string>();
+                            if (op == "<") return v < o;
+                            if (op == ">") return v > o;
+                            if (op == "<=") return v <= o;
+                            if (op == ">=") return v >= o;
+                        }
+                        return nullptr;
+                    }
+                    
+                    // Right is a single value: equality check
+                    if (right.is_null()) return nullptr;
+                    return left == right;
                 }
                 
                 std::ostringstream oss;
@@ -1027,6 +1668,35 @@ namespace orion::bre
                     
                     if (list_val.is_null()) return nullptr;
                     
+                    // Handle range object: expand to array for iteration
+                    if (list_val.is_object() && list_val.contains("__range__"))
+                    {
+                        auto& start = list_val["__start__"];
+                        auto& end = list_val["__end__"];
+                        // Only numeric integer ranges can be expanded
+                        if (start.is_number() && end.is_number())
+                        {
+                            auto s = start.get<double>();
+                            auto e = end.get<double>();
+                            if (s != std::floor(s) || e != std::floor(e) || s > e)
+                                return nullptr;
+                            json list = json::array();
+                            for (double v = s; v <= e; v += 1.0)
+                                list.push_back(v);
+                            json result = json::array();
+                            json local_ctx = input;
+                            for (const auto& item : list)
+                            {
+                                local_ctx[var_node->value] = item;
+                                auto val = return_expr->evaluate(local_ctx, eval_ctx);
+                                result.push_back(val);
+                            }
+                            return result;
+                        }
+                        // Non-numeric ranges (string, date, time, duration) → null
+                        return nullptr;
+                    }
+                    
                     // Auto-wrap non-list to list
                     json list;
                     if (list_val.is_array())
@@ -1038,9 +1708,6 @@ namespace orion::bre
                         list = json::array();
                         list.push_back(list_val);
                     }
-                    
-                    // Handle range: if list has two numbers, generate range
-                    // This is actually handled differently (range syntax), skip for now
                     
                     json result = json::array();
                     json local_ctx = input;
@@ -1213,6 +1880,30 @@ namespace orion::bre
                     }
                 }
                 return result;
+            }
+            case ASTNodeType::RANGE:
+            {
+                // Evaluates to a special JSON object representing a range
+                // value contains the bracket types (e.g., "[]", "(]", "[)", "()")
+                if (children.size() != 2) return nullptr;
+                json start_val = children[0]->evaluate(input, eval_ctx);
+                json end_val = children[1]->evaluate(input, eval_ctx);
+                json range_obj;
+                range_obj["__range__"] = value;
+                range_obj["__start__"] = start_val;
+                range_obj["__end__"] = end_val;
+                return range_obj;
+            }
+            case ASTNodeType::UNARY_TEST:
+            {
+                // Evaluates to a special JSON object representing a unary test
+                // value contains the operator (e.g., "<=", ">=", "<", ">")
+                if (children.size() != 1) return nullptr;
+                json operand = children[0]->evaluate(input, eval_ctx);
+                json test_obj;
+                test_obj["__unary_test__"] = value;
+                test_obj["__operand__"] = operand;
+                return test_obj;
             }
             default:
             {

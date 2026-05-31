@@ -247,9 +247,8 @@ namespace orion::bre::feel {
             {
                 advance(); // consume 'in'
                 
-                // Parse the list/range after 'in'
-                // Can be: list literal [1,2,3], range (1..10), or unary tests
-                auto right = parse_additive();
+                // Parse the right side: list, range, unary test, or positive unary tests
+                auto right = parse_in_tests();
                 
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "in");
                 node->children.push_back(std::move(left));
@@ -623,6 +622,29 @@ std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
 {
     advance(); // consume '('
     auto expr = parse_logical_or(); // Parse inner expression (start from lowest precedence)
+    
+    // Check if this is a range: (expr..expr] or (expr..expr)
+    if (check(TokenType::DOTDOT)) {
+        advance(); // consume ..
+        auto end_expr = parse_additive();
+        
+        std::string range_type = "(";
+        if (check(TokenType::RBRACKET)) {
+            range_type += "]";
+            advance();
+        } else if (check(TokenType::RPAREN)) {
+            range_type += ")";
+            advance();
+        } else {
+            throw std::runtime_error("Expected ']' or ')' to close range");
+        }
+        
+        auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
+        node->children.push_back(std::move(expr));
+        node->children.push_back(std::move(end_expr));
+        return node;
+    }
+    
     expect(TokenType::RPAREN, "Expected ')' after expression");
     
     // Check for property access after parenthesized expression
@@ -653,32 +675,55 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
 {
     advance(); // consume '['
     
-    auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "");
-    
-    // Parse list elements (if any)
+    // Check if this is a range: [expr..expr] or [expr..expr)
+    // Parse first element, then check for ..
     if (!check(TokenType::RBRACKET))
     {
-        while (true)
-        {
-            list_node->children.push_back(parse_logical_or());
+        auto first = parse_logical_or();
+        
+        // If we see .., this is a range not a list
+        if (check(TokenType::DOTDOT)) {
+            advance(); // consume ..
+            auto end_expr = parse_additive();
             
-            // Check for comma (more elements)
-            if (check(TokenType::COMMA))
-            {
-                advance(); // consume ','
-                // Allow trailing comma
-                if (check(TokenType::RBRACKET))
-                {
-                    break;
-                }
+            std::string range_type = "[";
+            if (check(TokenType::RBRACKET)) {
+                range_type += "]";
+                advance();
+            } else if (check(TokenType::RPAREN)) {
+                range_type += ")";
+                advance();
+            } else {
+                throw std::runtime_error("Expected ']' or ')' to close range");
             }
-            else
-            {
-                break; // No more elements
-            }
+            
+            auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
+            node->children.push_back(std::move(first));
+            node->children.push_back(std::move(end_expr));
+            return node;
         }
+        
+        // Not a range - continue as list
+        auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "");
+        list_node->children.push_back(std::move(first));
+        
+        while (check(TokenType::COMMA))
+        {
+            advance(); // consume ','
+            // Allow trailing comma
+            if (check(TokenType::RBRACKET))
+            {
+                break;
+            }
+            list_node->children.push_back(parse_logical_or());
+        }
+        
+        expect(TokenType::RBRACKET, "Expected ']' after list elements");
+        return list_node;
     }
     
+    // Empty list
+    auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "");
     expect(TokenType::RBRACKET, "Expected ']' after list elements");
     return list_node;
 }
@@ -852,6 +897,201 @@ std::unique_ptr<ASTNode> Parser::parse_quantified_expression(std::string_view qu
     auto condition = parse_logical_or();
     node->children.push_back(std::move(condition));
     
+    return node;
+}
+
+// Parse the right-hand side of an 'in' expression
+// Can be: range [1..10], (1..10), list [1,2,3], unary test <= 10, or value
+std::unique_ptr<ASTNode> Parser::parse_in_tests()
+{
+    // Check for unary test: operator followed by expression (e.g., <= 10, > 5, = 10, != 10)
+    if (check(TokenType::OPERATOR)) {
+        const std::string_view op = peek().text;
+        if (op == "<" || op == ">" || op == "<=" || op == ">=" || op == "=" || op == "!=") {
+            advance(); // consume operator
+            auto operand = parse_additive();
+            auto node = std::make_unique<ASTNode>(ASTNodeType::UNARY_TEST, std::string(op));
+            node->children.push_back(std::move(operand));
+            return node;
+        }
+    }
+    
+    // Check for range or list starting with [ or (
+    if (check(TokenType::LBRACKET) || check(TokenType::LPAREN)) {
+        TokenType open = peek().type;
+        size_t saved_pos = position_;
+        
+        advance(); // consume [ or (
+        
+        // For '(' - could be: range (expr..expr), or positive unary tests list (test, test, ...)
+        // For '[' - could be: range [expr..expr], or a list [expr, expr, ...]
+        
+        // Try parsing first element as a unary test or expression
+        auto first = parse_single_unary_test();
+        
+        if (check(TokenType::DOTDOT)) {
+            // This is a range!
+            advance(); // consume ..
+            auto end_expr = parse_additive();
+            
+            // Determine closing bracket
+            std::string range_type;
+            if (open == TokenType::LBRACKET) range_type += "[";
+            else range_type += "(";
+            
+            if (check(TokenType::RBRACKET)) {
+                range_type += "]";
+                advance();
+            } else if (check(TokenType::RPAREN)) {
+                range_type += ")";
+                advance();
+            } else {
+                throw std::runtime_error("Expected ']' or ')' to close range");
+            }
+            
+            auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
+            node->children.push_back(std::move(first));
+            node->children.push_back(std::move(end_expr));
+            return node;
+        }
+        
+        if (check(TokenType::COMMA)) {
+            // Comma-separated list of positive unary tests: (test1, test2, ...)
+            auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "list");
+            list_node->children.push_back(std::move(first));
+            while (check(TokenType::COMMA)) {
+                advance(); // consume comma
+                list_node->children.push_back(parse_single_unary_test());
+            }
+            if (open == TokenType::LBRACKET) {
+                if (!check(TokenType::RBRACKET))
+                    throw std::runtime_error("Expected ']' to close list");
+                advance();
+            } else {
+                if (!check(TokenType::RPAREN))
+                    throw std::runtime_error("Expected ')' to close list");
+                advance();
+            }
+            return list_node;
+        }
+        
+        // Single element in parens: (test) or [value]
+        if (open == TokenType::LPAREN && check(TokenType::RPAREN)) {
+            advance(); // consume )
+            // Wrap single test in a list for consistent evaluation
+            auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "list");
+            list_node->children.push_back(std::move(first));
+            return list_node;
+        }
+        
+        if (open == TokenType::LBRACKET && check(TokenType::RBRACKET)) {
+            // Single element list [value]
+            advance();
+            auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "list");
+            list_node->children.push_back(std::move(first));
+            return list_node;
+        }
+        
+        // Didn't match expected patterns - backtrack and parse normally
+        position_ = saved_pos;
+        return parse_additive();
+    }
+    
+    // Check for 'not' keyword: not(tests)
+    if (check(TokenType::KEYWORD) && check_text("not")) {
+        size_t saved_pos = position_;
+        advance(); // consume 'not'
+        if (check(TokenType::LPAREN)) {
+            advance(); // consume (
+            // Parse comma-separated unary tests inside not(...)
+            auto list_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_LIST, "list");
+            list_node->children.push_back(parse_single_unary_test());
+            while (check(TokenType::COMMA)) {
+                advance();
+                list_node->children.push_back(parse_single_unary_test());
+            }
+            if (!check(TokenType::RPAREN))
+                throw std::runtime_error("Expected ')' after not(...)");
+            advance();
+            // Wrap in a NOT unary test
+            auto node = std::make_unique<ASTNode>(ASTNodeType::UNARY_TEST, "not");
+            node->children.push_back(std::move(list_node));
+            return node;
+        }
+        position_ = saved_pos;
+    }
+    
+    // Default: parse as a normal expression (value or list)
+    return parse_additive();
+}
+
+std::unique_ptr<ASTNode> Parser::parse_single_unary_test()
+{
+    // Parse a single positive unary test: operator+expr, range, or plain value
+    if (check(TokenType::OPERATOR)) {
+        const std::string_view op = peek().text;
+        if (op == "<" || op == ">" || op == "<=" || op == ">=" || op == "=" || op == "!=") {
+            advance();
+            auto operand = parse_additive();
+            auto node = std::make_unique<ASTNode>(ASTNodeType::UNARY_TEST, std::string(op));
+            node->children.push_back(std::move(operand));
+            return node;
+        }
+    }
+    // Check for range starting with [ or (
+    if (check(TokenType::LBRACKET) || check(TokenType::LPAREN)) {
+        TokenType bracket = peek().type;
+        size_t saved = position_;
+        advance();
+        auto start_expr = parse_additive();
+        if (check(TokenType::DOTDOT)) {
+            advance();
+            auto end_expr = parse_additive();
+            std::string range_type;
+            range_type += (bracket == TokenType::LBRACKET) ? "[" : "(";
+            if (check(TokenType::RBRACKET)) { range_type += "]"; advance(); }
+            else if (check(TokenType::RPAREN)) { range_type += ")"; advance(); }
+            else throw std::runtime_error("Expected ']' or ')' to close range");
+            auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
+            node->children.push_back(std::move(start_expr));
+            node->children.push_back(std::move(end_expr));
+            return node;
+        }
+        position_ = saved;
+    }
+    return parse_additive();
+}
+
+// Parse a range expression when we know the opening bracket type
+// Called from parse_list_literal when we detect .. inside a list
+std::unique_ptr<ASTNode> Parser::parse_range(TokenType open_bracket)
+{
+    auto start_expr = parse_additive();
+    
+    if (!check(TokenType::DOTDOT)) {
+        throw std::runtime_error("Expected '..' in range expression");
+    }
+    advance(); // consume ..
+    
+    auto end_expr = parse_additive();
+    
+    std::string range_type;
+    if (open_bracket == TokenType::LBRACKET) range_type += "[";
+    else range_type += "(";
+    
+    if (check(TokenType::RBRACKET)) {
+        range_type += "]";
+        advance();
+    } else if (check(TokenType::RPAREN)) {
+        range_type += ")";
+        advance();
+    } else {
+        throw std::runtime_error("Expected ']' or ')' to close range");
+    }
+    
+    auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
+    node->children.push_back(std::move(start_expr));
+    node->children.push_back(std::move(end_expr));
     return node;
 }
 
