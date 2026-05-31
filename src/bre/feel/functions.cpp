@@ -2445,7 +2445,82 @@ json evaluate_string_function(const std::vector<json>& args)
 
     if (arg.is_array() || arg.is_object())
     {
-        return arg.dump();
+        // FEEL-style formatting: spaces after separators, unquoted keys
+        if (arg.is_array())
+        {
+            std::string result = "[";
+            bool first = true;
+            for (const auto& elem : arg)
+            {
+                if (!first) result += ", ";
+                first = false;
+                if (elem.is_string())
+                {
+                    result += "\"" + elem.get<std::string>() + "\"";
+                }
+                else if (elem.is_null())
+                {
+                    result += "null";
+                }
+                else
+                {
+                    // Recurse for nested structures
+                    auto nested = evaluate_string_function({elem});
+                    if (nested.is_string())
+                        result += nested.get<std::string>();
+                    else
+                        result += elem.dump();
+                }
+            }
+            result += "]";
+            return result;
+        }
+        else
+        {
+            // Context: {key: value, ...} with unquoted keys when valid identifiers
+            std::string result = "{";
+            bool first = true;
+            for (auto it = arg.begin(); it != arg.end(); ++it)
+            {
+                if (!first) result += ", ";
+                first = false;
+                // Check if key needs quoting (contains special chars)
+                const std::string& key = it.key();
+                bool needs_quotes = false;
+                for (char c : key)
+                {
+                    if (c == '{' || c == '}' || c == ':' || c == ',' || c == '"' || c == ' ')
+                    {
+                        needs_quotes = true;
+                        break;
+                    }
+                }
+                if (needs_quotes)
+                    result += "\"" + key + "\": ";
+                else
+                    result += key + ": ";
+                
+                const auto& val = it.value();
+                if (val.is_string())
+                {
+                    result += "\"" + val.get<std::string>() + "\"";
+                }
+                else if (val.is_null())
+                {
+                    result += "null";
+                }
+                else
+                {
+                    auto nested = evaluate_string_function({val});
+                    if (nested.is_string())
+                        result += nested.get<std::string>();
+                    else
+                        result += val.dump();
+                }
+            }
+            result += "}";
+            return result;
+        }
     }
 
     return nullptr;
