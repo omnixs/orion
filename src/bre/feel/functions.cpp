@@ -1254,11 +1254,20 @@ json evaluate_string_join_function(const std::vector<json>& args)
         return nullptr;
     }
 
-    // Type validation - first argument must be array
+    // Type validation - first argument must be array (coerce single value to list)
+    json coerced_list;
     if (!list.is_array())
     {
-        return nullptr; // DMN spec: return null for invalid argument type
+        if (list.is_string())
+        {
+            coerced_list = json::array({list});
+        }
+        else
+        {
+            return nullptr; // DMN spec: return null for invalid argument type
+        }
     }
+    const auto& effective_list = list.is_array() ? list : coerced_list;
 
     // Get delimiter (default is empty string if not provided)
     std::string delimiter = "";
@@ -1281,7 +1290,7 @@ json evaluate_string_join_function(const std::vector<json>& args)
 
     // Join the list elements - DMN spec requires all elements to be strings or null
     // First validate all non-null elements are strings
-    for (const auto& element : list)
+    for (const auto& element : effective_list)
     {
         if (!element.is_null() && !element.is_string())
         {
@@ -1292,7 +1301,7 @@ json evaluate_string_join_function(const std::vector<json>& args)
     std::string result;
     bool first = true;
 
-    for (const auto& element : list)
+    for (const auto& element : effective_list)
     {
         if (element.is_null())
         {

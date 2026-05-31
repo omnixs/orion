@@ -307,6 +307,12 @@ namespace orion::common
             {
                 listArray.push_back(parse_value_with_nil(directValueNode));
             }
+            else if (auto* nestedList = item->first_node("list"))
+            {
+                // Nested list within item — recurse
+                auto nested = nlohmann::json::parse(parse_expected_list(nestedList));
+                listArray.push_back(nested);
+            }
             else
             {
                 // Component-based item (object in array)
