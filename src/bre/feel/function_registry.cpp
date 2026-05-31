@@ -121,10 +121,10 @@ void register_list_functions(FunctionRegistry& reg) {
 
 // Helper: Register date/time and temporal functions
 void register_date_time_functions(FunctionRegistry& reg) {
-    // Date conversion functions
-    reg.register_function({"date", {{"from"}}});
-    reg.register_function({"time", {{"from"}}});
-    reg.register_function({"date and time", {{"from"}}});
+    // Date/time constructor functions NOT registered - they use fallback positional binding
+    // because they have multiple overloaded signatures with different param names
+    // (date: "from" OR "year,month,day"; time: "from" OR "hour,minute,second,offset")
+    // The evaluate_*_function() implementations handle all overloads internally.
     reg.register_function({"duration", {{"from"}}});
     
     reg.register_function({"number", {

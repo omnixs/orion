@@ -1357,6 +1357,7 @@ json evaluate_date_function(const std::vector<json>& args)
         int month_num = args[1].get<int>();
         int day_num = args[2].get<int>();
 
+        if (year_num < -999999999 || year_num > 999999999) return nullptr;
         if (month_num < 1 || month_num > 12 || day_num < 1 || day_num > 31) return nullptr;
 
         return format_date_string(year_num, month_num, day_num);
@@ -1832,9 +1833,55 @@ json evaluate_time_function(const std::vector<json>& args)
             << std::setw(2) << std::setfill('0') << m << ':'
             << std::setw(2) << std::setfill('0') << sec;
 
-        if (args.size() == 4 && !args[3].is_null()) {
+        if (args.size() >= 4 && !args[3].is_null()) {
             if (args[3].is_string()) {
-                oss << args[3].get<std::string>();
+                std::string offset_str = args[3].get<std::string>();
+                // Check if it's a duration string (timezone offset as duration)
+                if (!offset_str.empty() && (offset_str[0] == 'P' || (offset_str[0] == '-' && offset_str.size() > 1 && offset_str[1] == 'P'))) {
+                    // Parse duration to get hours and minutes for timezone offset
+                    bool negative = (offset_str[0] == '-');
+                    std::string dur = negative ? offset_str.substr(1) : offset_str;
+                    // Must be a day-time duration (PT...)
+                    if (dur.size() < 2 || dur[0] != 'P') return nullptr;
+                    dur = dur.substr(1); // remove P
+                    if (dur.empty() || dur[0] != 'T') return nullptr;
+                    dur = dur.substr(1); // remove T
+                    int off_h = 0, off_m = 0, off_s = 0;
+                    std::string num_buf;
+                    for (char c : dur) {
+                        if (std::isdigit(static_cast<unsigned char>(c))) {
+                            num_buf += c;
+                        } else if (c == 'H') {
+                            off_h = num_buf.empty() ? 0 : std::stoi(num_buf);
+                            num_buf.clear();
+                        } else if (c == 'M') {
+                            off_m = num_buf.empty() ? 0 : std::stoi(num_buf);
+                            num_buf.clear();
+                        } else if (c == 'S') {
+                            off_s = num_buf.empty() ? 0 : std::stoi(num_buf);
+                            num_buf.clear();
+                        }
+                    }
+                    // Format timezone offset
+                    if (off_h == 0 && off_m == 0 && off_s == 0) {
+                        oss << "Z";
+                    } else if (off_s == 0) {
+                        oss << (negative ? "-" : "+")
+                            << std::setw(2) << std::setfill('0') << off_h << ':'
+                            << std::setw(2) << std::setfill('0') << off_m;
+                    } else {
+                        // Offset with seconds (rare but valid per spec)
+                        oss << (negative ? "-" : "+")
+                            << std::setw(2) << std::setfill('0') << off_h << ':'
+                            << std::setw(2) << std::setfill('0') << off_m << ':'
+                            << std::setw(2) << std::setfill('0') << off_s;
+                    }
+                } else {
+                    // Assume it's already a timezone string (e.g., "@Europe/Paris" or "+02:00")
+                    oss << offset_str;
+                }
+            } else {
+                return nullptr; // 4th arg must be a string (duration) or null
             }
         }
         return oss.str();
@@ -1918,8 +1965,12 @@ json evaluate_years_and_months_duration_function(const std::vector<json>& args)
     if (!from.valid || !to.valid) return nullptr;
 
     int total_months = (to.year * 12 + to.month) - (from.year * 12 + from.month);
-    // If to-day < from-day, adjust by one month
-    if (to.day < from.day) total_months--;
+    // Adjust for incomplete months based on day difference
+    if (total_months > 0 && to.day < from.day) {
+        total_months--;
+    } else if (total_months < 0 && to.day > from.day) {
+        total_months++;
+    }
 
     bool negative = total_months < 0;
     if (negative) total_months = -total_months;
