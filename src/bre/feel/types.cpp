@@ -217,6 +217,32 @@ namespace orion::bre::feel {
                 continue;
             }
 
+            // Handle fractional seconds (e.g., PT0.999S)
+            if (current_char == '.' && in_time)
+            {
+                // Skip fractional digits until we hit 'S'
+                ++i;
+                while (i < str.size() && std::isdigit(static_cast<unsigned char>(str[i])))
+                {
+                    ++i;
+                }
+                // Now str[i] should be 'S'
+                if (i < str.size() && str[i] == 'S')
+                {
+                    // Treat as whole seconds (fractional part ignored for now in total_seconds)
+                    // But mark that we had a number
+                    if (!flush('S'))
+                    {
+                        return std::nullopt;
+                    }
+                }
+                else
+                {
+                    return std::nullopt; // Fractional without 'S'
+                }
+                continue;
+            }
+
             if (!flush(current_char))
             {
                 return std::nullopt; // expects Y/M/D/H/S
