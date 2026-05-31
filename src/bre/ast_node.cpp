@@ -509,6 +509,18 @@ namespace orion::bre
                     return nullptr;
                 }
                 
+                // Handle temporal property access on strings
+                if (obj.is_string())
+                {
+                    std::string str_val = obj.get<std::string>();
+                    json temporal_result = feel::get_temporal_property(str_val, propertyName);
+                    if (!temporal_result.is_null())
+                    {
+                        return temporal_result;
+                    }
+                    // Not a temporal property - fall through to error
+                }
+                
                 // Obj must be an object/dict to have properties
                 if (!obj.is_object())
                 {
@@ -769,6 +781,42 @@ namespace orion::bre
             else if (funcName == "duration")
             {
                 return feel::evaluate_duration_function(args);
+            }
+            else if (funcName == "time")
+            {
+                return feel::evaluate_time_function(args);
+            }
+            else if (funcName == "date and time")
+            {
+                return feel::evaluate_date_and_time_function(args);
+            }
+            else if (funcName == "years and months duration")
+            {
+                return feel::evaluate_years_and_months_duration_function(args);
+            }
+            else if (funcName == "day of year")
+            {
+                return feel::evaluate_day_of_year_function(args);
+            }
+            else if (funcName == "day of week")
+            {
+                return feel::evaluate_day_of_week_function(args);
+            }
+            else if (funcName == "month of year")
+            {
+                return feel::evaluate_month_of_year_function(args);
+            }
+            else if (funcName == "week of year")
+            {
+                return feel::evaluate_week_of_year_function(args);
+            }
+            else if (funcName == "now")
+            {
+                return feel::evaluate_now_function(args);
+            }
+            else if (funcName == "today")
+            {
+                return feel::evaluate_today_function(args);
             }
             // Phase 1: Trivial functions
             else if (funcName == "odd")

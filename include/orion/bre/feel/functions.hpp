@@ -442,6 +442,18 @@ namespace orion::bre::feel {
      */
     [[nodiscard]] json evaluate_duration_function(const std::vector<json>& args);
 
+    // ========== TEMPORAL FUNCTIONS (DMN 1.5 §10.3.4) ==========
+    [[nodiscard]] json evaluate_time_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_date_and_time_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_years_and_months_duration_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_day_of_year_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_day_of_week_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_month_of_year_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_week_of_year_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_now_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_today_function(const std::vector<json>& args);
+    [[nodiscard]] json get_temporal_property(const std::string& val, const std::string& prop);
+
     // ========== PHASE 1: TRIVIAL FUNCTIONS (DMN 1.5 §10.3.4) ==========
 
     /**

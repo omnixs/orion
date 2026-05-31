@@ -28,6 +28,7 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <chrono>
 #include <map>
 #include <limits>
 
@@ -1200,88 +1201,126 @@ json evaluate_string_join_function(const std::vector<json>& args)
     return result;
 }
 
+// Date component parsing - needed by evaluate_date_function
+struct DateComponents {
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    bool valid = false;
+};
+
+static DateComponents parse_date_components(const std::string& s)
+{
+    DateComponents dc;
+    size_t pos = 0;
+    bool negative = false;
+
+    if (!s.empty() && s[0] == '-') {
+        negative = true;
+        pos = 1;
+    }
+
+    // Find first dash after year
+    auto dash1 = s.find('-', pos);
+    if (dash1 == std::string::npos || dash1 == pos) return dc;
+
+    try {
+        dc.year = std::stoi(s.substr(pos, dash1 - pos));
+        if (negative) dc.year = -dc.year;
+
+        auto dash2 = s.find('-', dash1 + 1);
+        if (dash2 == std::string::npos) return dc;
+
+        dc.month = std::stoi(s.substr(dash1 + 1, dash2 - dash1 - 1));
+        
+        // Day ends at T, +, Z, @, or end of string
+        size_t day_end = s.size();
+        for (size_t i = dash2 + 1; i < s.size(); ++i) {
+            char c = s[i];
+            if (c == 'T' || c == '+' || c == 'Z' || c == '@') {
+                day_end = i;
+                break;
+            }
+        }
+        dc.day = std::stoi(s.substr(dash2 + 1, day_end - dash2 - 1));
+        dc.valid = (dc.month >= 1 && dc.month <= 12 && dc.day >= 1 && dc.day <= 31);
+    } catch (...) {
+        return dc;
+    }
+    return dc;
+}
+
+static std::string format_date_string(int year, int month, int day)
+{
+    std::ostringstream oss;
+    if (year < 0) {
+        oss << '-' << std::setw(4) << std::setfill('0') << (-year);
+    } else if (year > 9999) {
+        oss << year;
+    } else {
+        oss << std::setw(4) << std::setfill('0') << year;
+    }
+    oss << '-' << std::setw(2) << std::setfill('0') << month
+        << '-' << std::setw(2) << std::setfill('0') << day;
+    return oss.str();
+}
+
 json evaluate_date_function(const std::vector<json>& args)
 {
-    // date() can be called with:
-    // 1. One string argument: date("2017-01-01")
-    // 2. Three number arguments: date(2017, 1, 1)
-    
     if (args.size() == 1)
     {
-        // Parse from string
-        const auto& date_str = args[0];
-        
-        // DMN null propagation
-        if (date_str.is_null())
-        {
-            return nullptr;
+        if (args[0].is_null()) return nullptr;
+        if (!args[0].is_string()) return nullptr;
+
+        std::string s = args[0].get<std::string>();
+
+        // If it's a datetime string, extract date part
+        auto tpos = s.find('T');
+        if (tpos != std::string::npos) {
+            s = s.substr(0, tpos);
         }
+
+        // Strict DMN date validation:
+        // Must be [-]YYYY-MM-DD where YYYY is exactly 4 digits (or more without leading zeros)
+        // Leading + is NOT allowed
+        // 3-digit years NOT allowed
+        // 5-digit years with leading zero NOT allowed
+        size_t pos = 0;
+        if (!s.empty() && s[0] == '-') pos = 1;
+        if (!s.empty() && s[0] == '+') return nullptr; // Leading + not allowed
+
+        auto dash1 = s.find('-', pos);
+        if (dash1 == std::string::npos || dash1 == pos) return nullptr;
         
-        // Type validation
-        if (!date_str.is_string())
-        {
-            return nullptr;
+        std::string year_str = s.substr(pos, dash1 - pos);
+        // Year must be at least 4 digits; if more than 4, no leading zeros
+        if (year_str.size() < 4) return nullptr;
+        if (year_str.size() > 4 && year_str[0] == '0') return nullptr;
+        // All characters must be digits
+        for (char c : year_str) {
+            if (!std::isdigit(static_cast<unsigned char>(c))) return nullptr;
         }
-        
-        std::string date_string = date_str.get<std::string>();
-        
-        // Basic validation: ISO 8601 format YYYY-MM-DD
-        // Simplified validation - full implementation would use regex or date library
-        if (date_string.length() < 10)
-        {
-            return nullptr;
-        }
-        
-        // Check basic format: YYYY-MM-DD
-        if (date_string[4] != '-' || date_string[7] != '-')
-        {
-            return nullptr;
-        }
-        
-        // For now, return the string as-is (representing a date)
-        // In a full implementation, this would create a proper date object
-        // The string can be compared lexicographically since it's ISO format
-        return date_string;
+
+        auto dc = parse_date_components(s);
+        if (!dc.valid) return nullptr;
+
+        return s;
     }
 
     if (args.size() == 3)
     {
-        // Construct from year, month, day
-        const auto& year = args[0];
-        const auto& month = args[1];
-        const auto& day = args[2];
-        
-        // DMN null propagation
-        if (year.is_null() || month.is_null() || day.is_null())
-        {
-            return nullptr;
-        }
-        
-        // Type validation
-        if (!year.is_number() || !month.is_number() || !day.is_number())
-        {
-            return nullptr;
-        }
-        
-        int year_num = year.get<int>();
-        int month_num = month.get<int>();
-        int day_num = day.get<int>();
-        
-        // Basic range validation
-        if (year_num < 1 || year_num > 9999 || month_num < 1 || month_num > 12 || day_num < 1 || day_num > 31)
-        {
-            return nullptr;
-        }
-        
-        // Format as ISO 8601 string: YYYY-MM-DD
-        std::ostringstream oss;
-        oss << std::setw(4) << std::setfill('0') << year_num << '-'
-            << std::setw(2) << std::setfill('0') << month_num << '-'
-            << std::setw(2) << std::setfill('0') << day_num;
-        return oss.str();
+        if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
+        if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
+
+        int year_num = args[0].get<int>();
+        int month_num = args[1].get<int>();
+        int day_num = args[2].get<int>();
+
+        if (month_num < 1 || month_num > 12 || day_num < 1 || day_num > 31) return nullptr;
+
+        return format_date_string(year_num, month_num, day_num);
     }
 
-    // Invalid argument count
     return nullptr;
 }
 
@@ -1328,6 +1367,573 @@ json evaluate_duration_function(const std::vector<json>& args)
 
     // Invalid argument count
     return nullptr;
+}
+
+// ========== TEMPORAL HELPER FUNCTIONS ==========
+
+// Detect if a string looks like a date: YYYY-MM-DD or -YYYY-MM-DD
+static bool is_date_string(const std::string& s)
+{
+    size_t start = 0;
+    if (!s.empty() && s[0] == '-') start = 1;
+    if (s.size() < start + 10) return false;
+    // Check YYYY-MM-DD pattern
+    for (size_t i = start; i < start + 4; ++i) if (!std::isdigit(static_cast<unsigned char>(s[i]))) return false;
+    if (s[start + 4] != '-') return false;
+    for (size_t i = start + 5; i < start + 7; ++i) if (!std::isdigit(static_cast<unsigned char>(s[i]))) return false;
+    if (s[start + 7] != '-') return false;
+    for (size_t i = start + 8; i < start + 10; ++i) if (!std::isdigit(static_cast<unsigned char>(s[i]))) return false;
+    // Must be exactly 10 chars (no T following = pure date)
+    return s.size() == start + 10;
+}
+
+// Detect if a string is a datetime: contains T or is date + T + time
+static bool is_datetime_string(const std::string& s)
+{
+    // Look for T separator between date and time parts
+    auto tpos = s.find('T');
+    if (tpos == std::string::npos) return false;
+    if (tpos < 8) return false; // Need at least YYYY-MM-DD before T
+    return true;
+}
+
+// Detect if a string looks like a time: HH:MM:SS or HH:MM:SS.fff or with timezone
+static bool is_time_string(const std::string& s)
+{
+    if (s.size() < 5) return false;
+    if (!std::isdigit(static_cast<unsigned char>(s[0])) || !std::isdigit(static_cast<unsigned char>(s[1]))) return false;
+    if (s[2] != ':') return false;
+    if (!std::isdigit(static_cast<unsigned char>(s[3])) || !std::isdigit(static_cast<unsigned char>(s[4]))) return false;
+    return true;
+}
+
+// Detect if a string is a duration: starts with P or -P
+static bool is_duration_string(const std::string& s)
+{
+    if (s.empty()) return false;
+    if (s[0] == 'P') return true;
+    if (s.size() > 1 && s[0] == '-' && s[1] == 'P') return true;
+    return false;
+}
+
+// Parse time components from a string
+struct TimeComponents {
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    int nanosecond = 0;
+    std::string offset; // "+05:00", "Z", "@Europe/Paris", or ""
+    bool valid = false;
+};
+
+static TimeComponents parse_time_components(const std::string& s)
+{
+    TimeComponents tc;
+    if (s.size() < 5) return tc;
+
+    // Helper to check 2 digits at position
+    auto is_two_digits = [&](size_t pos) -> bool {
+        return pos + 1 < s.size() &&
+               std::isdigit(static_cast<unsigned char>(s[pos])) &&
+               std::isdigit(static_cast<unsigned char>(s[pos + 1]));
+    };
+
+    try {
+        if (!is_two_digits(0)) return tc;
+        tc.hour = std::stoi(s.substr(0, 2));
+        if (s[2] != ':') return tc;
+        if (!is_two_digits(3)) return tc;
+        tc.minute = std::stoi(s.substr(3, 2));
+
+        size_t pos = 5;
+        if (pos < s.size() && s[pos] == ':') {
+            if (!is_two_digits(pos + 1)) return tc;
+            tc.second = std::stoi(s.substr(pos + 1, 2));
+            pos += 3;
+            // Fractional seconds
+            if (pos < s.size() && s[pos] == '.') {
+                size_t frac_start = pos + 1;
+                size_t frac_end = frac_start;
+                while (frac_end < s.size() && std::isdigit(static_cast<unsigned char>(s[frac_end]))) ++frac_end;
+                if (frac_end == frac_start) return tc; // No digits after dot
+                std::string frac = s.substr(frac_start, frac_end - frac_start);
+                while (frac.size() < 9) frac += '0';
+                tc.nanosecond = std::stoi(frac.substr(0, 9));
+                pos = frac_end;
+            }
+        }
+
+        // Timezone/offset
+        if (pos < s.size()) {
+            std::string tz_part = s.substr(pos);
+            if (tz_part == "Z" || tz_part == "z") {
+                tc.offset = "Z";
+            } else if (tz_part[0] == '+' || tz_part[0] == '-') {
+                // Must not also have @timezone
+                if (tz_part.find('@') != std::string::npos) return tc;
+                // Validate offset format: ±HH:MM (exactly)
+                if (tz_part.size() != 6) return tc;
+                if (!std::isdigit(static_cast<unsigned char>(tz_part[1])) ||
+                    !std::isdigit(static_cast<unsigned char>(tz_part[2]))) return tc;
+                if (tz_part[3] != ':') return tc;
+                if (!std::isdigit(static_cast<unsigned char>(tz_part[4])) ||
+                    !std::isdigit(static_cast<unsigned char>(tz_part[5]))) return tc;
+                int off_h = std::stoi(tz_part.substr(1, 2));
+                int off_m = std::stoi(tz_part.substr(4, 2));
+                if (off_h > 18 || (off_h == 18 && off_m > 0)) return tc;
+                if (off_m > 59) return tc;
+                tc.offset = tz_part;
+            } else if (tz_part[0] == '@') {
+                // IANA timezone name - validate region prefix
+                std::string tz_name = tz_part.substr(1);
+                if (tz_name.find('/') == std::string::npos) return tc;
+                std::string region = tz_name.substr(0, tz_name.find('/'));
+                // Known IANA top-level regions
+                static const std::vector<std::string> valid_regions = {
+                    "Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic",
+                    "Australia", "Europe", "Indian", "Pacific", "Etc", "US"
+                };
+                bool valid_region = false;
+                for (const auto& r : valid_regions) {
+                    if (region == r) { valid_region = true; break; }
+                }
+                if (!valid_region) return tc;
+                tc.offset = tz_part;
+            } else {
+                return tc; // Unknown suffix
+            }
+        }
+
+        tc.valid = (tc.hour >= 0 && tc.hour <= 23 && tc.minute >= 0 && tc.minute <= 59 && tc.second >= 0 && tc.second <= 59);
+    } catch (...) {
+        return tc;
+    }
+    return tc;
+}
+
+// Parse duration components
+struct DurationComponents {
+    bool negative = false;
+    int years = 0;
+    int months = 0;
+    int days = 0;
+    int hours = 0;
+    int minutes = 0;
+    int seconds = 0;
+    bool valid = false;
+};
+
+static DurationComponents parse_duration_components(const std::string& s)
+{
+    DurationComponents dc;
+    auto parsed = parse_duration(s);
+    if (!parsed) return dc;
+
+    dc.negative = (!s.empty() && s[0] == '-');
+    int total_months = parsed->total_months;
+    long long total_seconds = parsed->total_seconds;
+
+    if (dc.negative) {
+        total_months = -total_months;
+        total_seconds = -total_seconds;
+    }
+
+    dc.years = total_months / 12;
+    dc.months = total_months % 12;
+    dc.days = static_cast<int>(total_seconds / 86400);
+    total_seconds %= 86400;
+    dc.hours = static_cast<int>(total_seconds / 3600);
+    total_seconds %= 3600;
+    dc.minutes = static_cast<int>(total_seconds / 60);
+    dc.seconds = static_cast<int>(total_seconds % 60);
+    dc.valid = true;
+    return dc;
+}
+
+// Get temporal property from a string value
+json get_temporal_property(const std::string& val, const std::string& prop)
+{
+    // Check if duration first (starts with P or -P)
+    if (is_duration_string(val)) {
+        auto dc = parse_duration_components(val);
+        if (!dc.valid) return nullptr;
+        if (prop == "years") return dc.years;
+        if (prop == "months") return dc.months;
+        if (prop == "days") return dc.days;
+        if (prop == "hours") return dc.hours;
+        if (prop == "minutes") return dc.minutes;
+        if (prop == "seconds") return dc.seconds;
+        return nullptr;
+    }
+
+    // Check datetime (has T separator)
+    if (is_datetime_string(val)) {
+        auto tpos = val.find('T');
+        auto date_part = val.substr(0, tpos);
+        auto time_part = val.substr(tpos + 1);
+
+        auto dcomp = parse_date_components(date_part);
+        auto tcomp = parse_time_components(time_part);
+
+        if (prop == "year" && dcomp.valid) return dcomp.year;
+        if (prop == "month" && dcomp.valid) return dcomp.month;
+        if (prop == "day" && dcomp.valid) return dcomp.day;
+        if (prop == "hour" && tcomp.valid) return tcomp.hour;
+        if (prop == "minute" && tcomp.valid) return tcomp.minute;
+        if (prop == "second" && tcomp.valid) return tcomp.second;
+        if (prop == "time offset" || prop == "timezone") {
+            if (!tcomp.offset.empty()) return tcomp.offset;
+            return nullptr;
+        }
+        if (prop == "date") {
+            if (dcomp.valid) return date_part;
+            return nullptr;
+        }
+        if (prop == "time") {
+            if (tcomp.valid) return time_part;
+            return nullptr;
+        }
+        if (prop == "weekday" && dcomp.valid) {
+            // Zeller-like day of week calculation
+            int y = dcomp.year, m = dcomp.month, d = dcomp.day;
+            if (m <= 2) { y--; m += 12; }
+            int dow = (d + 13*(m+1)/5 + y + y/4 - y/100 + y/400) % 7;
+            // Convert Zeller (0=Sat) to ISO 8601 (1=Mon..7=Sun)
+            int iso = ((dow + 5) % 7) + 1;
+            return iso;
+        }
+        return nullptr;
+    }
+
+    // Check date (YYYY-MM-DD, no T)
+    if (is_date_string(val)) {
+        auto dcomp = parse_date_components(val);
+        if (!dcomp.valid) return nullptr;
+        if (prop == "year") return dcomp.year;
+        if (prop == "month") return dcomp.month;
+        if (prop == "day") return dcomp.day;
+        if (prop == "weekday") {
+            int y = dcomp.year, m = dcomp.month, d = dcomp.day;
+            if (m <= 2) { y--; m += 12; }
+            int dow = (d + 13*(m+1)/5 + y + y/4 - y/100 + y/400) % 7;
+            int iso = ((dow + 5) % 7) + 1;
+            return iso;
+        }
+        return nullptr;
+    }
+
+    // Check time
+    if (is_time_string(val)) {
+        auto tcomp = parse_time_components(val);
+        if (!tcomp.valid) return nullptr;
+        if (prop == "hour") return tcomp.hour;
+        if (prop == "minute") return tcomp.minute;
+        if (prop == "second") return tcomp.second;
+        if (prop == "time offset" || prop == "timezone") {
+            if (!tcomp.offset.empty()) return tcomp.offset;
+            return nullptr;
+        }
+        return nullptr;
+    }
+
+    return nullptr;
+}
+
+// ========== TEMPORAL FUNCTIONS ==========
+
+json evaluate_time_function(const std::vector<json>& args)
+{
+    if (args.empty() || args.size() > 4) return nullptr;
+
+    if (args.size() == 1) {
+        if (args[0].is_null()) return nullptr;
+        if (args[0].is_string()) {
+            std::string s = args[0].get<std::string>();
+            // Could be a time string or a datetime string
+            // If datetime, extract time part
+            auto tpos = s.find('T');
+            if (tpos != std::string::npos) {
+                s = s.substr(tpos + 1);
+            }
+            // Validate it parses as a time
+            auto tc = parse_time_components(s);
+            if (!tc.valid) return nullptr;
+            return s;
+        }
+        return nullptr;
+    }
+
+    // time(hour, minute, second) or time(hour, minute, second, offset)
+    if (args.size() >= 3) {
+        if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
+        if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
+
+        int h = args[0].get<int>();
+        int m = args[1].get<int>();
+        int sec = args[2].get<int>();
+
+        if (h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59) return nullptr;
+
+        std::ostringstream oss;
+        oss << std::setw(2) << std::setfill('0') << h << ':'
+            << std::setw(2) << std::setfill('0') << m << ':'
+            << std::setw(2) << std::setfill('0') << sec;
+
+        if (args.size() == 4 && !args[3].is_null()) {
+            if (args[3].is_string()) {
+                oss << args[3].get<std::string>();
+            }
+        }
+        return oss.str();
+    }
+    return nullptr;
+}
+
+json evaluate_date_and_time_function(const std::vector<json>& args)
+{
+    if (args.empty() || args.size() > 2) return nullptr;
+
+    if (args.size() == 1) {
+        // date and time(string)
+        if (args[0].is_null()) return nullptr;
+        if (!args[0].is_string()) return nullptr;
+        std::string s = args[0].get<std::string>();
+        // Validate it has both date and time parts
+        auto tpos = s.find('T');
+        if (tpos == std::string::npos) return nullptr;
+        auto dcomp = parse_date_components(s.substr(0, tpos));
+        auto tcomp = parse_time_components(s.substr(tpos + 1));
+        if (!dcomp.valid || !tcomp.valid) return nullptr;
+        return s;
+    }
+
+    // date and time(date, time)
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!args[0].is_string() || !args[1].is_string()) return nullptr;
+
+    std::string date_str = args[0].get<std::string>();
+    std::string time_str = args[1].get<std::string>();
+
+    // If date_str is a datetime, extract just the date part
+    auto tpos = date_str.find('T');
+    if (tpos != std::string::npos) {
+        date_str = date_str.substr(0, tpos);
+    }
+
+    return date_str + "T" + time_str;
+}
+
+json evaluate_years_and_months_duration_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!args[0].is_string() || !args[1].is_string()) return nullptr;
+
+    std::string from_str = args[0].get<std::string>();
+    std::string to_str = args[1].get<std::string>();
+
+    // Extract date parts (handle both date and datetime)
+    auto t1 = from_str.find('T');
+    if (t1 != std::string::npos) from_str = from_str.substr(0, t1);
+    auto t2 = to_str.find('T');
+    if (t2 != std::string::npos) to_str = to_str.substr(0, t2);
+
+    auto from = parse_date_components(from_str);
+    auto to = parse_date_components(to_str);
+    if (!from.valid || !to.valid) return nullptr;
+
+    int total_months = (to.year * 12 + to.month) - (from.year * 12 + from.month);
+    // If to-day < from-day, adjust by one month
+    if (to.day < from.day) total_months--;
+
+    bool negative = total_months < 0;
+    if (negative) total_months = -total_months;
+
+    int years = total_months / 12;
+    int months = total_months % 12;
+
+    std::ostringstream oss;
+    if (negative) oss << '-';
+    oss << 'P';
+    if (years > 0) oss << years << 'Y';
+    if (months > 0) oss << months << 'M';
+    if (years == 0 && months == 0) oss << "0M";
+    return oss.str();
+}
+
+// Day of year (1-366)
+json evaluate_day_of_year_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    if (args[0].is_null()) return nullptr;
+    if (!args[0].is_string()) return nullptr;
+
+    std::string s = args[0].get<std::string>();
+    // Extract date part if datetime
+    auto tpos = s.find('T');
+    if (tpos != std::string::npos) s = s.substr(0, tpos);
+
+    auto dc = parse_date_components(s);
+    if (!dc.valid) return nullptr;
+
+    static const int days_before_month[] = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    int doy = days_before_month[dc.month] + dc.day;
+    // Leap year adjustment
+    bool leap = (dc.year % 4 == 0 && dc.year % 100 != 0) || (dc.year % 400 == 0);
+    if (leap && dc.month > 2) doy++;
+    return doy;
+}
+
+// Day of week: "Monday"..."Sunday"
+json evaluate_day_of_week_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    if (args[0].is_null()) return nullptr;
+    if (!args[0].is_string()) return nullptr;
+
+    std::string s = args[0].get<std::string>();
+    auto tpos = s.find('T');
+    if (tpos != std::string::npos) s = s.substr(0, tpos);
+
+    auto dc = parse_date_components(s);
+    if (!dc.valid) return nullptr;
+
+    // Zeller's formula
+    int y = dc.year, m = dc.month, d = dc.day;
+    if (m <= 2) { y--; m += 12; }
+    int dow = (d + 13*(m+1)/5 + y + y/4 - y/100 + y/400) % 7;
+    // Zeller: 0=Sat, 1=Sun, ..., 6=Fri → ISO: Mon=1..Sun=7
+    int iso = ((dow + 5) % 7) + 1;
+    static const char* names[] = {"", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+    return std::string(names[iso]);
+}
+
+// Month of year: "January"..."December"
+json evaluate_month_of_year_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    if (args[0].is_null()) return nullptr;
+    if (!args[0].is_string()) return nullptr;
+
+    std::string s = args[0].get<std::string>();
+    auto tpos = s.find('T');
+    if (tpos != std::string::npos) s = s.substr(0, tpos);
+
+    auto dc = parse_date_components(s);
+    if (!dc.valid) return nullptr;
+
+    static const char* names[] = {"", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"};
+    if (dc.month < 1 || dc.month > 12) return nullptr;
+    return std::string(names[dc.month]);
+}
+
+// Week of year (ISO 8601)
+json evaluate_week_of_year_function(const std::vector<json>& args)
+{
+    if (args.size() != 1) return nullptr;
+    if (args[0].is_null()) return nullptr;
+    if (!args[0].is_string()) return nullptr;
+
+    std::string s = args[0].get<std::string>();
+    auto tpos = s.find('T');
+    if (tpos != std::string::npos) s = s.substr(0, tpos);
+
+    auto dc = parse_date_components(s);
+    if (!dc.valid) return nullptr;
+
+    // ISO 8601 week number calculation
+    // First compute day-of-year
+    static const int days_before_month[] = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    int doy = days_before_month[dc.month] + dc.day;
+    bool leap = (dc.year % 4 == 0 && dc.year % 100 != 0) || (dc.year % 400 == 0);
+    if (leap && dc.month > 2) doy++;
+
+    // Day of week for this date (ISO: Mon=1..Sun=7)
+    int y = dc.year, m = dc.month, d = dc.day;
+    if (m <= 2) { y--; m += 12; }
+    int dow_z = (d + 13*(m+1)/5 + y + y/4 - y/100 + y/400) % 7;
+    int dow = ((dow_z + 5) % 7) + 1; // ISO dow
+
+    // ISO week number
+    int woy = (doy - dow + 10) / 7;
+
+    // Handle edge cases: week 0 → last week of previous year, week 53 validity
+    if (woy < 1) {
+        // Last week of previous year
+        int prev_year = dc.year - 1;
+        bool prev_leap = (prev_year % 4 == 0 && prev_year % 100 != 0) || (prev_year % 400 == 0);
+        int prev_days = prev_leap ? 366 : 365;
+        // Calculate dow of Dec 31 of previous year
+        int py = prev_year, pm = 12, pd = 31;
+        if (pm <= 2) { py--; pm += 12; }
+        int pdow_z = (pd + 13*(pm+1)/5 + py + py/4 - py/100 + py/400) % 7;
+        int pdow = ((pdow_z + 5) % 7) + 1;
+        woy = (prev_days - pdow + 10) / 7;
+    } else if (woy == 53) {
+        // Check if this year actually has 53 weeks
+        int jan1_y = dc.year, jan1_m = 1, jan1_d = 1;
+        if (jan1_m <= 2) { jan1_y--; jan1_m += 12; }
+        int jan1_z = (jan1_d + 13*(jan1_m+1)/5 + jan1_y + jan1_y/4 - jan1_y/100 + jan1_y/400) % 7;
+        int jan1_dow = ((jan1_z + 5) % 7) + 1;
+        // Year has 53 weeks if Jan 1 is Thursday, or Dec 31 is Thursday
+        if (jan1_dow != 4) {
+            int dec31_y = dc.year, dec31_m = 12, dec31_d = 31;
+            if (dec31_m <= 2) { dec31_y--; dec31_m += 12; }
+            int dec31_z = (dec31_d + 13*(dec31_m+1)/5 + dec31_y + dec31_y/4 - dec31_y/100 + dec31_y/400) % 7;
+            int dec31_dow = ((dec31_z + 5) % 7) + 1;
+            if (dec31_dow != 4) {
+                woy = 1; // First week of next year
+            }
+        }
+    }
+
+    return woy;
+}
+
+// now() - returns current date and time
+json evaluate_now_function(const std::vector<json>& args)
+{
+    if (!args.empty()) return nullptr;
+
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    struct tm tm_now;
+#ifdef _WIN32
+    localtime_s(&tm_now, &time_t_now);
+#else
+    localtime_r(&time_t_now, &tm_now);
+#endif
+
+    std::ostringstream oss;
+    oss << std::setw(4) << std::setfill('0') << (tm_now.tm_year + 1900) << '-'
+        << std::setw(2) << std::setfill('0') << (tm_now.tm_mon + 1) << '-'
+        << std::setw(2) << std::setfill('0') << tm_now.tm_mday << 'T'
+        << std::setw(2) << std::setfill('0') << tm_now.tm_hour << ':'
+        << std::setw(2) << std::setfill('0') << tm_now.tm_min << ':'
+        << std::setw(2) << std::setfill('0') << tm_now.tm_sec;
+    return oss.str();
+}
+
+// today() - returns current date
+json evaluate_today_function(const std::vector<json>& args)
+{
+    if (!args.empty()) return nullptr;
+
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    struct tm tm_now;
+#ifdef _WIN32
+    localtime_s(&tm_now, &time_t_now);
+#else
+    localtime_r(&time_t_now, &tm_now);
+#endif
+
+    std::ostringstream oss;
+    oss << std::setw(4) << std::setfill('0') << (tm_now.tm_year + 1900) << '-'
+        << std::setw(2) << std::setfill('0') << (tm_now.tm_mon + 1) << '-'
+        << std::setw(2) << std::setfill('0') << tm_now.tm_mday;
+    return oss.str();
 }
 
 // ========== PHASE 1: TRIVIAL FUNCTIONS ==========

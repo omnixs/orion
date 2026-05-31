@@ -141,6 +141,8 @@ void register_date_time_functions(FunctionRegistry& reg) {
     reg.register_function({"day of week", {{"date"}}});
     reg.register_function({"month of year", {{"date"}}});
     reg.register_function({"week of year", {{"date"}}});
+    reg.register_function({"now", {}});
+    reg.register_function({"today", {}});
 }
 
 // Helper: Register context and miscellaneous functions
