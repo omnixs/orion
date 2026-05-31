@@ -1373,12 +1373,59 @@ namespace orion::bre
             // This handles both positional and named parameters
             // Parameter validation errors should return null per DMN spec
             std::vector<json> args;
-            try {
-                args = feel::bind_parameters(funcName, parameters, input, eval_ctx);
-            } catch (const std::runtime_error&) {
-                // Parameter validation failed (wrong param names, wrong count, etc.)
-                // Return null as per DMN 1.5 spec
-                return json(nullptr);
+            
+            // For "context put", DMN spec defines two signatures:
+            //   context put(context, key, value) - key is string
+            //   context put(context, keys, value) - keys is list<string>
+            // Handle "keys" named param by remapping to "key" for binding
+            bool context_put_keys_variant = false;
+            if (funcName == "context put")
+            {
+                for (const auto& p : parameters)
+                {
+                    if (p.name == "keys") { context_put_keys_variant = true; break; }
+                }
+            }
+            
+            if (context_put_keys_variant)
+            {
+                // Manually bind: evaluate params by name
+                json ctx_arg = nullptr;
+                json key_arg = nullptr;
+                json val_arg = nullptr;
+                for (const auto& p : parameters)
+                {
+                    if (p.name == "context") ctx_arg = p.valueExpr->evaluate(input, eval_ctx);
+                    else if (p.name == "keys") key_arg = p.valueExpr->evaluate(input, eval_ctx);
+                    else if (p.name == "value") val_arg = p.valueExpr->evaluate(input, eval_ctx);
+                }
+                args = {std::move(ctx_arg), std::move(key_arg), std::move(val_arg)};
+            }
+            else
+            {
+                try {
+                    args = feel::bind_parameters(funcName, parameters, input, eval_ctx);
+                } catch (const std::runtime_error&) {
+                    // Parameter validation failed (wrong param names, wrong count, etc.)
+                    // Return null as per DMN 1.5 spec
+                    return json(nullptr);
+                }
+            }
+            
+            // For "context put" with named param "key": validate key is string (not list)
+            // DMN spec: key param requires string; keys param requires list
+            if (funcName == "context put" && !context_put_keys_variant && args.size() >= 2)
+            {
+                // Check if "key" named param was used with a non-string value
+                bool has_key_param = false;
+                for (const auto& p : parameters)
+                {
+                    if (p.name == "key") { has_key_param = true; break; }
+                }
+                if (has_key_param && args[1].is_array())
+                {
+                    return json(nullptr); // Type mismatch: "key" expects string, got list
+                }
             }
             
             // Dispatch to appropriate function

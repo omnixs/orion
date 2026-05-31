@@ -3259,9 +3259,52 @@ json evaluate_context_put_function(const std::vector<json>& args)
     if (context.is_null()) return nullptr;
     if (!context.is_object()) return nullptr;
 
+    // Handle list-of-keys (nested path) variant
+    if (key.is_array())
+    {
+        if (key.empty()) return nullptr;
+        
+        // Validate all keys are strings
+        for (const auto& k : key)
+        {
+            if (k.is_null() || !k.is_string()) return nullptr;
+        }
+        
+        if (key.size() == 1)
+        {
+            json result = context;
+            result[key[0].get<std::string>()] = value;
+            return result;
+        }
+        
+        // Nested path: recursively set value
+        std::string first_key = key[0].get<std::string>();
+        json sub_keys = json::array();
+        for (size_t i = 1; i < key.size(); ++i)
+            sub_keys.push_back(key[i]);
+        
+        // Get sub-context — must exist and be an object
+        json sub_context;
+        if (context.contains(first_key))
+        {
+            if (!context[first_key].is_object())
+                return nullptr; // Can't traverse into non-object
+            sub_context = context[first_key];
+        }
+        else
+        {
+            sub_context = json::object();
+        }
+        
+        json new_sub = evaluate_context_put_function({sub_context, sub_keys, value});
+        if (new_sub.is_null()) return nullptr;
+        
+        json result = context;
+        result[first_key] = new_sub;
+        return result;
+    }
+
     // DMN spec: key must be a string
-    // The list-of-keys (nested path) variant uses the 'keys' parameter name,
-    // which is not currently supported
     if (!key.is_string())
     {
         return nullptr;

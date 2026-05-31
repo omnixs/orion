@@ -271,6 +271,9 @@ namespace orion::common
         return parse_xml_value(valNode->value(), xsiType);
     }
 
+    // Forward declaration
+    static std::string parse_expected_list(rapidxml::xml_node<>* listNode);
+
     // Helper function to parse component-based expected value (object structure)
     static std::string parse_expected_components(rapidxml::xml_node<>* expNode)
     {
@@ -287,6 +290,17 @@ namespace orion::common
                 if (valNode != nullptr)
                 {
                     componentObj[compName] = parse_value_with_nil(valNode);
+                }
+                else if (comp->first_node("component"))
+                {
+                    // Nested components — recurse
+                    auto nested = nlohmann::json::parse(parse_expected_components(comp));
+                    componentObj[compName] = nested;
+                }
+                else if (auto* listNode = comp->first_node("list"))
+                {
+                    auto nested = nlohmann::json::parse(parse_expected_list(listNode));
+                    componentObj[compName] = nested;
                 }
             }
         }
