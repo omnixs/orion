@@ -233,6 +233,20 @@ namespace orion::bre::feel {
                             type_name += " " + std::string(advance().text);
                         }
                     }
+                    // Handle parameterized types: list<type>, context<...>
+                    if (check(TokenType::OPERATOR) && peek().text == "<")
+                    {
+                        int depth = 1;
+                        advance(); // consume <
+                        while (depth > 0 && position_ < tokens_->size())
+                        {
+                            if (check(TokenType::OPERATOR) && peek().text == "<") depth++;
+                            else if (check(TokenType::OPERATOR) && peek().text == ">") depth--;
+                            if (depth > 0) advance();
+                        }
+                        if (check(TokenType::OPERATOR) && peek().text == ">")
+                            advance(); // consume final >
+                    }
                 }
                 else
                 {
@@ -490,7 +504,9 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
     // Check if this is a function call (followed by left parenthesis)
     if (check(TokenType::LPAREN))
     {
-        return parse_function_call(token.text);
+        auto node = parse_function_call(token.text);
+        // Check for postfix property access and filter on function call result
+        return parse_postfix(std::move(node));
     }
     
     // Not a function call - handle as variable with potential property access
@@ -669,6 +685,39 @@ std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
     }
     
     return expr;
+}
+
+std::unique_ptr<ASTNode> Parser::parse_postfix(std::unique_ptr<ASTNode> node)
+{
+    // Handle property access (.property) and filter expressions ([filter])
+    while (check(TokenType::DOT) || check(TokenType::LBRACKET))
+    {
+        if (check(TokenType::DOT))
+        {
+            advance(); // consume '.'
+            if (!check(TokenType::IDENTIFIER) && !check(TokenType::KEYWORD))
+            {
+                return node; // no valid property name
+            }
+            const Token& prop_token = advance();
+            auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, std::string(prop_token.text));
+            prop_access->children.push_back(std::move(node));
+            node = std::move(prop_access);
+        }
+        else if (check(TokenType::LBRACKET))
+        {
+            advance(); // consume '['
+            auto filter = parse_logical_or();
+            if (!check(TokenType::RBRACKET))
+                throw std::runtime_error("Expected ']' in filter expression");
+            advance(); // consume ']'
+            auto filter_node = std::make_unique<ASTNode>(ASTNodeType::FILTER_EXPR, "filter");
+            filter_node->children.push_back(std::move(node));
+            filter_node->children.push_back(std::move(filter));
+            node = std::move(filter_node);
+        }
+    }
+    return node;
 }
 
 std::unique_ptr<ASTNode> Parser::parse_list_literal()

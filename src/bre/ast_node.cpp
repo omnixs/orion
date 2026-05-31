@@ -1165,10 +1165,7 @@ namespace orion::bre
                 // Obj must be an object/dict to have properties
                 if (!obj.is_object())
                 {
-                    std::ostringstream oss;
-                    oss << "Cannot access property '" << propertyName 
-                        << "' on non-object value (type: " << obj.type_name() << ")";
-                    throw std::runtime_error(oss.str());
+                    return nullptr;
                 }
                 
                 // Try exact property name first (hot path — avoids all string allocations)
@@ -1637,17 +1634,37 @@ namespace orion::bre
                 
                 const std::string& type_name = value;
                 
-                if (type_name == "Any") return true;
                 if (val.is_null()) return type_name == "Null" || type_name == "null";
+                if (type_name == "Any") return true;
                 if (type_name == "number") return val.is_number();
                 if (type_name == "string") return val.is_string();
                 if (type_name == "boolean") return val.is_boolean();
                 if (type_name == "list") return val.is_array();
-                if (type_name == "context") return val.is_object();
+                if (type_name == "context") return val.is_object() && !val.contains("__range__") && !val.contains("__unary_test__");
                 if (type_name == "null" || type_name == "Null") return val.is_null();
                 
                 // Temporal types - check string-encoded temporal values
-                // These would need proper type system (Phase 4) for full support
+                if (val.is_string())
+                {
+                    auto s = val.get<std::string>();
+                    if (type_name == "date") return is_date_string(s);
+                    if (type_name == "time") return is_time_string(s);
+                    if (type_name == "date and time") return is_datetime_string(s);
+                    if (type_name == "days and time duration") {
+                        auto d = feel::parse_duration(s);
+                        return d.has_value() && d->total_months == 0;
+                    }
+                    if (type_name == "years and months duration") {
+                        auto d = feel::parse_duration(s);
+                        return d.has_value() && d->total_months != 0;
+                    }
+                }
+                
+                // Parameterized types
+                if (type_name.starts_with("list")) return val.is_array();
+                if (type_name.starts_with("context")) return val.is_object();
+                if (type_name.starts_with("function")) return false; // functions not supported yet
+                
                 return false;
             }
             case ASTNodeType::FOR_EXPR:

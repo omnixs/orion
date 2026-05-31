@@ -1557,6 +1557,38 @@ json get_temporal_property(const std::string& val, const std::string& prop)
     if (is_duration_string(val)) {
         auto dc = parse_duration_components(val);
         if (!dc.valid) return nullptr;
+        auto parsed = parse_duration(val);
+        if (!parsed) return nullptr;
+        bool is_ym = (parsed->total_months != 0 || parsed->total_seconds == 0);
+        // Determine type from string: contains Y or M before T → YM, contains D/H/S or T → DT
+        // More reliable: check if string has Y or non-time M
+        bool has_ym_component = false;
+        bool has_dt_component = false;
+        {
+            bool in_time = false;
+            for (size_t i = (val[0] == '-' ? 2 : 1); i < val.size(); i++) {
+                if (val[i] == 'T') { in_time = true; continue; }
+                if (val[i] == 'Y') has_ym_component = true;
+                if (val[i] == 'M' && !in_time) has_ym_component = true;
+                if (val[i] == 'D' || val[i] == 'H' || val[i] == 'S') has_dt_component = true;
+                if (val[i] == 'M' && in_time) has_dt_component = true;
+            }
+        }
+        if (has_ym_component && !has_dt_component) {
+            // YM duration: only years and months
+            if (prop == "years") return dc.years;
+            if (prop == "months") return dc.months;
+            return nullptr;
+        }
+        if (has_dt_component && !has_ym_component) {
+            // DT duration: only days, hours, minutes, seconds
+            if (prop == "days") return dc.days;
+            if (prop == "hours") return dc.hours;
+            if (prop == "minutes") return dc.minutes;
+            if (prop == "seconds") return dc.seconds;
+            return nullptr;
+        }
+        // Mixed or zero — return whatever is asked
         if (prop == "years") return dc.years;
         if (prop == "months") return dc.months;
         if (prop == "days") return dc.days;
