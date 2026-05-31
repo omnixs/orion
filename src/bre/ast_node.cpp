@@ -973,55 +973,45 @@ namespace orion::bre
                 // Logical operators - DMN ternary logic with null propagation
                 else if (value == "and")
                 {
-                    // DMN ternary AND logic:
-                    // false and X = false (short-circuit)
-                    // null and false = false
-                    // null and true = null
-                    // true and X = X
-                    if (left.is_null())
+                    // DMN ternary AND logic: non-boolean values treated as null
+                    bool left_is_bool = left.is_boolean();
+                    bool right_is_bool = right.is_boolean();
+                    bool left_is_null = left.is_null() || !left_is_bool;
+                    bool right_is_null = right.is_null() || !right_is_bool;
+                    
+                    if (left_is_null && right_is_null) return nullptr;
+                    if (left_is_null)
                     {
-                        // null and false = false
-                        if (right.is_boolean() && !right.get<bool>())
-                            return false;
-                        // null and true = null, null and null = null
+                        if (!right.get<bool>()) return false;
                         return nullptr;
                     }
-                    if (right.is_null())
+                    if (right_is_null)
                     {
-                        // false and null = false
-                        if (left.is_boolean() && !left.get<bool>())
-                            return false;
-                        // true and null = null
+                        if (!left.get<bool>()) return false;
                         return nullptr;
                     }
-                    // Regular boolean AND for non-null values
-                    return toBoolean(left) && toBoolean(right);
+                    return left.get<bool>() && right.get<bool>();
                 }
                 else if (value == "or")
                 {
-                    // DMN ternary OR logic:
-                    // true or X = true (short-circuit)
-                    // null or true = true
-                    // null or false = null
-                    // false or X = X
-                    if (left.is_null())
+                    // DMN ternary OR logic: non-boolean values treated as null
+                    bool left_is_bool = left.is_boolean();
+                    bool right_is_bool = right.is_boolean();
+                    bool left_is_null = left.is_null() || !left_is_bool;
+                    bool right_is_null = right.is_null() || !right_is_bool;
+                    
+                    if (left_is_null && right_is_null) return nullptr;
+                    if (left_is_null)
                     {
-                        // null or true = true
-                        if (right.is_boolean() && right.get<bool>())
-                            return true;
-                        // null or false = null, null or null = null
+                        if (right.get<bool>()) return true;
                         return nullptr;
                     }
-                    if (right.is_null())
+                    if (right_is_null)
                     {
-                        // true or null = true
-                        if (left.is_boolean() && left.get<bool>())
-                            return true;
-                        // false or null = null
+                        if (left.get<bool>()) return true;
                         return nullptr;
                     }
-                    // Regular boolean OR for non-null values
-                    return toBoolean(left) || toBoolean(right);
+                    return left.get<bool>() || right.get<bool>();
                 }
                 else if (value == "in")
                 {
