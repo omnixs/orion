@@ -19,6 +19,13 @@ on:
       - 'NOTICE'
   workflow_dispatch:
 
+# Pin vcpkg to a known-good commit so dependency versions and vcpkg's own tool
+# requirements are reproducible. Without this, every run picked up whatever
+# vcpkg master happened to be, so CI could break with no change to this repo.
+# Keep this in sync with "builtin-baseline" in vcpkg.json.
+env:
+  VCPKG_COMMIT: 3c5d90a305ff00ca841f085a74a7ce74ee777dee
+
 jobs:
   build-and-test:
     name: ${{ matrix.os }} - Debug - Unit Tests
@@ -33,8 +40,14 @@ jobs:
             triplet: x64-linux
             cc: gcc-13
             cxx: g++-13
+            vcpkg_root: /home/runner/vcpkg-orion
+            vcpkg_downloads: /home/runner/vcpkg-downloads
+            vcpkg_archives: /home/runner/.cache/vcpkg
           - os: windows-latest
             triplet: x64-windows-static
+            vcpkg_root: C:\vcpkg-orion
+            vcpkg_downloads: C:\vcpkg-downloads
+            vcpkg_archives: C:\Users\runneradmin\AppData\Local\vcpkg\archives
     
     steps:
     - name: Checkout repository
@@ -42,61 +55,163 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Cache vcpkg
+    # Caches both the built-package archives and the raw downloads (vcpkg tools
+    # such as PowerShell/CMake/7zip plus dependency source tarballs). Caching the
+    # downloads directory is what stops every run from re-fetching those assets
+    # from GitHub, which is where the HTTP 504 failures originated.
+    - name: Cache vcpkg archives and downloads
       uses: actions/cache@v4
       with:
         path: |
-          C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          ~/.cache/vcpkg
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+          ${{ matrix.vcpkg_archives }}
+          ${{ matrix.vcpkg_downloads }}
+        key: ${{ runner.os }}-vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
         restore-keys: |
-          ${{ runner.os }}-vcpkg-
+          ${{ runner.os }}-vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_COMMIT }}-
+          ${{ runner.os }}-vcpkg-${{ matrix.triplet }}-
     
     - name: Install vcpkg (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        VCPKG_DOWNLOADS: ${{ matrix.vcpkg_downloads }}
       run: |
-        New-Item -ItemType Directory -Force -Path "C:\Users\runneradmin\AppData\Local\vcpkg\archives"
-        git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
-        C:\vcpkg\bootstrap-vcpkg.bat
-        echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
-        echo "VCPKG_DEFAULT_BINARY_CACHE=C:\Users\runneradmin\AppData\Local\vcpkg\archives" >> $env:GITHUB_ENV
+        New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_archives }}" | Out-Null
+        New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_downloads }}" | Out-Null
+        
+        $maxAttempts = 5
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+          if (Test-Path "${{ matrix.vcpkg_root }}") {
+            Remove-Item -Recurse -Force "${{ matrix.vcpkg_root }}"
+          }
+          git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
+          if ($LASTEXITCODE -eq 0) {
+            git -C "${{ matrix.vcpkg_root }}" checkout --detach $env:VCPKG_COMMIT
+            if ($LASTEXITCODE -eq 0) {
+              & "${{ matrix.vcpkg_root }}\bootstrap-vcpkg.bat"
+              if ($LASTEXITCODE -eq 0) { break }
+            }
+          }
+          if ($attempt -eq $maxAttempts) {
+            throw "vcpkg bootstrap failed after $maxAttempts attempts"
+          }
+          $delay = 5 * [math]::Pow(2, $attempt)
+          Write-Host "vcpkg bootstrap attempt $attempt failed; retrying in $delay seconds"
+          Start-Sleep -Seconds $delay
+        }
+        
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=${{ matrix.vcpkg_root }}"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}"
     
     - name: Install vcpkg (Linux)
       if: runner.os == 'Linux'
+      shell: bash
+      env:
+        VCPKG_DOWNLOADS: ${{ matrix.vcpkg_downloads }}
       run: |
-        mkdir -p $HOME/.cache/vcpkg
-        git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
-        $HOME/vcpkg/bootstrap-vcpkg.sh
-        echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
-        echo "VCPKG_DEFAULT_BINARY_CACHE=$HOME/.cache/vcpkg" >> $GITHUB_ENV
+        mkdir -p "${{ matrix.vcpkg_archives }}" "${{ matrix.vcpkg_downloads }}"
+        
+        max_attempts=5
+        for attempt in $(seq 1 $max_attempts); do
+          rm -rf "${{ matrix.vcpkg_root }}"
+          if git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}" \
+            && git -C "${{ matrix.vcpkg_root }}" checkout --detach "$VCPKG_COMMIT" \
+            && "${{ matrix.vcpkg_root }}/bootstrap-vcpkg.sh"; then
+            break
+          fi
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "vcpkg bootstrap failed after $max_attempts attempts" >&2
+            exit 1
+          fi
+          delay=$((5 * 2 ** attempt))
+          echo "vcpkg bootstrap attempt $attempt failed; retrying in ${delay}s"
+          sleep "$delay"
+        done
+        
+        echo "VCPKG_ROOT=${{ matrix.vcpkg_root }}" >> $GITHUB_ENV
+        echo "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}" >> $GITHUB_ENV
+        echo "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}" >> $GITHUB_ENV
     
-    - name: Install GCC 13 (Linux)
+    # gcc-13 and ninja ship with the ubuntu-24.04 image, so only reach for apt
+    # (and the network) when something is genuinely missing.
+    - name: Ensure build toolchain (Linux)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-13 g++-13 ninja-build
+        missing=""
+        command -v gcc-13 >/dev/null || missing="$missing gcc-13"
+        command -v g++-13 >/dev/null || missing="$missing g++-13"
+        command -v ninja >/dev/null || missing="$missing ninja-build"
+        if [ -n "$missing" ]; then
+          echo "Installing missing toolchain packages:$missing"
+          sudo apt-get update
+          sudo apt-get install -y $missing
+        else
+          echo "gcc-13, g++-13 and ninja are already present on the runner image"
+        fi
+        gcc-13 --version
+        ninja --version
     
+    # vcpkg fetches its tools and dependency sources during configure, so this
+    # step is network-bound and must tolerate transient HTTP failures.
     - name: Configure CMake (Linux)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
-        CC=gcc-13 CXX=g++-13 cmake -S . -B build \
-          -G Ninja \
-          -DCMAKE_BUILD_TYPE=Debug \
-          -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake \
-          -DVCPKG_TARGET_TRIPLET=x64-linux \
-          -DORION_BUILD_TESTS=ON
+        max_attempts=3
+        for attempt in $(seq 1 $max_attempts); do
+          if CC=gcc-13 CXX=g++-13 cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=x64-linux \
+            -DORION_BUILD_TESTS=ON; then
+            exit 0
+          fi
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "CMake configure failed after $max_attempts attempts" >&2
+            exit 1
+          fi
+          delay=$((15 * attempt))
+          echo "CMake configure attempt $attempt failed; retrying in ${delay}s"
+          rm -rf build
+          sleep "$delay"
+        done
     
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALLPATH=%%i"
+        if not defined VSINSTALLPATH (
+          echo Could not locate a Visual Studio C++ toolset via vswhere.
+          exit /b 1
+        )
+        call "%VSINSTALLPATH%\VC\Auxiliary\Build\vcvars64.bat"
+        where ninja
+        if %ERRORLEVEL% NEQ 0 (
+          echo Ninja was not found on PATH.
+          exit /b 1
+        )
+        set ATTEMPT=0
+        :configure_retry
+        set /a ATTEMPT+=1
         cmake -S . -B build ^
           -G Ninja ^
           -DCMAKE_BUILD_TYPE=Debug ^
-          -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}\scripts\buildsystems\vcpkg.cmake ^
           -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
           -DORION_BUILD_TESTS=ON
+        if %ERRORLEVEL% EQU 0 exit /b 0
+        if %ATTEMPT% GEQ 3 (
+          echo CMake configure failed after %ATTEMPT% attempts
+          exit /b 1
+        )
+        echo CMake configure attempt %ATTEMPT% failed; retrying...
+        rmdir /s /q build
+        powershell -NoProfile -Command "Start-Sleep -Seconds (15 * %ATTEMPT%)"
+        goto configure_retry
     
     - name: Build (Linux)
       if: runner.os == 'Linux'
@@ -106,7 +221,8 @@ jobs:
       if: runner.os == 'Windows'
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALLPATH=%%i"
+        call "%VSINSTALLPATH%\VC\Auxiliary\Build\vcvars64.bat"
         cmake --build build --parallel
     
     - name: Run Unit Tests (Linux)
