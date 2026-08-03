@@ -88,10 +88,10 @@ void register_string_functions(FunctionRegistry& reg) {
 void register_list_functions(FunctionRegistry& reg) {
     reg.register_function({"list contains", {{"list"}, {"element"}}});
     reg.register_function({"count", {{"list"}}});
-    reg.register_function({"min", {{"list"}}});
-    reg.register_function({"max", {{"list"}}});
-    reg.register_function({"sum", {{"list"}}});
-    reg.register_function({"mean", {{"list"}}});
+    reg.register_function({"min", {{"list"}}, true});
+    reg.register_function({"max", {{"list"}}, true});
+    reg.register_function({"sum", {{"list"}}, true});
+    reg.register_function({"mean", {{"list"}}, true});
     reg.register_function({"all", {{"list"}}, true});
     reg.register_function({"any", {{"list"}}, true});
     
@@ -112,10 +112,10 @@ void register_list_functions(FunctionRegistry& reg) {
     reg.register_function({"union", {{"list"}}, true});
     reg.register_function({"distinct values", {{"list"}}});
     reg.register_function({"flatten", {{"list"}}});
-    reg.register_function({"product", {{"list"}}});
-    reg.register_function({"median", {{"list"}}});
-    reg.register_function({"stddev", {{"list"}}});
-    reg.register_function({"mode", {{"list"}}});
+    reg.register_function({"product", {{"list"}}, true});
+    reg.register_function({"median", {{"list"}}, true});
+    reg.register_function({"stddev", {{"list"}}, true});
+    reg.register_function({"mode", {{"list"}}, true});
     reg.register_function({"list replace", {{"list"}, {"position"}, {"newItem"}}});
 }
 

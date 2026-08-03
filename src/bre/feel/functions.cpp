@@ -3135,11 +3135,10 @@ json evaluate_list_replace_function(const std::vector<json>& args)
 {
     if (args.size() != 3) return nullptr;
     const auto& list_arg = args[0];
-    const auto& position = args[1];
+    const auto& position_or_match = args[1];
     const auto& new_item = args[2];
 
     if (list_arg.is_null()) return nullptr;
-    if (position.is_null() || !position.is_number()) return nullptr;
 
     json list = list_arg;
     if (!list.is_array())
@@ -3148,7 +3147,26 @@ json evaluate_list_replace_function(const std::vector<json>& args)
         list = json::array({list_arg});
     }
 
-    int pos = static_cast<int>(position.get<double>());
+    // FEEL overload: list replace(list, match(item, newItem), newItem)
+    // Current parser/evaluator does not represent first-class functions yet.
+    // For constant predicates (true/false), apply the match semantics directly.
+    if (position_or_match.is_boolean())
+    {
+        if (!position_or_match.get<bool>())
+        {
+            return list; // Predicate never matches
+        }
+        json result = list;
+        for (auto& item : result)
+        {
+            item = new_item; // Predicate always matches
+        }
+        return result;
+    }
+
+    if (position_or_match.is_null() || !position_or_match.is_number()) return nullptr;
+
+    int pos = static_cast<int>(position_or_match.get<double>());
     int size = static_cast<int>(list.size());
 
     int idx;
