@@ -500,6 +500,14 @@ std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
 std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
 {
     const Token& token = advance();
+
+    auto is_word_token = [this]() {
+        return check(TokenType::IDENTIFIER) || check(TokenType::KEYWORD);
+    };
+
+    auto matches_word = [this, &is_word_token](std::string_view word) {
+        return is_word_token() && peek().text == word;
+    };
     
     // Check for multi-word function names: "date and time", "years and months duration", "days and time duration"
     if (token.text == "date" || token.text == "years" || token.text == "days")
@@ -555,6 +563,68 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
             }
             position_ = saved; // backtrack
         }
+    }
+
+    // Check for common 2-word function names used by FEEL built-ins
+    // Examples: "list contains", "insert before", "index of", "distinct values",
+    // "substring before", "substring after", "starts with", "ends with",
+    // "get value", "get entries", "context put", "context merge",
+    // "upper case", "lower case", "round up", "round down"
+    {
+        size_t saved = position_;
+        std::string multi_name;
+
+        if (token.text == "list" && matches_word("contains")) multi_name = "list contains";
+        else if (token.text == "list" && matches_word("replace")) multi_name = "list replace";
+        else if (token.text == "insert" && matches_word("before")) multi_name = "insert before";
+        else if (token.text == "index" && matches_word("of")) multi_name = "index of";
+        else if (token.text == "distinct" && matches_word("values")) multi_name = "distinct values";
+        else if (token.text == "substring" && matches_word("before")) multi_name = "substring before";
+        else if (token.text == "substring" && matches_word("after")) multi_name = "substring after";
+        else if (token.text == "starts" && matches_word("with")) multi_name = "starts with";
+        else if (token.text == "ends" && matches_word("with")) multi_name = "ends with";
+        else if (token.text == "get" && matches_word("value")) multi_name = "get value";
+        else if (token.text == "get" && matches_word("entries")) multi_name = "get entries";
+        else if (token.text == "context" && matches_word("put")) multi_name = "context put";
+        else if (token.text == "context" && matches_word("merge")) multi_name = "context merge";
+        else if (token.text == "upper" && matches_word("case")) multi_name = "upper case";
+        else if (token.text == "lower" && matches_word("case")) multi_name = "lower case";
+        else if (token.text == "round" && matches_word("up")) multi_name = "round up";
+        else if (token.text == "round" && matches_word("down")) multi_name = "round down";
+
+        if (!multi_name.empty())
+        {
+            advance(); // consume second word
+            if (check(TokenType::LPAREN))
+            {
+                auto node = parse_function_call(multi_name);
+                return parse_postfix(std::move(node));
+            }
+            position_ = saved; // backtrack if not actually a function call
+        }
+    }
+
+    // Check for common 3-word function names used by FEEL built-ins
+    // Examples: "round half up", "round half down", "date and time"
+    if (token.text == "round")
+    {
+        size_t saved = position_;
+        if (matches_word("half"))
+        {
+            advance(); // consume "half"
+            if (matches_word("up") || matches_word("down"))
+            {
+                std::string third_word(peek().text);
+                advance(); // consume "up" or "down"
+                std::string multi_name = "round half " + third_word;
+                if (check(TokenType::LPAREN))
+                {
+                    auto node = parse_function_call(multi_name);
+                    return parse_postfix(std::move(node));
+                }
+            }
+        }
+        position_ = saved; // backtrack
     }
     
     // Check if this is a function call (followed by left parenthesis)

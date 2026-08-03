@@ -3134,12 +3134,19 @@ json evaluate_sort_function(const std::vector<json>& args)
 json evaluate_list_replace_function(const std::vector<json>& args)
 {
     if (args.size() != 3) return nullptr;
-    const auto& list = args[0];
+    const auto& list_arg = args[0];
     const auto& position = args[1];
     const auto& new_item = args[2];
 
-    if (list.is_null() || !list.is_array()) return nullptr;
+    if (list_arg.is_null()) return nullptr;
     if (position.is_null() || !position.is_number()) return nullptr;
+
+    json list = list_arg;
+    if (!list.is_array())
+    {
+        // FEEL singleton coercion: a scalar value is treated as a one-item list.
+        list = json::array({list_arg});
+    }
 
     int pos = static_cast<int>(position.get<double>());
     int size = static_cast<int>(list.size());
