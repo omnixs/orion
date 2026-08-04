@@ -74,28 +74,19 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_archives }}" | Out-Null
         New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_downloads }}" | Out-Null
-        
-        $maxAttempts = 5
-        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-          if (Test-Path "${{ matrix.vcpkg_root }}") {
-            Remove-Item -Recurse -Force "${{ matrix.vcpkg_root }}"
-          }
-          git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
-          if ($LASTEXITCODE -eq 0) {
-            git -C "${{ matrix.vcpkg_root }}" checkout --detach $env:VCPKG_COMMIT
-            if ($LASTEXITCODE -eq 0) {
-              & "${{ matrix.vcpkg_root }}\bootstrap-vcpkg.bat"
-              if ($LASTEXITCODE -eq 0) { break }
-            }
-          }
-          if ($attempt -eq $maxAttempts) {
-            throw "vcpkg bootstrap failed after $maxAttempts attempts"
-          }
-          $delay = 5 * [math]::Pow(2, $attempt)
-          Write-Host "vcpkg bootstrap attempt $attempt failed; retrying in $delay seconds"
-          Start-Sleep -Seconds $delay
+        if (Test-Path "${{ matrix.vcpkg_root }}") {
+          Remove-Item -Recurse -Force "${{ matrix.vcpkg_root }}"
         }
-        
+
+        git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
+        if ($LASTEXITCODE -ne 0) { throw "vcpkg clone failed" }
+
+        git -C "${{ matrix.vcpkg_root }}" checkout --detach $env:VCPKG_COMMIT
+        if ($LASTEXITCODE -ne 0) { throw "vcpkg checkout failed" }
+
+        & "${{ matrix.vcpkg_root }}\bootstrap-vcpkg.bat"
+        if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed" }
+
         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=${{ matrix.vcpkg_root }}"
         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}"
         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}"
@@ -107,24 +98,12 @@ jobs:
         VCPKG_DOWNLOADS: ${{ matrix.vcpkg_downloads }}
       run: |
         mkdir -p "${{ matrix.vcpkg_archives }}" "${{ matrix.vcpkg_downloads }}"
-        
-        max_attempts=5
-        for attempt in $(seq 1 $max_attempts); do
-          rm -rf "${{ matrix.vcpkg_root }}"
-          if git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}" \
-            && git -C "${{ matrix.vcpkg_root }}" checkout --detach "$VCPKG_COMMIT" \
-            && "${{ matrix.vcpkg_root }}/bootstrap-vcpkg.sh"; then
-            break
-          fi
-          if [ "$attempt" -eq "$max_attempts" ]; then
-            echo "vcpkg bootstrap failed after $max_attempts attempts" >&2
-            exit 1
-          fi
-          delay=$((5 * 2 ** attempt))
-          echo "vcpkg bootstrap attempt $attempt failed; retrying in ${delay}s"
-          sleep "$delay"
-        done
-        
+        rm -rf "${{ matrix.vcpkg_root }}"
+
+        git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
+        git -C "${{ matrix.vcpkg_root }}" checkout --detach "$VCPKG_COMMIT"
+        "${{ matrix.vcpkg_root }}/bootstrap-vcpkg.sh"
+
         echo "VCPKG_ROOT=${{ matrix.vcpkg_root }}" >> $GITHUB_ENV
         echo "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}" >> $GITHUB_ENV
         echo "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}" >> $GITHUB_ENV
@@ -149,32 +128,17 @@ jobs:
         gcc-13 --version
         ninja --version
     
-    # vcpkg fetches its tools and dependency sources during configure, so this
-    # step is network-bound and must tolerate transient HTTP failures.
     - name: Configure CMake (Linux)
       if: runner.os == 'Linux'
       shell: bash
       run: |
-        max_attempts=3
-        for attempt in $(seq 1 $max_attempts); do
-          if CC=gcc-13 CXX=g++-13 cmake -S . -B build \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}/scripts/buildsystems/vcpkg.cmake \
-            -DVCPKG_TARGET_TRIPLET=x64-linux \
-            -DORION_BUILD_TESTS=ON \
-            -DORION_BUILD_APPS=ON; then
-            exit 0
-          fi
-          if [ "$attempt" -eq "$max_attempts" ]; then
-            echo "CMake configure failed after $max_attempts attempts" >&2
-            exit 1
-          fi
-          delay=$((15 * attempt))
-          echo "CMake configure attempt $attempt failed; retrying in ${delay}s"
-          rm -rf build
-          sleep "$delay"
-        done
+        CC=gcc-13 CXX=g++-13 cmake -S . -B build \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=x64-linux \
+          -DORION_BUILD_TESTS=ON \
+          -DORION_BUILD_APPS=ON
     
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
@@ -191,9 +155,6 @@ jobs:
           echo Ninja was not found on PATH.
           exit /b 1
         )
-        set ATTEMPT=0
-        :configure_retry
-        set /a ATTEMPT+=1
         cmake -S . -B build ^
           -G Ninja ^
           -DCMAKE_BUILD_TYPE=Release ^
@@ -201,15 +162,6 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
           -DORION_BUILD_TESTS=ON ^
           -DORION_BUILD_APPS=ON
-        if %ERRORLEVEL% EQU 0 exit /b 0
-        if %ATTEMPT% GEQ 3 (
-          echo CMake configure failed after %ATTEMPT% attempts
-          exit /b 1
-        )
-        echo CMake configure attempt %ATTEMPT% failed; retrying...
-        rmdir /s /q build
-        powershell -NoProfile -Command "Start-Sleep -Seconds (15 * %ATTEMPT%)"
-        goto configure_retry
     
     - name: Build (Linux)
       if: runner.os == 'Linux'
