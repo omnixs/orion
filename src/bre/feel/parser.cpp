@@ -428,7 +428,9 @@ namespace orion::bre::feel {
     
     if (check(TokenType::LBRACE))
     {
-        return parse_context_literal();
+        // A context literal may be followed by property access or a filter,
+        // e.g. `{a: 1}.a` (DMN 1.5 §10.3.2.5)
+        return parse_postfix(parse_context_literal());
     }
     
     if (check(TokenType::OPERATOR) && check_text("-"))
@@ -919,7 +921,28 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
     // Parse key (must be identifier or string)
     if (check(TokenType::IDENTIFIER))
     {
-        return std::string(advance().text);
+        std::string key(advance().text);
+
+        // DMN 1.5 §10.3.1.2 (grammar rule 26): a FEEL name may contain "additional
+        // name symbols" (. / - + *) between name parts. The lexer emits those as
+        // separate operator/dot tokens, so re-assemble them here. This is safe
+        // because a context key is always terminated by ':'.
+        auto is_additional_name_symbol = [this]() {
+            if (check(TokenType::DOT)) return true;
+            if (!check(TokenType::OPERATOR)) return false;
+            const std::string_view op = peek().text;
+            return op == "+" || op == "-" || op == "*" || op == "/";
+        };
+
+        while (is_additional_name_symbol())
+        {
+            key += std::string(advance().text);
+            if (check(TokenType::IDENTIFIER) || check(TokenType::NUMBER) || check(TokenType::KEYWORD))
+            {
+                key += std::string(advance().text);
+            }
+        }
+        return key;
     }
     
     if (check(TokenType::STRING))

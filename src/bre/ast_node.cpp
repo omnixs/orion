@@ -453,15 +453,34 @@ namespace orion::bre
         
         case ASTNodeType::LITERAL_CONTEXT:
         {
+            // DMN 1.5 §10.3.1.2: context entry names SHALL be unique; a duplicate
+            // name makes the whole context literal invalid (null).
+            // DMN 1.5 clause 10.4: when evaluating an entry value, the scope includes
+            // the previous entries of the same context, so `{a: 1, b: a + 1}` works.
             json contextObject = json::object();
+
+            // Only a context with more than one entry can reference a previous entry,
+            // so avoid copying the input scope for the common single-entry case.
+            const bool needs_local_scope = children.size() > 2;
+            json local_scope = needs_local_scope ? input : json(nullptr);
+            const json& entry_scope = needs_local_scope ? local_scope : input;
+
             // Children are stored as pairs: [key_node, value_node, key_node, value_node, ...]
             for (size_t i = 0; i + 1 < children.size(); i += 2)
             {
                 // Key is stored in a LITERAL_STRING node
                 const std::string& key = children[i]->value;
+                if (contextObject.contains(key))
+                {
+                    return nullptr; // Duplicate context entry name
+                }
                 // Value is any expression
-                json val = children[i + 1]->evaluate(input, eval_ctx);
-                contextObject[key] = val;
+                json val = children[i + 1]->evaluate(entry_scope, eval_ctx);
+                if (needs_local_scope)
+                {
+                    local_scope[key] = val;
+                }
+                contextObject[key] = std::move(val);
             }
             return contextObject;
         }

@@ -312,6 +312,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_tck_abs_debug.cpp
       tst/bre/feel/test_feel_matches.cpp
       tst/bre/feel/test_phase1_trivial_functions.cpp
+      tst/bre/feel/test_phase3_context_functions.cpp
       tst/common/test_xml2json.cpp
   )
 

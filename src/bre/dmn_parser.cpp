@@ -25,6 +25,10 @@
 #include <orion/bre/type_validator.hpp>
 #include <rapidxml/rapidxml.hpp>  // Use RapidXML instead of TinyXML2
 
+#include <algorithm>
+#include <string_view>
+#include <utility>
+
 using std::string;
 using std::unique_ptr;
 using std::make_unique;
@@ -362,6 +366,158 @@ namespace orion::bre
         return node;
     }
 
+    // Helper to get an element name without its XML namespace prefix
+    [[nodiscard]] static std::string_view local_element_name(rapidxml::xml_node<>* node)
+    {
+        if (node == nullptr || node->name() == nullptr) return {};
+        const std::string_view name = node->name();
+        const auto colon = name.find(':');
+        return (colon == std::string_view::npos) ? name : name.substr(colon + 1);
+    }
+
+    // Helper to render a context entry name as a quoted FEEL string key
+    [[nodiscard]] static std::string quote_feel_key(std::string_view name)
+    {
+        std::string quoted;
+        quoted.reserve(name.size() + 2);
+        quoted.push_back('"');
+        for (const char character : name)
+        {
+            if (character == '"' || character == '\\') quoted.push_back('\\');
+            quoted.push_back(character);
+        }
+        quoted.push_back('"');
+        return quoted;
+    }
+
+    [[nodiscard]] static std::string boxed_context_to_feel(rapidxml::xml_node<>* context_node);
+
+    /**
+     * @brief Convert a boxed expression element to equivalent FEEL text
+     *
+     * Supports literalExpression and (recursively) nested boxed contexts.
+     *
+     * @param expr_node XML node of the boxed expression
+     * @return FEEL expression text, or empty string when the kind is unsupported
+     */
+    [[nodiscard]] static std::string boxed_expression_to_feel(rapidxml::xml_node<>* expr_node)
+    {
+        const std::string_view element_name = local_element_name(expr_node);
+
+        if (element_name == "literalExpression")
+        {
+            auto* text = find_node(expr_node, "dmn:text", "text");
+            if (text != nullptr && text->value() != nullptr && text->value()[0] != '\0')
+            {
+                return text->value();
+            }
+            return "null";
+        }
+
+        if (element_name == "context")
+        {
+            return boxed_context_to_feel(expr_node);
+        }
+
+        return {};
+    }
+
+    /**
+     * @brief Convert a boxed <context> element into an equivalent FEEL context literal
+     *
+     * DMN 1.5 §10.2.1.4: the meaning of a boxed context is
+     * `{ "Name 1": Value 1, ..., "Name n": Value n }` when no result box is present.
+     * When a result box (a contextEntry without a variable) is present, the meaning is
+     * `{ "Name 1": Value 1, ..., "result": Result }.result`.
+     *
+     * @param context_node XML node of the boxed context
+     * @return FEEL expression text, or empty string when the context cannot be converted
+     */
+    [[nodiscard]] static std::string boxed_context_to_feel(rapidxml::xml_node<>* context_node)
+    {
+        std::vector<std::pair<std::string, std::string>> entries;
+        std::string result_expression;
+        bool has_result = false;
+
+        for (auto* entry = context_node->first_node(); entry != nullptr; entry = entry->next_sibling())
+        {
+            if (local_element_name(entry) != "contextEntry") continue;
+
+            std::string entry_name;
+            rapidxml::xml_node<>* value_node = nullptr;
+
+            for (auto* child = entry->first_node(); child != nullptr; child = child->next_sibling())
+            {
+                const std::string_view child_name = local_element_name(child);
+                if (child_name == "variable")
+                {
+                    if (auto* name_attr = child->first_attribute("name"))
+                    {
+                        entry_name = name_attr->value();
+                    }
+                }
+                else if (child_name != "description" && child_name != "extensionElements" && value_node == nullptr)
+                {
+                    value_node = child;
+                }
+            }
+
+            if (value_node == nullptr) return {};
+
+            std::string value_expression = boxed_expression_to_feel(value_node);
+            if (value_expression.empty()) return {}; // Unsupported boxed expression kind
+
+            if (entry_name.empty())
+            {
+                has_result = true;
+                result_expression = std::move(value_expression);
+            }
+            else
+            {
+                entries.emplace_back(std::move(entry_name), std::move(value_expression));
+            }
+        }
+
+        if (entries.empty() && !has_result) return {};
+
+        // Pick a result key that cannot collide with a declared entry name
+        std::string result_key = "result";
+        if (has_result)
+        {
+            const auto collides = [&entries](const std::string& key) {
+                return std::any_of(entries.begin(), entries.end(),
+                                   [&key](const auto& entry) { return entry.first == key; });
+            };
+            while (collides(result_key)) result_key.push_back('_');
+        }
+
+        std::string feel_expression = "{";
+        bool first_entry = true;
+        for (const auto& [name, expression] : entries)
+        {
+            if (!first_entry) feel_expression += ", ";
+            first_entry = false;
+            feel_expression += quote_feel_key(name);
+            feel_expression += ": ";
+            feel_expression += expression;
+        }
+        if (has_result)
+        {
+            if (!first_entry) feel_expression += ", ";
+            feel_expression += result_key;
+            feel_expression += ": ";
+            feel_expression += result_expression;
+        }
+        feel_expression += "}";
+
+        if (has_result)
+        {
+            feel_expression += ".";
+            feel_expression += result_key;
+        }
+        return feel_expression;
+    }
+
     /**
      * @brief Extract text content from first text child element
      * 
@@ -544,6 +700,16 @@ namespace orion::bre
                 if (text != nullptr && text->value() != nullptr)
                 {
                     decision.expression = std::string(text->value());
+                }
+            }
+
+            // Parse boxed context if present (converted to an equivalent FEEL context literal)
+            if (!decision.decisionTable.has_value() && decision.expression.empty())
+            {
+                auto* context_node = find_node(decision_node, "dmn:context", "context");
+                if (context_node != nullptr)
+                {
+                    decision.expression = boxed_context_to_feel(context_node);
                 }
             }
 
