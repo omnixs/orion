@@ -25,11 +25,41 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
 
 namespace orion::bre
 {
     namespace
     {
+        std::string format_date_ymd(int y, int m, int d)
+        {
+            std::ostringstream oss;
+            if (y < 0)
+            {
+                oss << '-' << std::setw(4) << std::setfill('0') << -y;
+            }
+            else
+            {
+                oss << std::setw(4) << std::setfill('0') << y;
+            }
+            oss << '-'
+                << std::setw(2) << std::setfill('0') << m
+                << '-'
+                << std::setw(2) << std::setfill('0') << d;
+            return oss.str();
+        }
+
+        std::string format_time_hms(int h, int m, int s)
+        {
+            std::ostringstream oss;
+            oss << std::setw(2) << std::setfill('0') << h
+                << ':'
+                << std::setw(2) << std::setfill('0') << m
+                << ':'
+                << std::setw(2) << std::setfill('0') << s;
+            return oss.str();
+        }
+
         // Duration arithmetic helpers
         bool is_duration_string(const json& val)
         {
@@ -133,13 +163,7 @@ namespace orion::bre
             while (d > days_in_month(y, m)) { d -= days_in_month(y, m); m++; if (m > 12) { m = 1; y++; } }
             while (d < 1) { m--; if (m < 1) { m = 12; y--; } d += days_in_month(y, m); }
             
-            char buf[32];
-            if (y < 0) {
-                snprintf(buf, sizeof(buf), "-%04d-%02d-%02d", -y, m, d);
-            } else {
-                snprintf(buf, sizeof(buf), "%04d-%02d-%02d", y, m, d);
-            }
-            return buf;
+            return format_date_ymd(y, m, d);
         }
         
         std::string add_duration_to_datetime(const std::string& dt_str, const feel::Duration& dur, bool subtract = false)
@@ -192,13 +216,7 @@ namespace orion::bre
             while (d > days_in_month(y, mo)) { d -= days_in_month(y, mo); mo++; if (mo > 12) { mo = 1; y++; } }
             while (d < 1) { mo--; if (mo < 1) { mo = 12; y--; } d += days_in_month(y, mo); }
             
-            char buf[64];
-            if (y < 0) {
-                snprintf(buf, sizeof(buf), "-%04d-%02d-%02dT%02d:%02d:%02d", -y, mo, d, h, mi, s);
-            } else {
-                snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02d", y, mo, d, h, mi, s);
-            }
-            return std::string(buf) + tz_suffix;
+            return format_date_ymd(y, mo, d) + "T" + format_time_hms(h, mi, s) + tz_suffix;
         }
         
         std::string add_duration_to_time(const std::string& time_str, const feel::Duration& dur, bool subtract = false)
@@ -219,9 +237,7 @@ namespace orion::bre
             m = static_cast<int>((total % 3600) / 60);
             s = static_cast<int>(total % 60);
             
-            char buf[32];
-            snprintf(buf, sizeof(buf), "%02d:%02d:%02d", h, m, s);
-            return std::string(buf) + suffix;
+            return format_time_hms(h, m, s) + suffix;
         }
 
         /**
@@ -298,78 +314,6 @@ namespace orion::bre
             std::ostringstream oss;
             oss << "Undefined variable: '" << name << "'";
             throw std::runtime_error(oss.str());
-        }
-        
-        /**
-         * @brief Convert JSON value to number for arithmetic operations
-         */
-        double toNumber(const json& value, std::string_view operation)
-        {
-            if (value.is_number())
-            {
-                return value.get<double>();
-            }
-            if (value.is_null())
-            {
-                return 0.0; // null treated as 0 in arithmetic
-            }
-            if (value.is_boolean())
-            {
-                return value.get<bool>() ? 1.0 : 0.0;
-            }
-            if (value.is_string())
-            {
-                try
-                {
-                    return std::stod(value.get<std::string>());
-                }
-                catch (const std::invalid_argument&)
-                {
-                    std::ostringstream oss;
-                    oss << "Cannot convert string to number in " << operation;
-                    throw std::runtime_error(oss.str());
-                }
-                catch (const std::out_of_range&)
-                {
-                    std::ostringstream oss;
-                    oss << "Number out of range in " << operation;
-                    throw std::runtime_error(oss.str());
-                }
-            }
-            
-            std::ostringstream oss;
-            oss << "Type error in " << operation << ": expected number";
-            throw std::runtime_error(oss.str());
-        }
-        
-        /**
-         * @brief Convert JSON value to string for concatenation
-         */
-        std::string toString(const json& value)
-        {
-            if (value.is_string())
-            {
-                return value.get<std::string>();
-            }
-            if (value.is_number())
-            {
-                double d = value.get<double>();
-                // Check if it's an integer
-                if (d == std::floor(d))
-                {
-                    return std::to_string(static_cast<long long>(d));
-                }
-                return std::to_string(d);
-            }
-            if (value.is_boolean())
-            {
-                return value.get<bool>() ? "true" : "false";
-            }
-            if (value.is_null())
-            {
-                return "null";
-            }
-            return value.dump(); // Fallback: JSON representation
         }
         
         /**
