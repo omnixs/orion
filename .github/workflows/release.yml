@@ -120,18 +120,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          if (Test-Path 'C:\vcpkg-orion') {
-            Remove-Item -Recurse -Force 'C:\vcpkg-orion'
-          }
-
           git clone https://github.com/microsoft/vcpkg.git C:\vcpkg-orion
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg clone failed" }
-
           git -C C:\vcpkg-orion checkout --detach $env:VCPKG_COMMIT
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg checkout failed" }
-
           & 'C:\vcpkg-orion\bootstrap-vcpkg.bat'
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed" }
 
           Add-Content -Path $env:GITHUB_ENV -Value 'VCPKG_ROOT=C:\vcpkg-orion'
           
@@ -139,8 +130,6 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          rm -rf "$HOME/vcpkg-orion"
-
           git clone https://github.com/microsoft/vcpkg.git "$HOME/vcpkg-orion"
           git -C "$HOME/vcpkg-orion" checkout --detach "$VCPKG_COMMIT"
           "$HOME/vcpkg-orion/bootstrap-vcpkg.sh"

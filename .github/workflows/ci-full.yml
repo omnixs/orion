@@ -74,18 +74,9 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_archives }}" | Out-Null
         New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_downloads }}" | Out-Null
-        if (Test-Path "${{ matrix.vcpkg_root }}") {
-          Remove-Item -Recurse -Force "${{ matrix.vcpkg_root }}"
-        }
-
         git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
-        if ($LASTEXITCODE -ne 0) { throw "vcpkg clone failed" }
-
         git -C "${{ matrix.vcpkg_root }}" checkout --detach $env:VCPKG_COMMIT
-        if ($LASTEXITCODE -ne 0) { throw "vcpkg checkout failed" }
-
         & "${{ matrix.vcpkg_root }}\bootstrap-vcpkg.bat"
-        if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed" }
 
         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=${{ matrix.vcpkg_root }}"
         Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}"
@@ -98,7 +89,6 @@ jobs:
         VCPKG_DOWNLOADS: ${{ matrix.vcpkg_downloads }}
       run: |
         mkdir -p "${{ matrix.vcpkg_archives }}" "${{ matrix.vcpkg_downloads }}"
-        rm -rf "${{ matrix.vcpkg_root }}"
 
         git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
         git -C "${{ matrix.vcpkg_root }}" checkout --detach "$VCPKG_COMMIT"
@@ -131,10 +121,6 @@ jobs:
       shell: cmd
       run: |
         for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALLPATH=%%i"
-        if not defined VSINSTALLPATH (
-          echo Could not locate a Visual Studio C++ toolset via vswhere.
-          exit /b 1
-        )
         call "%VSINSTALLPATH%\VC\Auxiliary\Build\vcvars64.bat"
         cmake -S . -B build ^
           -G Ninja ^
