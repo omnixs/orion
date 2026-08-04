@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE(test_self_referencing_decision)
     BusinessRulesEngine engine;
     
     // Loading a self-referencing decision should throw ContractViolation (cycle detected)
-    BOOST_CHECK_THROW(engine.load_dmn_model(dmn_xml), orion::bre::ContractViolation);
+    BOOST_CHECK_THROW((void)engine.load_dmn_model(dmn_xml), orion::bre::ContractViolation);
 }
 
 /**
