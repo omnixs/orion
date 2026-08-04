@@ -112,25 +112,11 @@ jobs:
         echo "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}" >> $GITHUB_ENV
         echo "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}" >> $GITHUB_ENV
     
-    # gcc-13 and ninja ship with the ubuntu-24.04 image, so only reach for apt
-    # (and the network) when something is genuinely missing.
-    - name: Ensure build toolchain (Linux)
+    - name: Install GCC 13 (Linux)
       if: runner.os == 'Linux'
-      shell: bash
       run: |
-        missing=""
-        command -v gcc-13 >/dev/null || missing="$missing gcc-13"
-        command -v g++-13 >/dev/null || missing="$missing g++-13"
-        command -v ninja >/dev/null || missing="$missing ninja-build"
-        if [ -n "$missing" ]; then
-          echo "Installing missing toolchain packages:$missing"
-          sudo apt-get update
-          sudo apt-get install -y $missing
-        else
-          echo "gcc-13, g++-13 and ninja are already present on the runner image"
-        fi
-        gcc-13 --version
-        ninja --version
+        sudo apt-get update
+        sudo apt-get install -y gcc-13 g++-13 ninja-build
     
     - name: Configure CMake (Linux)
       if: runner.os == 'Linux'
@@ -153,11 +139,6 @@ jobs:
           exit /b 1
         )
         call "%VSINSTALLPATH%\VC\Auxiliary\Build\vcvars64.bat"
-        where ninja
-        if %ERRORLEVEL% NEQ 0 (
-          echo Ninja was not found on PATH.
-          exit /b 1
-        )
         cmake -S . -B build ^
           -G Ninja ^
           -DCMAKE_BUILD_TYPE=Debug ^
