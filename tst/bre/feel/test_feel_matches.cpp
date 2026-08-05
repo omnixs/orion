@@ -4,8 +4,10 @@
  */
 
 // Suppress deprecation warnings for tests using legacy global cache API
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 #include <boost/test/unit_test.hpp>
 #include <orion/bre/feel/evaluator.hpp>
@@ -169,4 +171,6 @@ BOOST_AUTO_TEST_CASE(test_matches_with_special_characters)
 
 BOOST_AUTO_TEST_SUITE_END()
 
+#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
