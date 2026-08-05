@@ -19,6 +19,11 @@ on:
 permissions:
   contents: write  # Required for creating releases and pushing tags
 
+# Pin vcpkg to a known-good commit so release artifacts are reproducible.
+# Keep this in sync with "builtin-baseline" in vcpkg.json.
+env:
+  VCPKG_COMMIT: 3c5d90a305ff00ca841f085a74a7ce74ee777dee
+
 jobs:
   version-bump:
     name: Version Bump and Tag
@@ -113,17 +118,23 @@ jobs:
           
       - name: Install vcpkg (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
-          C:\vcpkg\bootstrap-vcpkg.bat
-          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg-orion
+          git -C C:\vcpkg-orion checkout --detach $env:VCPKG_COMMIT
+          & 'C:\vcpkg-orion\bootstrap-vcpkg.bat'
+
+          Add-Content -Path $env:GITHUB_ENV -Value 'VCPKG_ROOT=C:\vcpkg-orion'
           
       - name: Install vcpkg (Linux)
         if: runner.os == 'Linux'
+        shell: bash
         run: |
-          git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
-          $HOME/vcpkg/bootstrap-vcpkg.sh
-          echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
+          git clone https://github.com/microsoft/vcpkg.git "$HOME/vcpkg-orion"
+          git -C "$HOME/vcpkg-orion" checkout --detach "$VCPKG_COMMIT"
+          "$HOME/vcpkg-orion/bootstrap-vcpkg.sh"
+
+          echo "VCPKG_ROOT=$HOME/vcpkg-orion" >> $GITHUB_ENV
           
       - name: Install GCC 13 (Linux)
         if: runner.os == 'Linux'
@@ -133,21 +144,23 @@ jobs:
           
       - name: Configure CMake (Linux)
         if: runner.os == 'Linux'
+        shell: bash
         run: |
           CC=gcc-13 CXX=g++-13 cmake -S . -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg-orion/scripts/buildsystems/vcpkg.cmake \
             -DVCPKG_TARGET_TRIPLET=x64-linux \
             -DORION_BUILD_TESTS=ON \
             -DORION_BUILD_APPS=ON
             
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           cmake -S . -B build `
             -G "Visual Studio 17 2022" -A x64 `
-            -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg\scripts\buildsystems\vcpkg.cmake" `
+            -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg-orion\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-static `
             -DORION_BUILD_TESTS=ON `
             -DORION_BUILD_APPS=ON
