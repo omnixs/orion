@@ -1758,9 +1758,6 @@ json get_temporal_property(const std::string& val, const std::string& prop)
     if (is_duration_string(val)) {
         auto dc = parse_duration_components(val);
         if (!dc.valid) return nullptr;
-        auto parsed = parse_duration(val);
-        if (!parsed) return nullptr;
-        bool is_ym = (parsed->total_months != 0 || parsed->total_seconds == 0);
         // Determine type from string: contains Y or M before T → YM, contains D/H/S or T → DT
         // More reliable: check if string has Y or non-time M
         bool has_ym_component = false;
