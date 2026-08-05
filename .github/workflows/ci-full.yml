@@ -15,6 +15,13 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
+# Pin vcpkg to a known-good commit so dependency versions and vcpkg's own tool
+# requirements are reproducible. Without this, every run picked up whatever
+# vcpkg master happened to be, so CI could break with no change to this repo.
+# Keep this in sync with "builtin-baseline" in vcpkg.json.
+env:
+  VCPKG_COMMIT: 3c5d90a305ff00ca841f085a74a7ce74ee777dee
+
 jobs:
   full-validation:
     name: ${{ matrix.os }} - Release - Full Tests
@@ -29,8 +36,14 @@ jobs:
             triplet: x64-linux
             cc: gcc-13
             cxx: g++-13
+            vcpkg_root: /home/runner/vcpkg-orion
+            vcpkg_downloads: /home/runner/vcpkg-downloads
+            vcpkg_archives: /home/runner/.cache/vcpkg
           - os: windows-latest
             triplet: x64-windows-static
+            vcpkg_root: C:\vcpkg-orion
+            vcpkg_downloads: C:\vcpkg-downloads
+            vcpkg_archives: C:\Users\runneradmin\AppData\Local\vcpkg\archives
     
     steps:
     - name: Checkout repository
@@ -38,33 +51,52 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Cache vcpkg
+    # Caches both the built-package archives and the raw downloads (vcpkg tools
+    # such as PowerShell/CMake/7zip plus dependency source tarballs). Caching the
+    # downloads directory is what stops every run from re-fetching those assets
+    # from GitHub, which is where the HTTP 504 failures originated.
+    - name: Cache vcpkg archives and downloads
       uses: actions/cache@v4
       with:
         path: |
-          C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          ~/.cache/vcpkg
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+          ${{ matrix.vcpkg_archives }}
+          ${{ matrix.vcpkg_downloads }}
+        key: ${{ runner.os }}-vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
         restore-keys: |
-          ${{ runner.os }}-vcpkg-
+          ${{ runner.os }}-vcpkg-${{ matrix.triplet }}-${{ env.VCPKG_COMMIT }}-
+          ${{ runner.os }}-vcpkg-${{ matrix.triplet }}-
     
     - name: Install vcpkg (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        VCPKG_DOWNLOADS: ${{ matrix.vcpkg_downloads }}
       run: |
-        New-Item -ItemType Directory -Force -Path "C:\Users\runneradmin\AppData\Local\vcpkg\archives"
-        git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
-        C:\vcpkg\bootstrap-vcpkg.bat
-        echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
-        echo "VCPKG_DEFAULT_BINARY_CACHE=C:\Users\runneradmin\AppData\Local\vcpkg\archives" >> $env:GITHUB_ENV
+        New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_archives }}" | Out-Null
+        New-Item -ItemType Directory -Force -Path "${{ matrix.vcpkg_downloads }}" | Out-Null
+        git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
+        git -C "${{ matrix.vcpkg_root }}" checkout --detach $env:VCPKG_COMMIT
+        & "${{ matrix.vcpkg_root }}\bootstrap-vcpkg.bat"
+
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=${{ matrix.vcpkg_root }}"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}"
     
     - name: Install vcpkg (Linux)
       if: runner.os == 'Linux'
+      shell: bash
+      env:
+        VCPKG_DOWNLOADS: ${{ matrix.vcpkg_downloads }}
       run: |
-        mkdir -p $HOME/.cache/vcpkg
-        git clone https://github.com/Microsoft/vcpkg.git $HOME/vcpkg
-        $HOME/vcpkg/bootstrap-vcpkg.sh
-        echo "VCPKG_ROOT=$HOME/vcpkg" >> $GITHUB_ENV
-        echo "VCPKG_DEFAULT_BINARY_CACHE=$HOME/.cache/vcpkg" >> $GITHUB_ENV
+        mkdir -p "${{ matrix.vcpkg_archives }}" "${{ matrix.vcpkg_downloads }}"
+
+        git clone https://github.com/microsoft/vcpkg.git "${{ matrix.vcpkg_root }}"
+        git -C "${{ matrix.vcpkg_root }}" checkout --detach "$VCPKG_COMMIT"
+        "${{ matrix.vcpkg_root }}/bootstrap-vcpkg.sh"
+
+        echo "VCPKG_ROOT=${{ matrix.vcpkg_root }}" >> $GITHUB_ENV
+        echo "VCPKG_DEFAULT_BINARY_CACHE=${{ matrix.vcpkg_archives }}" >> $GITHUB_ENV
+        echo "VCPKG_DOWNLOADS=${{ matrix.vcpkg_downloads }}" >> $GITHUB_ENV
     
     - name: Install GCC 13 (Linux)
       if: runner.os == 'Linux'
@@ -74,11 +106,12 @@ jobs:
     
     - name: Configure CMake (Linux)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
         CC=gcc-13 CXX=g++-13 cmake -S . -B build \
           -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE=$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake \
+          -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=x64-linux \
           -DORION_BUILD_TESTS=ON \
           -DORION_BUILD_APPS=ON
@@ -87,11 +120,12 @@ jobs:
       if: runner.os == 'Windows'
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALLPATH=%%i"
+        call "%VSINSTALLPATH%\VC\Auxiliary\Build\vcvars64.bat"
         cmake -S . -B build ^
           -G Ninja ^
           -DCMAKE_BUILD_TYPE=Release ^
-          -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+          -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}\scripts\buildsystems\vcpkg.cmake ^
           -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
           -DORION_BUILD_TESTS=ON ^
           -DORION_BUILD_APPS=ON
@@ -104,7 +138,8 @@ jobs:
       if: runner.os == 'Windows'
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALLPATH=%%i"
+        call "%VSINSTALLPATH%\VC\Auxiliary\Build\vcvars64.bat"
         cmake --build build --parallel
     
     - name: Run Unit Tests (Linux)

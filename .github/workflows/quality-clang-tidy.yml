@@ -10,6 +10,11 @@ on:
   # pull_request:
   #   branches: [ "main" ]
 
+# Pin vcpkg to a known-good commit. Must match "builtin-baseline" in vcpkg.json,
+# otherwise vcpkg cannot resolve the baseline.
+env:
+  VCPKG_COMMIT: 3c5d90a305ff00ca841f085a74a7ce74ee777dee
+
 jobs:
   clang-tidy:
     name: Static Analysis (Linux)
@@ -24,12 +29,12 @@ jobs:
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: 'c8696863d371ab7f46e213d8f5ca923c4ff84406'
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
     
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-13 g++-13 ninja-build clang-tidy
+        sudo apt-get install -y clang-tidy
     
     - name: Configure CMake
       run: |
