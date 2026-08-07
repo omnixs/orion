@@ -100,14 +100,27 @@ namespace orion::bre::feel {
             }
         }
 
+        // XPath 2.0 regex semantics (which DMN inherits) treat both CR and LF as
+        // line terminators, so '.' must not match either unless the 's' flag is
+        // given. PCRE2's default convention only excludes LF. The newline
+        // convention is part of the compile context, not the options bitmask.
+        pcre2_compile_context* compile_context = pcre2_compile_context_create(nullptr);
+        if (compile_context) {
+            pcre2_set_newline(compile_context, PCRE2_NEWLINE_ANYCRLF);
+        }
+
         pcre2_code* code = pcre2_compile(
             reinterpret_cast<PCRE2_SPTR>(pattern.data()),
             pattern.size(),
             pcre2_options,
             &error_code,
             &error_offset,
-            nullptr // use default compile context
+            compile_context
         );
+
+        if (compile_context) {
+            pcre2_compile_context_free(compile_context);
+        }
 
         if (!code) {
             // Compilation failed - invalid pattern
@@ -145,6 +158,64 @@ namespace orion::bre::feel {
         // Per XPath spec: "returns true if input or SOME SUBSTRING matches"
         // DMN 1.5 Section 10.3.4.3 delegates to XQuery/XPath semantics
         return rc >= 0;
+    }
+
+    std::optional<std::string> CompiledRegex::replace_all(std::string_view input,
+                                                          std::string_view replacement) const
+    {
+        if (!code_) {
+            return std::nullopt;
+        }
+
+        // Start with a generous buffer; grow once if PCRE2 reports it is too small.
+        std::string output;
+        PCRE2_SIZE output_length = input.size() + replacement.size() + 64;
+        output.resize(output_length);
+
+        // GLOBAL: replace every occurrence, as DMN's replace() requires.
+        // UNSET_EMPTY: a reference to a group that did not participate in the
+        // match expands to the empty string rather than failing, which is the
+        // XPath fn:replace behaviour (e.g. replace("abcd", "(ab)|(a)", "[1=$1][2=$2]")).
+        const uint32_t options = PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_UNSET_EMPTY;
+
+        int rc = pcre2_substitute(
+            code_,
+            reinterpret_cast<PCRE2_SPTR>(input.data()),
+            input.size(),
+            0,       // start offset
+            options,
+            nullptr, // match data (allocated internally)
+            nullptr, // default match context
+            reinterpret_cast<PCRE2_SPTR>(replacement.data()),
+            replacement.size(),
+            reinterpret_cast<PCRE2_UCHAR*>(output.data()),
+            &output_length
+        );
+
+        if (rc == PCRE2_ERROR_NOMEMORY) {
+            // output_length now holds the required size (including the terminator)
+            output.resize(output_length);
+            rc = pcre2_substitute(
+                code_,
+                reinterpret_cast<PCRE2_SPTR>(input.data()),
+                input.size(),
+                0,
+                options,
+                nullptr,
+                nullptr,
+                reinterpret_cast<PCRE2_SPTR>(replacement.data()),
+                replacement.size(),
+                reinterpret_cast<PCRE2_UCHAR*>(output.data()),
+                &output_length
+            );
+        }
+
+        if (rc < 0) {
+            return std::nullopt;
+        }
+
+        output.resize(output_length);
+        return output;
     }
 
     // RegexCache implementation

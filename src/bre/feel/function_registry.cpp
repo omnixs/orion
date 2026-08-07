@@ -198,14 +198,11 @@ void FunctionRegistry::register_function(const FunctionSignature& sig) {
     functions_[sig.name] = sig;
 }
 
-std::optional<FunctionSignature> FunctionRegistry::get_signature(
-    std::string_view name) const 
+const FunctionSignature* FunctionRegistry::get_signature(
+    std::string_view name) const noexcept
 {
     auto iter = functions_.find(name);
-    if (iter != functions_.end()) {
-        return iter->second;
-    }
-    return std::nullopt;
+    return iter != functions_.end() ? &iter->second : nullptr;
 }
 
 } // namespace orion::bre::feel

@@ -164,7 +164,8 @@ bool has_named_parameters(const std::vector<FunctionParameter>& parameters)
     {
     // Get function signature from registry
     auto& registry = FunctionRegistry::instance();
-    auto signature = registry.get_signature(functionName);      if (!signature.has_value())
+    const FunctionSignature* signature = registry.get_signature(functionName);
+        if (signature == nullptr)
         {
             // Function not in registry - fall back to positional binding
             // This allows calling functions that haven't been registered yet
@@ -177,7 +178,7 @@ bool has_named_parameters(const std::vector<FunctionParameter>& parameters)
             return args;
         }
         
-        const auto& sig = signature.value();
+        const auto& sig = *signature;
         
         // Detect if using named or positional parameters
         bool using_named_params = has_named_parameters(parameters);

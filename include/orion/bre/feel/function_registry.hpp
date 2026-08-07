@@ -72,10 +72,17 @@ public:
     
     /**
      * @brief Get the signature for a function by name
+     *
+     * Returns an observer pointer rather than a copy: signatures are immutable
+     * process-lifetime metadata, and this is called on every function
+     * invocation, where copying the name plus a vector of parameter names cost
+     * several heap allocations per call.
+     *
      * @param name The function name (case-sensitive)
-     * @return The function signature if found, otherwise nullopt
+     * @return Pointer to the signature if found, otherwise nullptr. The pointee
+     *         remains valid for the lifetime of the registry singleton.
      */
-    [[nodiscard]] std::optional<FunctionSignature> get_signature(std::string_view name) const;
+    [[nodiscard]] const FunctionSignature* get_signature(std::string_view name) const noexcept;
     
     // Prevent copying and moving (singleton pattern)
     FunctionRegistry(const FunctionRegistry&) = delete;
