@@ -30,6 +30,8 @@
 #include <iostream>
 #include <chrono>
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <limits>
 #include <regex>
 
@@ -2688,6 +2690,7 @@ json evaluate_median_function(const std::vector<json>& args)
     if (list.empty()) return nullptr;
 
     std::vector<double> values;
+    values.reserve(list.size());  // Reserve capacity upfront
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
@@ -2712,9 +2715,10 @@ json evaluate_stddev_function(const std::vector<json>& args)
     if (!list.is_array()) return nullptr;
     if (list.size() < 2) return nullptr;
 
-    // Calculate mean
+    // Single pass: validate, calculate sum, and build values vector
     double total = 0.0;
     std::vector<double> values;
+    values.reserve(list.size());  // Reserve capacity upfront
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
@@ -2725,7 +2729,7 @@ json evaluate_stddev_function(const std::vector<json>& args)
     }
     double mean = total / static_cast<double>(values.size());
 
-    // Calculate sample standard deviation
+    // Calculate sample standard deviation (single pass with cached mean)
     double sum_sq_diff = 0.0;
     for (double v : values)
     {
@@ -2744,28 +2748,23 @@ json evaluate_mode_function(const std::vector<json>& args)
     if (!list.is_array()) return nullptr;
     if (list.empty()) return json::array();
 
-    // Count frequencies
-    std::vector<double> values;
+    // Count frequencies without sorting input values
+    std::map<double, int> freq;
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
         if (!item.is_number()) return nullptr;
-        values.push_back(item.get<double>());
+        freq[item.get<double>()]++;
     }
 
-    std::sort(values.begin(), values.end());
-    std::map<double, int> freq;
-    for (double v : values)
-    {
-        freq[v]++;
-    }
-
+    // Find max frequency
     int max_freq = 0;
     for (const auto& [val, count] : freq)
     {
         if (count > max_freq) max_freq = count;
     }
 
+    // Return values with max frequency from sorted map
     json result = json::array();
     for (const auto& [val, count] : freq)
     {
@@ -2921,6 +2920,7 @@ json evaluate_reverse_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
+    result.get_ptr<json::array_t*>()->reserve(list.size());  // Reserve capacity
     for (auto it = list.rbegin(); it != list.rend(); ++it)
     {
         result.push_back(*it);
@@ -2995,7 +2995,10 @@ json evaluate_union_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
 
+    // Use JSON-as-key tracking via dumping to string for uniqueness
     json result = json::array();
+    std::unordered_set<std::string> seen;
+    
     for (const auto& arg : args)
     {
         if (arg.is_null()) continue;
@@ -3003,23 +3006,22 @@ json evaluate_union_function(const std::vector<json>& args)
         {
             for (const auto& item : arg)
             {
-                // Add only if not already present
-                bool found = false;
-                for (const auto& existing : result)
+                std::string key = item.dump();
+                if (seen.find(key) == seen.end())
                 {
-                    if (existing == item) { found = true; break; }
+                    seen.insert(key);
+                    result.push_back(item);
                 }
-                if (!found) result.push_back(item);
             }
         }
         else
         {
-            bool found = false;
-            for (const auto& existing : result)
+            std::string key = arg.dump();
+            if (seen.find(key) == seen.end())
             {
-                if (existing == arg) { found = true; break; }
+                seen.insert(key);
+                result.push_back(arg);
             }
-            if (!found) result.push_back(arg);
         }
     }
     return result;
@@ -3033,15 +3035,19 @@ json evaluate_distinct_values_function(const std::vector<json>& args)
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return json::array({list});
 
+    // Use JSON-as-key tracking via dumping to string for uniqueness
     json result = json::array();
+    std::unordered_set<std::string> seen;
+    
+    result.get_ptr<json::array_t*>()->reserve(list.size());
     for (const auto& item : list)
     {
-        bool found = false;
-        for (const auto& existing : result)
+        std::string key = item.dump();
+        if (seen.find(key) == seen.end())
         {
-            if (existing == item) { found = true; break; }
+            seen.insert(key);
+            result.push_back(item);
         }
-        if (!found) result.push_back(item);
     }
     return result;
 }
@@ -3070,6 +3076,7 @@ json evaluate_flatten_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
+    result.get_ptr<json::array_t*>()->reserve(list.size());  // Reserve initial capacity
     flatten_recursive(list, result);
     return result;
 }
@@ -3083,42 +3090,39 @@ json evaluate_sort_function(const std::vector<json>& args)
     if (!list.is_array()) return nullptr;
     if (list.empty()) return json::array();
 
-    // Check if all elements are numbers
-    std::vector<double> numbers;
+    // Single pass to determine type and reserve capacity
     bool all_numbers = true;
     bool all_strings = true;
-    std::vector<std::string> strings;
-
     for (const auto& item : list)
     {
-        if (item.is_number())
-        {
-            numbers.push_back(item.get<double>());
-            all_strings = false;
-        }
-        else if (item.is_string())
-        {
-            strings.push_back(item.get<std::string>());
-            all_numbers = false;
-        }
-        else
-        {
-            all_numbers = false;
-            all_strings = false;
-        }
+        if (!item.is_number()) all_numbers = false;
+        if (!item.is_string()) all_strings = false;
+        if (!all_numbers && !all_strings) break;  // Early exit if mixed
     }
 
     if (all_numbers)
     {
+        std::vector<double> numbers;
+        numbers.reserve(list.size());
+        for (const auto& item : list)
+            numbers.push_back(item.get<double>());
+        
         std::sort(numbers.begin(), numbers.end());
         json result = json::array();
+        result.get_ptr<json::array_t*>()->reserve(numbers.size());
         for (double v : numbers) result.push_back(v);
         return result;
     }
     if (all_strings)
     {
+        std::vector<std::string> strings;
+        strings.reserve(list.size());
+        for (const auto& item : list)
+            strings.push_back(item.get<std::string>());
+        
         std::sort(strings.begin(), strings.end());
         json result = json::array();
+        result.get_ptr<json::array_t*>()->reserve(strings.size());
         for (const auto& s : strings) result.push_back(s);
         return result;
     }
