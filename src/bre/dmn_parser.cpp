@@ -419,6 +419,25 @@ namespace orion::bre
             return boxed_context_to_feel(expr_node);
         }
 
+        if (element_name == "list")
+        {
+            // DMN boxed list maps to FEEL list literal: [item1, item2, ...]
+            std::string feel_list = "[";
+            bool first = true;
+
+            for (auto* item = expr_node->first_node(); item != nullptr; item = item->next_sibling())
+            {
+                const std::string item_expr = boxed_expression_to_feel(item);
+                if (item_expr.empty()) return {};
+                if (!first) feel_list += ", ";
+                first = false;
+                feel_list += item_expr;
+            }
+
+            feel_list += "]";
+            return feel_list;
+        }
+
         return {};
     }
 
@@ -710,6 +729,16 @@ namespace orion::bre
                 if (context_node != nullptr)
                 {
                     decision.expression = boxed_context_to_feel(context_node);
+                }
+            }
+
+            // Parse boxed list if present (converted to equivalent FEEL list literal)
+            if (!decision.decisionTable.has_value() && decision.expression.empty())
+            {
+                auto* list_node = find_node(decision_node, "dmn:list", "list");
+                if (list_node != nullptr)
+                {
+                    decision.expression = boxed_expression_to_feel(list_node);
                 }
             }
 

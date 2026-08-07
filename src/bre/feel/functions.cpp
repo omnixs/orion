@@ -1329,6 +1329,8 @@ struct DateComponents {
     bool valid = false;
 };
 
+static bool is_datetime_string(const std::string& s);
+
 static DateComponents parse_date_components(const std::string& s)
 {
     DateComponents dc;
@@ -1395,8 +1397,8 @@ json evaluate_date_function(const std::vector<json>& args)
         std::string s = args[0].get<std::string>();
 
         // If it's a datetime string, extract date part
-        auto tpos = s.find('T');
-        if (tpos != std::string::npos) {
+        if (is_datetime_string(s)) {
+            auto tpos = s.find('T');
             s = s.substr(0, tpos);
         }
 
@@ -1421,6 +1423,15 @@ json evaluate_date_function(const std::vector<json>& args)
             if (!std::isdigit(static_cast<unsigned char>(c))) return nullptr;
         }
 
+        // date(from string) accepts only pure date lexical forms after the
+        // optional datetime extraction above.
+        if (s.find('T') != std::string::npos ||
+            s.find('+') != std::string::npos ||
+            s.find('Z') != std::string::npos ||
+            s.find('@') != std::string::npos) {
+            return nullptr;
+        }
+
         auto dc = parse_date_components(s);
         if (!dc.valid) return nullptr;
 
@@ -1432,9 +1443,32 @@ json evaluate_date_function(const std::vector<json>& args)
         if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
         if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
 
-        int year_num = args[0].get<int>();
-        int month_num = args[1].get<int>();
-        int day_num = args[2].get<int>();
+        auto to_integral = [](const json& v, int& out) -> bool {
+            if (v.is_number_integer()) {
+                out = v.get<int>();
+                return true;
+            }
+            if (v.is_number_unsigned()) {
+                out = static_cast<int>(v.get<unsigned int>());
+                return true;
+            }
+            if (v.is_number_float()) {
+                double d = v.get<double>();
+                if (!std::isfinite(d)) return false;
+                double rounded = std::round(d);
+                if (std::fabs(d - rounded) > 1e-9) return false;
+                out = static_cast<int>(rounded);
+                return true;
+            }
+            return false;
+        };
+
+        int year_num = 0;
+        int month_num = 0;
+        int day_num = 0;
+        if (!to_integral(args[0], year_num) || !to_integral(args[1], month_num) || !to_integral(args[2], day_num)) {
+            return nullptr;
+        }
 
         if (year_num < -999999999 || year_num > 999999999) return nullptr;
         if (month_num < 1 || month_num > 12 || day_num < 1 || day_num > 31) return nullptr;
@@ -1468,6 +1502,32 @@ json evaluate_duration_function(const std::vector<json>& args)
         }
         
         std::string duration_string = duration_str.get<std::string>();
+
+        // Enforce ISO-8601 lexical shape before semantic parsing. This rejects
+        // malformed values that parse_duration() may otherwise normalize.
+        static const std::regex duration_pattern(
+            R"(^-?P(?:(?:\d+Y)?(?:\d+M)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d*)?S)?)?|T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d*)?S)?)$)");
+        if (!std::regex_match(duration_string, duration_pattern)) {
+            return nullptr;
+        }
+
+        bool has_t = duration_string.find('T') != std::string::npos;
+        bool has_date_unit = duration_string.find('Y') != std::string::npos ||
+                             duration_string.find('D') != std::string::npos ||
+                             (duration_string.find('M') != std::string::npos && !has_t);
+        bool has_time_unit = false;
+        if (has_t) {
+            auto t_pos = duration_string.find('T');
+            has_time_unit = duration_string.find('H', t_pos + 1) != std::string::npos ||
+                            duration_string.find('M', t_pos + 1) != std::string::npos ||
+                            duration_string.find('S', t_pos + 1) != std::string::npos;
+            if (!has_time_unit) {
+                return nullptr;
+            }
+        }
+        if (!has_date_unit && !has_time_unit) {
+            return nullptr;
+        }
         
         // Validate using parse_duration() from types.cpp
         // This supports full ISO 8601: P[n]Y[n]M[n]DT[n]H[n]M[n]S
@@ -1555,11 +1615,7 @@ static bool is_date_string(const std::string& s)
 // Detect if a string is a datetime: contains T or is date + T + time
 static bool is_datetime_string(const std::string& s)
 {
-    // Look for T separator between date and time parts
-    auto tpos = s.find('T');
-    if (tpos == std::string::npos) return false;
-    if (tpos < 8) return false; // Need at least YYYY-MM-DD before T
-    return true;
+    return parse_datetime(s).has_value();
 }
 
 // Detect if a string looks like a time: HH:MM:SS or HH:MM:SS.fff or with timezone
@@ -1636,7 +1692,7 @@ static TimeComponents parse_time_components(const std::string& s)
             } else if (tz_part[0] == '+' || tz_part[0] == '-') {
                 // Must not also have @timezone
                 if (tz_part.find('@') != std::string::npos) return tc;
-                // Validate offset format: ±HH:MM (exactly)
+                // Validate offset format: +-HH:MM (exactly)
                 if (tz_part.size() != 6) return tc;
                 if (!std::isdigit(static_cast<unsigned char>(tz_part[1])) ||
                     !std::isdigit(static_cast<unsigned char>(tz_part[2]))) return tc;
@@ -1709,6 +1765,47 @@ static std::string normalize_time_string(const std::string& s)
         }
     }
 
+    return oss.str();
+}
+
+static std::string offset_to_duration_string(const std::string& offset)
+{
+    if (offset.empty()) return {};
+    if (offset == "Z" || offset == "z") return "PT0H";
+    if (offset[0] != '+' && offset[0] != '-') return {};
+    if (offset.size() != 6 && offset.size() != 9) return {};
+
+    const bool negative = (offset[0] == '-');
+    if (!std::isdigit(static_cast<unsigned char>(offset[1])) ||
+        !std::isdigit(static_cast<unsigned char>(offset[2])) ||
+        offset[3] != ':' ||
+        !std::isdigit(static_cast<unsigned char>(offset[4])) ||
+        !std::isdigit(static_cast<unsigned char>(offset[5]))) {
+        return {};
+    }
+
+    int h = std::stoi(offset.substr(1, 2));
+    int m = std::stoi(offset.substr(4, 2));
+    int s = 0;
+
+    if (offset.size() == 9) {
+        if (offset[6] != ':' ||
+            !std::isdigit(static_cast<unsigned char>(offset[7])) ||
+            !std::isdigit(static_cast<unsigned char>(offset[8]))) {
+            return {};
+        }
+        s = std::stoi(offset.substr(7, 2));
+    }
+
+    std::ostringstream oss;
+    if (negative && (h > 0 || m > 0 || s > 0)) {
+        oss << '-';
+    }
+    oss << 'P' << 'T';
+    if (h > 0) oss << h << 'H';
+    if (m > 0) oss << m << 'M';
+    if (s > 0) oss << s << 'S';
+    if (h == 0 && m == 0 && s == 0) oss << "0H";
     return oss.str();
 }
 
@@ -1812,7 +1909,15 @@ json get_temporal_property(const std::string& val, const std::string& prop)
         if (prop == "minute" && tcomp.valid) return tcomp.minute;
         if (prop == "second" && tcomp.valid) return tcomp.second;
         if (prop == "time offset" || prop == "timezone") {
-            if (!tcomp.offset.empty()) return tcomp.offset;
+            if (tcomp.offset.empty()) return nullptr;
+            if (prop == "time offset") {
+                if (tcomp.offset[0] == '@') return nullptr;
+                return offset_to_duration_string(tcomp.offset);
+            }
+            if (tcomp.offset[0] == '@') return tcomp.offset.substr(1);
+            return nullptr;
+        }
+        if (prop == "year" || prop == "month" || prop == "day") {
             return nullptr;
         }
         if (prop == "date") {
@@ -1860,7 +1965,12 @@ json get_temporal_property(const std::string& val, const std::string& prop)
         if (prop == "minute") return tcomp.minute;
         if (prop == "second") return tcomp.second;
         if (prop == "time offset" || prop == "timezone") {
-            if (!tcomp.offset.empty()) return tcomp.offset;
+            if (tcomp.offset.empty()) return nullptr;
+            if (prop == "time offset") {
+                if (tcomp.offset[0] == '@') return nullptr;
+                return offset_to_duration_string(tcomp.offset);
+            }
+            if (tcomp.offset[0] == '@') return tcomp.offset.substr(1);
             return nullptr;
         }
         return nullptr;
@@ -1881,9 +1991,15 @@ json evaluate_time_function(const std::vector<json>& args)
             std::string s = args[0].get<std::string>();
             // Could be a time string or a datetime string
             // If datetime, extract time part
-            auto tpos = s.find('T');
-            if (tpos != std::string::npos) {
+            if (is_datetime_string(s)) {
+                auto tpos = s.find('T');
                 s = s.substr(tpos + 1);
+            } else {
+                // date("YYYY-MM-DD") case maps to midnight UTC
+                auto dcomp = parse_date_components(s);
+                if (dcomp.valid && is_date_string(s)) {
+                    return std::string("00:00:00Z");
+                }
             }
             // Validate it parses as a time
             auto tc = parse_time_components(s);
@@ -1898,9 +2014,34 @@ json evaluate_time_function(const std::vector<json>& args)
         if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
         if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
 
-        int h = args[0].get<int>();
-        int m = args[1].get<int>();
-        int sec = args[2].get<int>();
+        auto to_integral = [](const json& v, int& out) -> bool {
+            if (v.is_number_integer()) {
+                out = v.get<int>();
+                return true;
+            }
+            if (v.is_number_unsigned()) {
+                out = static_cast<int>(v.get<unsigned int>());
+                return true;
+            }
+            if (v.is_number_float()) {
+                double d = v.get<double>();
+                if (!std::isfinite(d)) return false;
+                double rounded = std::round(d);
+                if (std::fabs(d - rounded) > 1e-9) return false;
+                out = static_cast<int>(rounded);
+                return true;
+            }
+            return false;
+        };
+
+        int h = 0;
+        int m = 0;
+        if (!to_integral(args[0], h) || !to_integral(args[1], m)) return nullptr;
+
+        double sec_value = args[2].get<double>();
+        if (!std::isfinite(sec_value) || sec_value < 0.0 || sec_value >= 60.0) return nullptr;
+        int sec = static_cast<int>(std::floor(sec_value));
+        double sec_fraction = sec_value - static_cast<double>(sec);
 
         if (h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59) return nullptr;
 
@@ -1908,6 +2049,21 @@ json evaluate_time_function(const std::vector<json>& args)
         oss << std::setw(2) << std::setfill('0') << h << ':'
             << std::setw(2) << std::setfill('0') << m << ':'
             << std::setw(2) << std::setfill('0') << sec;
+
+        if (sec_fraction > 1e-12) {
+            std::ostringstream frac;
+            frac << std::fixed << std::setprecision(9) << sec_fraction;
+            std::string frac_str = frac.str();
+            if (!frac_str.empty() && frac_str[0] == '0') {
+                frac_str.erase(frac_str.begin());
+            }
+            while (!frac_str.empty() && frac_str.back() == '0') {
+                frac_str.pop_back();
+            }
+            if (!frac_str.empty() && frac_str != ".") {
+                oss << frac_str;
+            }
+        }
 
         if (args.size() >= 4 && !args[3].is_null()) {
             if (args[3].is_string()) {
@@ -1954,6 +2110,11 @@ json evaluate_time_function(const std::vector<json>& args)
                     }
                 } else {
                     // Assume it's already a timezone string (e.g., "@Europe/Paris" or "+02:00")
+                    if (!offset_str.empty() && (offset_str[0] == '+' || offset_str[0] == '-')) {
+                        if (offset_str == "+00:00" || offset_str == "-00:00") {
+                            offset_str = "Z";
+                        }
+                    }
                     oss << offset_str;
                 }
             } else {

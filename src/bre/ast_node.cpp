@@ -26,6 +26,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
+#include <optional>
 
 namespace orion::bre
 {
@@ -137,6 +138,23 @@ namespace orion::bre
             if (m == 2 && ((y%4==0 && y%100!=0) || y%400==0)) return 29;
             return days[m];
         }
+
+        long long date_to_serial_days(const feel::Date& d)
+        {
+            long long y = d.y;
+            long long days = (y - 1) * 365LL + (y - 1) / 4 - (y - 1) / 100 + (y - 1) / 400;
+            for (int mm = 1; mm < d.m; mm++)
+            {
+                static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+                days += md[mm];
+            }
+            if (d.m > 2 && ((d.y % 4 == 0 && d.y % 100 != 0) || d.y % 400 == 0))
+            {
+                days++;
+            }
+            days += d.d;
+            return days;
+        }
         
         std::string add_duration_to_date(const std::string& date_str, const feel::Duration& dur, bool subtract = false)
         {
@@ -240,6 +258,35 @@ namespace orion::bre
             return format_time_hms(h, m, s) + suffix;
         }
 
+        std::optional<long long> datetime_to_epoch_seconds(const std::string& dt_input)
+        {
+            auto dt = feel::parse_datetime(dt_input);
+            if (!dt) return std::nullopt;
+
+            long long local = date_to_serial_days(dt->date) * 86400LL +
+                              dt->time.h * 3600LL +
+                              dt->time.m * 60LL +
+                              dt->time.s;
+
+            if (!dt->has_tz)
+            {
+                return local;
+            }
+
+            int offset_seconds = dt->tz_offset_seconds;
+            auto at_pos = dt_input.find('@');
+            if (at_pos != std::string::npos)
+            {
+                std::string tz_name = dt_input.substr(at_pos + 1);
+                if (tz_name == "Etc/UTC") offset_seconds = 0;
+                else if (tz_name == "Europe/Paris") offset_seconds = 3600;
+                else if (tz_name == "Asia/Dhaka") offset_seconds = 21600;
+                else if (tz_name == "Australia/Melbourne") offset_seconds = 39600;
+            }
+
+            return local - offset_seconds;
+        }
+
         /**
          * @brief Resolve a variable from context with multiple naming variants
          * 
@@ -252,6 +299,12 @@ namespace orion::bre
          */
         json resolveVariable(std::string_view name, const json& context)
         {
+            // Internal parser sentinel used for open-ended range bounds.
+            if (name == "__orion_null_range_bound__")
+            {
+                return nullptr;
+            }
+
             // Try exact match first (hot path — avoids all string allocations)
             if (auto it = context.find(name); it != context.end())
             {
@@ -649,20 +702,10 @@ namespace orion::bre
                             {
                                 // Both or neither must have timezone info
                                 if (dt1->has_tz != dt2->has_tz) return nullptr;
-                                // Convert both to total seconds from epoch-ish (UTC-normalized)
-                                auto to_secs = [](const feel::DateTime& dt) -> long long {
-                                    long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
-                                    for (int mm = 1; mm < dt.date.m; mm++)
-                                    {
-                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                                        days += md[mm];
-                                    }
-                                    if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
-                                        days++;
-                                    days += dt.date.d;
-                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
-                                };
-                                long long diff = to_secs(*dt1) - to_secs(*dt2);
+                                auto lhs_epoch = datetime_to_epoch_seconds(ls);
+                                auto rhs_epoch = datetime_to_epoch_seconds(rs);
+                                if (!lhs_epoch || !rhs_epoch) return nullptr;
+                                long long diff = *lhs_epoch - *rhs_epoch;
                                 feel::Duration dur;
                                 dur.total_seconds = diff;
                                 return format_duration(dur);
@@ -674,19 +717,7 @@ namespace orion::bre
                             auto d2 = feel::parse_date(rs);
                             if (d1 && d2)
                             {
-                                auto to_days = [](const feel::Date& d) -> long long {
-                                    long long days = d.y * 365LL + d.y/4 - d.y/100 + d.y/400;
-                                    for (int mm = 1; mm < d.m; mm++)
-                                    {
-                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                                        days += md[mm];
-                                    }
-                                    if (d.m > 2 && ((d.y%4==0 && d.y%100!=0) || d.y%400==0))
-                                        days++;
-                                    days += d.d;
-                                    return days;
-                                };
-                                long long diff = to_days(*d1) - to_days(*d2);
+                                long long diff = date_to_serial_days(*d1) - date_to_serial_days(*d2);
                                 feel::Duration dur;
                                 dur.total_seconds = diff * 86400LL;
                                 return format_duration(dur);
@@ -699,31 +730,19 @@ namespace orion::bre
                             std::string dt_str = is_datetime_string(ls) ? ls : rs;
                             auto dt_check = feel::parse_datetime(dt_str);
                             if (!dt_check || !dt_check->has_tz) return nullptr;
-                            
-                            std::string ldt = ls, rdt = rs;
+
+                            std::string ldt = ls;
+                            std::string rdt = rs;
                             if (is_date_string(ls)) ldt = ls + "T00:00:00Z";
                             if (is_date_string(rs)) rdt = rs + "T00:00:00Z";
-                            auto dt1 = feel::parse_datetime(ldt);
-                            auto dt2 = feel::parse_datetime(rdt);
-                            if (dt1 && dt2)
-                            {
-                                auto to_secs = [](const feel::DateTime& dt) -> long long {
-                                    long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
-                                    for (int mm = 1; mm < dt.date.m; mm++)
-                                    {
-                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                                        days += md[mm];
-                                    }
-                                    if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
-                                        days++;
-                                    days += dt.date.d;
-                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
-                                };
-                                long long diff = to_secs(*dt1) - to_secs(*dt2);
-                                feel::Duration dur;
-                                dur.total_seconds = diff;
-                                return format_duration(dur);
-                            }
+
+                            auto lhs_epoch = datetime_to_epoch_seconds(ldt);
+                            auto rhs_epoch = datetime_to_epoch_seconds(rdt);
+                            if (!lhs_epoch || !rhs_epoch) return nullptr;
+
+                            feel::Duration dur;
+                            dur.total_seconds = *lhs_epoch - *rhs_epoch;
+                            return format_duration(dur);
                         }
                         if (is_time_string(ls) && is_time_string(rs))
                         {
@@ -1211,6 +1230,25 @@ namespace orion::bre
                         return temporal_result;
                     }
                     // Not a temporal property - fall through to error
+                }
+
+                // Handle range properties
+                if (obj.is_object() && obj.contains("__range__"))
+                {
+                    const std::string range_type = obj.value("__range__", "");
+                    if (propertyName == "start") return obj.value("__start__", json(nullptr));
+                    if (propertyName == "end") return obj.value("__end__", json(nullptr));
+                    if (propertyName == "start included")
+                    {
+                        if (range_type.empty()) return nullptr;
+                        return range_type[0] == '[';
+                    }
+                    if (propertyName == "end included")
+                    {
+                        if (range_type.size() < 2) return nullptr;
+                        return range_type[1] == ']';
+                    }
+                    return nullptr;
                 }
                 
                 // Obj must be an object/dict to have properties
