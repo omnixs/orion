@@ -1224,6 +1224,21 @@ namespace orion::bre
                 {
                     return nullptr;
                 }
+
+                // FEEL range properties on internal range representation.
+                if (obj.contains("__range__"))
+                {
+                    const std::string type = obj.value("__range__", "()");
+                    const bool start_included = !type.empty() && type[0] == '[';
+                    const bool end_included = type.size() > 1 && type[1] == ']';
+
+                    if (propertyName == "start") return obj.contains("__start__") ? obj["__start__"] : nullptr;
+                    if (propertyName == "end") return obj.contains("__end__") ? obj["__end__"] : nullptr;
+                    if (propertyName == "start included") return start_included;
+                    if (propertyName == "end included") return end_included;
+
+                    return nullptr;
+                }
                 
                 // Try exact property name first (hot path — avoids all string allocations)
                 if (auto it = obj.find(propertyName); it != obj.end())
@@ -1287,10 +1302,8 @@ namespace orion::bre
                     }
                 }
                 
-                // Property not found - throw error
-                std::ostringstream oss;
-                oss << "Property '" << propertyName << "' not found on object";
-                throw std::runtime_error(oss.str());
+                // FEEL missing-property semantics: evaluate to null.
+                return nullptr;
             }
             
         case ASTNodeType::CONDITIONAL:

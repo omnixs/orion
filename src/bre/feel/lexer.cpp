@@ -67,12 +67,58 @@ namespace orion::bre::feel {
     // Helper: Process single-character punctuation token
     void Lexer::process_punctuation(char current, std::vector<Token>& tokens)
     {
+        auto prev_type = [&tokens]() -> TokenType {
+            if (tokens.empty()) return TokenType::END_OF_INPUT;
+            return tokens.back().type;
+        };
+
+        auto next_non_space = [this](size_t pos) -> char {
+            size_t i = pos;
+            while (i < input_.size() && std::isspace(static_cast<unsigned char>(input_[i])))
+            {
+                ++i;
+            }
+            if (i >= input_.size()) return '\0';
+            return input_[i];
+        };
+
         TokenType type;
         switch (current) {
             case '(': type = TokenType::LPAREN; break;
             case ')': type = TokenType::RPAREN; break;
-            case '[': type = TokenType::LBRACKET; break;
-            case ']': type = TokenType::RBRACKET; break;
+            case '[':
+            {
+                type = TokenType::LBRACKET;
+                const TokenType pt = prev_type();
+                const bool prev_is_value =
+                    pt == TokenType::NUMBER || pt == TokenType::IDENTIFIER || pt == TokenType::STRING ||
+                    pt == TokenType::RPAREN || pt == TokenType::RBRACKET;
+                const char nn = next_non_space(position_ + 1);
+                const bool next_starts_postfix = (nn == '.' || nn == ',' || nn == ')' || nn == '}' || nn == '\0');
+                // FEEL alias for open upper-exclusive bound: [a..b[
+                if (prev_is_value && next_starts_postfix)
+                {
+                    type = TokenType::RPAREN;
+                }
+                break;
+            }
+            case ']':
+            {
+                type = TokenType::RBRACKET;
+                const TokenType pt = prev_type();
+                const bool prev_allows_open_range =
+                    pt == TokenType::END_OF_INPUT || pt == TokenType::LPAREN || pt == TokenType::LBRACE ||
+                    pt == TokenType::COMMA || pt == TokenType::COLON || pt == TokenType::OPERATOR;
+                const char nn = next_non_space(position_ + 1);
+                const bool next_starts_value =
+                    std::isalnum(static_cast<unsigned char>(nn)) || nn == '_' || nn == '"';
+                // FEEL alias for open lower-exclusive bound: ]a..b]
+                if (prev_allows_open_range && next_starts_value)
+                {
+                    type = TokenType::LPAREN;
+                }
+                break;
+            }
             case '{': type = TokenType::LBRACE; break;
             case '}': type = TokenType::RBRACE; break;
             case ',': type = TokenType::COMMA; break;
@@ -374,12 +420,36 @@ namespace orion::bre::feel {
         // First character (letter or underscore)
         advance();
 
-        // Subsequent characters (letters, digits, underscores, spaces)
+        // Subsequent characters (letters, digits, underscores, hyphens, spaces)
         // FEEL allows spaces in identifiers (e.g., "Full Name", "Monthly Salary")
-        while (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_' || peek() == ' ')
+        while (true)
         {
+            const char ch = peek();
+
+            const bool is_regular_ident_char =
+                std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == ' ';
+
+            bool is_hyphenated_segment = false;
+            if (ch == '-')
+            {
+                const size_t next_pos = position_ + 1;
+                if (next_pos < input_.length())
+                {
+                    const char next = input_[next_pos];
+                    if (std::isalnum(static_cast<unsigned char>(next)) || next == '_')
+                    {
+                        is_hyphenated_segment = true;
+                    }
+                }
+            }
+
+            if (!is_regular_ident_char && !is_hyphenated_segment)
+            {
+                break;
+            }
+
             // Check if we should stop at this space
-            if (peek() == ' ' && should_stop_at_space(input_.substr(start, position_ - start)))
+            if (ch == ' ' && should_stop_at_space(input_.substr(start, position_ - start)))
             {
                 break;
             }

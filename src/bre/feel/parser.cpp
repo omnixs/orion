@@ -928,12 +928,75 @@ std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(std::string_view
 std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
 {
     advance(); // consume '('
+
+    // FEEL shorthand range forms: (<x), (<=x), (>x), (>=x), (=x)
+    if (check(TokenType::OPERATOR))
+    {
+        const std::string op = std::string(peek().text);
+        if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "=")
+        {
+            advance(); // consume operator
+            auto bound_expr = parse_conditional();
+            expect(TokenType::RPAREN, "Expected ')' after shorthand range");
+
+            auto make_null = []() {
+                return std::make_unique<ASTNode>(ASTNodeType::LITERAL_NUMBER, "null");
+            };
+            auto clone_literal = [](const ASTNode& node) -> std::unique_ptr<ASTNode> {
+                if (node.type == ASTNodeType::LITERAL_NUMBER || node.type == ASTNodeType::LITERAL_STRING)
+                {
+                    return std::make_unique<ASTNode>(node.type, node.value);
+                }
+                return nullptr;
+            };
+
+            auto range_node = std::make_unique<ASTNode>(ASTNodeType::RANGE, "()");
+            if (op == "<")
+            {
+                range_node->value = "()";
+                range_node->children.push_back(make_null());
+                range_node->children.push_back(std::move(bound_expr));
+            }
+            else if (op == "<=")
+            {
+                range_node->value = "(]";
+                range_node->children.push_back(make_null());
+                range_node->children.push_back(std::move(bound_expr));
+            }
+            else if (op == ">")
+            {
+                range_node->value = "()";
+                range_node->children.push_back(std::move(bound_expr));
+                range_node->children.push_back(make_null());
+            }
+            else if (op == ">=")
+            {
+                range_node->value = "[)";
+                range_node->children.push_back(std::move(bound_expr));
+                range_node->children.push_back(make_null());
+            }
+            else // op == "="
+            {
+                auto rhs = clone_literal(*bound_expr);
+                if (!rhs)
+                {
+                    throw std::runtime_error("Expected literal bound for '(=...)' shorthand range");
+                }
+                range_node->value = "[]";
+                range_node->children.push_back(std::move(bound_expr));
+                range_node->children.push_back(std::move(rhs));
+            }
+
+            return parse_postfix(std::move(range_node));
+        }
+    }
+
     auto expr = parse_conditional(); // Parse inner expression (start from lowest precedence)
     
     // Check if this is a range: (expr..expr] or (expr..expr)
     if (check(TokenType::DOTDOT)) {
         advance(); // consume ..
-        auto end_expr = parse_additive();
+        auto end_expr = parse_primary();
         
         std::string range_type = "(";
         if (check(TokenType::RBRACKET)) {
@@ -942,14 +1005,17 @@ std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
         } else if (check(TokenType::RPAREN)) {
             range_type += ")";
             advance();
+        } else if (check(TokenType::LBRACKET)) {
+            range_type += ")";
+            advance();
         } else {
-            throw std::runtime_error("Expected ']' or ')' to close range");
+            throw std::runtime_error("Expected ']', ')', or '[' to close range");
         }
         
         auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
         node->children.push_back(std::move(expr));
         node->children.push_back(std::move(end_expr));
-        return node;
+        return parse_postfix(std::move(node));
     }
     
     expect(TokenType::RPAREN, "Expected ')' after expression");
@@ -1024,7 +1090,7 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
         // If we see .., this is a range not a list
         if (check(TokenType::DOTDOT)) {
             advance(); // consume ..
-            auto end_expr = parse_additive();
+            auto end_expr = parse_primary();
             
             std::string range_type = "[";
             if (check(TokenType::RBRACKET)) {
@@ -1054,6 +1120,41 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
             if (check(TokenType::RBRACKET))
             {
                 break;
+            }
+
+            if (check(TokenType::RBRACKET))
+            {
+                // Alternate FEEL range start token: ]a..b] means (a..b]
+                advance(); // consume ']'
+                auto start_expr = parse_conditional();
+                expect(TokenType::DOTDOT, "Expected '..' in range expression");
+                auto end_expr = parse_primary();
+
+                std::string range_type = "(";
+                if (check(TokenType::RBRACKET))
+                {
+                    range_type += "]";
+                    advance();
+                }
+                else if (check(TokenType::RPAREN))
+                {
+                    range_type += ")";
+                    advance();
+                }
+                else if (check(TokenType::LBRACKET))
+                {
+                    range_type += ")";
+                    advance();
+                }
+                else
+                {
+                    throw std::runtime_error("Expected ']', ')', or '[' to close range");
+                }
+
+                auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
+                node->children.push_back(std::move(start_expr));
+                node->children.push_back(std::move(end_expr));
+                return parse_postfix(std::move(node));
             }
             list_node->children.push_back(parse_conditional());
         }
@@ -1215,7 +1316,7 @@ std::unique_ptr<ASTNode> Parser::parse_for_expression()
         if (check(TokenType::DOTDOT))
         {
             advance(); // consume ..
-            auto end_expr = parse_additive();
+            auto end_expr = parse_primary();
             auto range_node = std::make_unique<ASTNode>(ASTNodeType::RANGE, ".."); // bare iteration range
             range_node->children.push_back(std::move(list_expr));
             range_node->children.push_back(std::move(end_expr));
@@ -1321,7 +1422,7 @@ std::unique_ptr<ASTNode> Parser::parse_in_tests()
         if (check(TokenType::DOTDOT)) {
             // This is a range!
             advance(); // consume ..
-            auto end_expr = parse_additive();
+            auto end_expr = parse_primary();
             
             // Determine closing bracket
             std::string range_type;
@@ -1334,8 +1435,11 @@ std::unique_ptr<ASTNode> Parser::parse_in_tests()
             } else if (check(TokenType::RPAREN)) {
                 range_type += ")";
                 advance();
+            } else if (check(TokenType::LBRACKET)) {
+                range_type += ")";
+                advance();
             } else {
-                throw std::runtime_error("Expected ']' or ')' to close range");
+                throw std::runtime_error("Expected ']', ')', or '[' to close range");
             }
             
             auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
@@ -1462,7 +1566,7 @@ std::unique_ptr<ASTNode> Parser::parse_range(TokenType open_bracket)
     }
     advance(); // consume ..
     
-    auto end_expr = parse_additive();
+    auto end_expr = parse_primary();
     
     std::string range_type;
     if (open_bracket == TokenType::LBRACKET) range_type += "[";
