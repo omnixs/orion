@@ -29,7 +29,6 @@
 #include <orion/api/engine.hpp>
 #include <orion/api/logger.hpp>
 #include <orion/api/spdlog_logger.hpp>
-#include <orion/bre/feel/types.hpp>
 #include <orion/common/xml2json.hpp>
 #include "../common/log.hpp"
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -720,45 +719,11 @@ static bool json_values_equal(const nlohmann::json& expected, const nlohmann::js
         return true;
     }
     return expected == actual;
-<<<<<<< HEAD
-}
-
-static bool equivalent_duration_strings(std::string_view expected, std::string_view actual)
-{
-    auto exp = orion::bre::feel::parse_duration(expected);
-    auto act = orion::bre::feel::parse_duration(actual);
-    if (!exp || !act) return false;
-
-    // Both parsed: compare normalized internal representation.
-    return exp->total_months == act->total_months &&
-           exp->total_seconds == act->total_seconds;
-=======
->>>>>>> main
 }
 
 // Helper: Compare expected vs actual values with numeric tolerance
 static bool compare_values(std::string_view expected, std::string_view actual)
 {
-<<<<<<< HEAD
-    // TCK may encode equivalent durations with different lexical forms.
-    // Compare as durations first so P1Y and P1Y0M are treated as equal.
-    std::string expected_unquoted(expected);
-    std::string actual_unquoted(actual);
-    if (expected_unquoted.size() >= 2 && expected_unquoted.front() == '"' && expected_unquoted.back() == '"')
-    {
-        expected_unquoted = expected_unquoted.substr(1, expected_unquoted.size() - 2);
-    }
-    if (actual_unquoted.size() >= 2 && actual_unquoted.front() == '"' && actual_unquoted.back() == '"')
-    {
-        actual_unquoted = actual_unquoted.substr(1, actual_unquoted.size() - 2);
-    }
-    if (equivalent_duration_strings(expected_unquoted, actual_unquoted))
-    {
-        return true;
-    }
-
-=======
->>>>>>> main
     // Try JSON-aware comparison first
     try
     {
@@ -801,7 +766,6 @@ static bool compare_values(std::string_view expected, std::string_view actual)
     {
         return true;
     }
-
     return actual == expected;
 }
 

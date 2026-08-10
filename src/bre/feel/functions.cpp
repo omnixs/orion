@@ -30,15 +30,10 @@
 #include <iostream>
 #include <chrono>
 #include <map>
-<<<<<<< HEAD
-#include <limits>
-#include <regex>
-=======
 #include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <limits>
->>>>>>> main
 
 namespace orion::bre::feel {
 
@@ -1108,78 +1103,6 @@ json evaluate_replace_function(const std::vector<json>& args, const EvaluationCo
         }
     }
 
-<<<<<<< HEAD
-    // Convert XPath/FEEL replacement syntax ($1, $2) to std::regex syntax ($1, $2) - same
-    // But FEEL uses $0 for whole match - std::regex uses $& or $0 depending on implementation
-    // Actually std::regex_replace uses $1, $2 etc. which matches FEEL spec
-
-    // Build regex flags
-    std::regex_constants::syntax_option_type regex_flags = std::regex_constants::ECMAScript;
-    for (char f : flags_val)
-    {
-        switch (f)
-        {
-            case 'i': regex_flags |= std::regex_constants::icase; break;
-            case 's': // dot matches newline - handled by modifying pattern
-                break;
-            case 'm': regex_flags |= std::regex_constants::multiline; break;
-            case 'x': // extended - ignore whitespace in pattern
-                break;
-            default: return nullptr; // Invalid flag
-        }
-    }
-
-    // Handle 's' flag: make '.' match newline by replacing unescaped '.' with [\s\S]
-    std::string effective_pattern = pattern_val;
-    if (flags_val.find('s') != std::string::npos)
-    {
-        // Simple approach: replace . with [\s\S] (but not \. or [.])
-        std::string new_pat;
-        for (size_t i = 0; i < effective_pattern.size(); ++i)
-        {
-            if (effective_pattern[i] == '.' && (i == 0 || effective_pattern[i-1] != '\\'))
-            {
-                new_pat += "[\\s\\S]";
-            }
-            else
-            {
-                new_pat += effective_pattern[i];
-            }
-        }
-        effective_pattern = new_pat;
-    }
-
-    // Handle 'x' flag: strip unescaped whitespace from pattern
-    if (flags_val.find('x') != std::string::npos)
-    {
-        std::string new_pat;
-        for (size_t i = 0; i < effective_pattern.size(); ++i)
-        {
-            if (effective_pattern[i] == '\\' && i + 1 < effective_pattern.size())
-            {
-                new_pat += effective_pattern[i];
-                new_pat += effective_pattern[i + 1];
-                ++i;
-            }
-            else if (!std::isspace(static_cast<unsigned char>(effective_pattern[i])))
-            {
-                new_pat += effective_pattern[i];
-            }
-        }
-        effective_pattern = new_pat;
-    }
-
-    try
-    {
-        std::regex re(effective_pattern, regex_flags);
-        std::string result = std::regex_replace(input_val, re, replacement_val);
-        return result;
-    }
-    catch (const std::regex_error&)
-    {
-        return nullptr; // Invalid regex pattern
-    }
-=======
     // Share the compiled-pattern cache, the JIT and the regex flavour with
     // matches(). std::regex would recompile on every call, use ECMAScript
     // semantics instead of the XPath flavour DMN mandates, and can exhaust the
@@ -1196,7 +1119,6 @@ json evaluate_replace_function(const std::vector<json>& args, const EvaluationCo
         return nullptr;
     }
     return *result;
->>>>>>> main
 }
 
 json evaluate_matches_function(const std::vector<json>& args, const EvaluationContext& eval_ctx)
@@ -1419,11 +1341,6 @@ struct DateComponents {
     bool valid = false;
 };
 
-<<<<<<< HEAD
-static bool is_datetime_string(const std::string& s);
-
-=======
->>>>>>> main
 static DateComponents parse_date_components(const std::string& s)
 {
     DateComponents dc;
@@ -1490,43 +1407,6 @@ json evaluate_date_function(const std::vector<json>& args)
         std::string s = args[0].get<std::string>();
 
         // If it's a datetime string, extract date part
-<<<<<<< HEAD
-        if (is_datetime_string(s)) {
-            auto tpos = s.find('T');
-            s = s.substr(0, tpos);
-        }
-
-        // Strict DMN date validation:
-        // Must be [-]YYYY-MM-DD where YYYY is exactly 4 digits (or more without leading zeros)
-        // Leading + is NOT allowed
-        // 3-digit years NOT allowed
-        // 5-digit years with leading zero NOT allowed
-        size_t pos = 0;
-        if (!s.empty() && s[0] == '-') pos = 1;
-        if (!s.empty() && s[0] == '+') return nullptr; // Leading + not allowed
-
-        auto dash1 = s.find('-', pos);
-        if (dash1 == std::string::npos || dash1 == pos) return nullptr;
-        
-        std::string year_str = s.substr(pos, dash1 - pos);
-        // Year must be at least 4 digits; if more than 4, no leading zeros
-        if (year_str.size() < 4) return nullptr;
-        if (year_str.size() > 4 && year_str[0] == '0') return nullptr;
-        // All characters must be digits
-        for (char c : year_str) {
-            if (!std::isdigit(static_cast<unsigned char>(c))) return nullptr;
-        }
-
-        // date(from string) accepts only pure date lexical forms after the
-        // optional datetime extraction above.
-        if (s.find('T') != std::string::npos ||
-            s.find('+') != std::string::npos ||
-            s.find('Z') != std::string::npos ||
-            s.find('@') != std::string::npos) {
-            return nullptr;
-        }
-
-=======
         auto tpos = s.find('T');
         if (tpos != std::string::npos) {
             s = s.substr(0, tpos);
@@ -1553,7 +1433,6 @@ json evaluate_date_function(const std::vector<json>& args)
             if (!std::isdigit(static_cast<unsigned char>(c))) return nullptr;
         }
 
->>>>>>> main
         auto dc = parse_date_components(s);
         if (!dc.valid) return nullptr;
 
@@ -1565,38 +1444,9 @@ json evaluate_date_function(const std::vector<json>& args)
         if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
         if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
 
-<<<<<<< HEAD
-        auto to_integral = [](const json& v, int& out) -> bool {
-            if (v.is_number_integer()) {
-                out = v.get<int>();
-                return true;
-            }
-            if (v.is_number_unsigned()) {
-                out = static_cast<int>(v.get<unsigned int>());
-                return true;
-            }
-            if (v.is_number_float()) {
-                double d = v.get<double>();
-                if (!std::isfinite(d)) return false;
-                double rounded = std::round(d);
-                if (std::fabs(d - rounded) > 1e-9) return false;
-                out = static_cast<int>(rounded);
-                return true;
-            }
-            return false;
-        };
-
-        int year_num = 0;
-        int month_num = 0;
-        int day_num = 0;
-        if (!to_integral(args[0], year_num) || !to_integral(args[1], month_num) || !to_integral(args[2], day_num)) {
-            return nullptr;
-        }
-=======
         int year_num = args[0].get<int>();
         int month_num = args[1].get<int>();
         int day_num = args[2].get<int>();
->>>>>>> main
 
         if (year_num < -999999999 || year_num > 999999999) return nullptr;
         if (month_num < 1 || month_num > 12 || day_num < 1 || day_num > 31) return nullptr;
@@ -1631,29 +1481,26 @@ json evaluate_duration_function(const std::vector<json>& args)
         
         std::string duration_string = duration_str.get<std::string>();
 
-        // Enforce ISO-8601 lexical shape before semantic parsing. This rejects
-        // malformed values that parse_duration() may otherwise normalize.
-        static const std::regex duration_pattern(
-            R"(^-?P(?:(?:\d+Y)?(?:\d+M)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d*)?S)?)?|T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d*)?S)?)$)");
-        if (!std::regex_match(duration_string, duration_pattern)) {
+        // Enforce core lexical constraints before semantic parsing:
+        // - bare P / -P is invalid
+        // - H and S units require a T separator (e.g., P1H is invalid)
+        if (duration_string == "P" || duration_string == "-P")
+        {
             return nullptr;
         }
 
-        bool has_t = duration_string.find('T') != std::string::npos;
-        bool has_date_unit = duration_string.find('Y') != std::string::npos ||
-                             duration_string.find('D') != std::string::npos ||
-                             (duration_string.find('M') != std::string::npos && !has_t);
-        bool has_time_unit = false;
-        if (has_t) {
-            auto t_pos = duration_string.find('T');
-            has_time_unit = duration_string.find('H', t_pos + 1) != std::string::npos ||
-                            duration_string.find('M', t_pos + 1) != std::string::npos ||
-                            duration_string.find('S', t_pos + 1) != std::string::npos;
-            if (!has_time_unit) {
-                return nullptr;
-            }
+        const size_t value_start = (duration_string[0] == '-') ? 1 : 0;
+        if (value_start >= duration_string.size() || duration_string[value_start] != 'P')
+        {
+            return nullptr;
         }
-        if (!has_date_unit && !has_time_unit) {
+
+        const size_t t_pos = duration_string.find('T', value_start + 1);
+        const size_t h_pos = duration_string.find('H', value_start + 1);
+        const size_t s_pos = duration_string.find('S', value_start + 1);
+        if ((h_pos != std::string::npos && (t_pos == std::string::npos || h_pos < t_pos)) ||
+            (s_pos != std::string::npos && (t_pos == std::string::npos || s_pos < t_pos)))
+        {
             return nullptr;
         }
         
@@ -1743,15 +1590,11 @@ static bool is_date_string(const std::string& s)
 // Detect if a string is a datetime: contains T or is date + T + time
 static bool is_datetime_string(const std::string& s)
 {
-<<<<<<< HEAD
-    return parse_datetime(s).has_value();
-=======
     // Look for T separator between date and time parts
     auto tpos = s.find('T');
     if (tpos == std::string::npos) return false;
     if (tpos < 8) return false; // Need at least YYYY-MM-DD before T
     return true;
->>>>>>> main
 }
 
 // Detect if a string looks like a time: HH:MM:SS or HH:MM:SS.fff or with timezone
@@ -1828,11 +1671,7 @@ static TimeComponents parse_time_components(const std::string& s)
             } else if (tz_part[0] == '+' || tz_part[0] == '-') {
                 // Must not also have @timezone
                 if (tz_part.find('@') != std::string::npos) return tc;
-<<<<<<< HEAD
-                // Validate offset format: +-HH:MM (exactly)
-=======
                 // Validate offset format: ±HH:MM (exactly)
->>>>>>> main
                 if (tz_part.size() != 6) return tc;
                 if (!std::isdigit(static_cast<unsigned char>(tz_part[1])) ||
                     !std::isdigit(static_cast<unsigned char>(tz_part[2]))) return tc;
@@ -1908,50 +1747,6 @@ static std::string normalize_time_string(const std::string& s)
     return oss.str();
 }
 
-<<<<<<< HEAD
-static std::string offset_to_duration_string(const std::string& offset)
-{
-    if (offset.empty()) return {};
-    if (offset == "Z" || offset == "z") return "PT0H";
-    if (offset[0] != '+' && offset[0] != '-') return {};
-    if (offset.size() != 6 && offset.size() != 9) return {};
-
-    const bool negative = (offset[0] == '-');
-    if (!std::isdigit(static_cast<unsigned char>(offset[1])) ||
-        !std::isdigit(static_cast<unsigned char>(offset[2])) ||
-        offset[3] != ':' ||
-        !std::isdigit(static_cast<unsigned char>(offset[4])) ||
-        !std::isdigit(static_cast<unsigned char>(offset[5]))) {
-        return {};
-    }
-
-    int h = std::stoi(offset.substr(1, 2));
-    int m = std::stoi(offset.substr(4, 2));
-    int s = 0;
-
-    if (offset.size() == 9) {
-        if (offset[6] != ':' ||
-            !std::isdigit(static_cast<unsigned char>(offset[7])) ||
-            !std::isdigit(static_cast<unsigned char>(offset[8]))) {
-            return {};
-        }
-        s = std::stoi(offset.substr(7, 2));
-    }
-
-    std::ostringstream oss;
-    if (negative && (h > 0 || m > 0 || s > 0)) {
-        oss << '-';
-    }
-    oss << 'P' << 'T';
-    if (h > 0) oss << h << 'H';
-    if (m > 0) oss << m << 'M';
-    if (s > 0) oss << s << 'S';
-    if (h == 0 && m == 0 && s == 0) oss << "0H";
-    return oss.str();
-}
-
-=======
->>>>>>> main
 // Parse duration components
 struct DurationComponents {
     bool negative = false;
@@ -2052,19 +1847,7 @@ json get_temporal_property(const std::string& val, const std::string& prop)
         if (prop == "minute" && tcomp.valid) return tcomp.minute;
         if (prop == "second" && tcomp.valid) return tcomp.second;
         if (prop == "time offset" || prop == "timezone") {
-<<<<<<< HEAD
-            if (tcomp.offset.empty()) return nullptr;
-            if (prop == "time offset") {
-                if (tcomp.offset[0] == '@') return nullptr;
-                return offset_to_duration_string(tcomp.offset);
-            }
-            if (tcomp.offset[0] == '@') return tcomp.offset.substr(1);
-            return nullptr;
-        }
-        if (prop == "year" || prop == "month" || prop == "day") {
-=======
             if (!tcomp.offset.empty()) return tcomp.offset;
->>>>>>> main
             return nullptr;
         }
         if (prop == "date") {
@@ -2112,16 +1895,7 @@ json get_temporal_property(const std::string& val, const std::string& prop)
         if (prop == "minute") return tcomp.minute;
         if (prop == "second") return tcomp.second;
         if (prop == "time offset" || prop == "timezone") {
-<<<<<<< HEAD
-            if (tcomp.offset.empty()) return nullptr;
-            if (prop == "time offset") {
-                if (tcomp.offset[0] == '@') return nullptr;
-                return offset_to_duration_string(tcomp.offset);
-            }
-            if (tcomp.offset[0] == '@') return tcomp.offset.substr(1);
-=======
             if (!tcomp.offset.empty()) return tcomp.offset;
->>>>>>> main
             return nullptr;
         }
         return nullptr;
@@ -2142,21 +1916,9 @@ json evaluate_time_function(const std::vector<json>& args)
             std::string s = args[0].get<std::string>();
             // Could be a time string or a datetime string
             // If datetime, extract time part
-<<<<<<< HEAD
-            if (is_datetime_string(s)) {
-                auto tpos = s.find('T');
-                s = s.substr(tpos + 1);
-            } else {
-                // date("YYYY-MM-DD") case maps to midnight UTC
-                auto dcomp = parse_date_components(s);
-                if (dcomp.valid && is_date_string(s)) {
-                    return std::string("00:00:00Z");
-                }
-=======
             auto tpos = s.find('T');
             if (tpos != std::string::npos) {
                 s = s.substr(tpos + 1);
->>>>>>> main
             }
             // Validate it parses as a time
             auto tc = parse_time_components(s);
@@ -2171,40 +1933,9 @@ json evaluate_time_function(const std::vector<json>& args)
         if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
         if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
 
-<<<<<<< HEAD
-        auto to_integral = [](const json& v, int& out) -> bool {
-            if (v.is_number_integer()) {
-                out = v.get<int>();
-                return true;
-            }
-            if (v.is_number_unsigned()) {
-                out = static_cast<int>(v.get<unsigned int>());
-                return true;
-            }
-            if (v.is_number_float()) {
-                double d = v.get<double>();
-                if (!std::isfinite(d)) return false;
-                double rounded = std::round(d);
-                if (std::fabs(d - rounded) > 1e-9) return false;
-                out = static_cast<int>(rounded);
-                return true;
-            }
-            return false;
-        };
-
-        int h = 0;
-        int m = 0;
-        if (!to_integral(args[0], h) || !to_integral(args[1], m)) return nullptr;
-
-        double sec_value = args[2].get<double>();
-        if (!std::isfinite(sec_value) || sec_value < 0.0 || sec_value >= 60.0) return nullptr;
-        int sec = static_cast<int>(std::floor(sec_value));
-        double sec_fraction = sec_value - static_cast<double>(sec);
-=======
         int h = args[0].get<int>();
         int m = args[1].get<int>();
         int sec = args[2].get<int>();
->>>>>>> main
 
         if (h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59) return nullptr;
 
@@ -2213,24 +1944,6 @@ json evaluate_time_function(const std::vector<json>& args)
             << std::setw(2) << std::setfill('0') << m << ':'
             << std::setw(2) << std::setfill('0') << sec;
 
-<<<<<<< HEAD
-        if (sec_fraction > 1e-12) {
-            std::ostringstream frac;
-            frac << std::fixed << std::setprecision(9) << sec_fraction;
-            std::string frac_str = frac.str();
-            if (!frac_str.empty() && frac_str[0] == '0') {
-                frac_str.erase(frac_str.begin());
-            }
-            while (!frac_str.empty() && frac_str.back() == '0') {
-                frac_str.pop_back();
-            }
-            if (!frac_str.empty() && frac_str != ".") {
-                oss << frac_str;
-            }
-        }
-
-=======
->>>>>>> main
         if (args.size() >= 4 && !args[3].is_null()) {
             if (args[3].is_string()) {
                 std::string offset_str = args[3].get<std::string>();
@@ -2276,14 +1989,6 @@ json evaluate_time_function(const std::vector<json>& args)
                     }
                 } else {
                     // Assume it's already a timezone string (e.g., "@Europe/Paris" or "+02:00")
-<<<<<<< HEAD
-                    if (!offset_str.empty() && (offset_str[0] == '+' || offset_str[0] == '-')) {
-                        if (offset_str == "+00:00" || offset_str == "-00:00") {
-                            offset_str = "Z";
-                        }
-                    }
-=======
->>>>>>> main
                     oss << offset_str;
                 }
             } else {
@@ -2783,13 +2488,9 @@ json evaluate_string_function(const std::vector<json>& args)
                 first = false;
                 if (elem.is_string())
                 {
-<<<<<<< HEAD
-                    result += "\"" + elem.get<std::string>() + "\"";
-=======
                     // Re-escape embedded quotes/backslashes so the rendered
                     // literal round-trips (e.g. `"foo"` -> "\"foo\"").
                     result += elem.dump(-1, ' ', false, json::error_handler_t::replace);
->>>>>>> main
                 }
                 else if (elem.is_null())
                 {
@@ -2829,11 +2530,7 @@ json evaluate_string_function(const std::vector<json>& args)
                     }
                 }
                 if (needs_quotes)
-<<<<<<< HEAD
-                    result += "\"" + key + "\": ";
-=======
                     result += json(key).dump(-1, ' ', false, json::error_handler_t::replace) + ": ";
->>>>>>> main
                 else
                     result += key + ": ";
                 
@@ -2897,11 +2594,6 @@ json evaluate_is_function(const std::vector<json>& args)
 
 // ========== PHASE 2A: AGGREGATION FUNCTIONS ==========
 
-<<<<<<< HEAD
-// Helper: Normalize variadic args to a single flat list of numbers
-// min(1,2,3) or min([1,2,3]) → [1,2,3]
-static json normalize_to_list(const std::vector<json>& args)
-=======
 // Helper: FEEL value equality over a JSON array.
 // Uses json::operator==, which compares numbers numerically (1 == 1.0) as
 // required by DMN. Do not substitute a serialization-based key: dump() would
@@ -2937,20 +2629,10 @@ static std::optional<long long> to_list_index(const json& value)
 // Postcondition: on success the result is always an array, so callers must not
 // re-test for that. Returns nullopt only for a single null argument.
 static std::optional<json> normalize_to_list(const std::vector<json>& args)
->>>>>>> main
 {
     if (args.size() == 1)
     {
         const auto& arg = args[0];
-<<<<<<< HEAD
-        if (arg.is_null()) return nullptr;
-        if (arg.is_array()) return arg;
-        // Single scalar → wrap in array
-        return json::array({arg});
-    }
-    // Multiple args → treat as list
-    json result = json::array();
-=======
         if (arg.is_null()) return std::nullopt;
         if (arg.is_array()) return std::optional<json>(arg);
         // Single scalar → wrap in array
@@ -2959,45 +2641,27 @@ static std::optional<json> normalize_to_list(const std::vector<json>& args)
     // Multiple args → treat as list
     json result = json::array();
     result.get_ref<json::array_t&>().reserve(args.size());
->>>>>>> main
     for (const auto& a : args)
     {
         result.push_back(a);
     }
-<<<<<<< HEAD
-    return result;
-=======
     return std::optional<json>(std::move(result));
->>>>>>> main
 }
 
 json evaluate_count_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return json(1); // single element
-    return json(static_cast<double>(list.size()));
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     return json(static_cast<double>(list_opt->size()));
->>>>>>> main
 }
 
 json evaluate_sum_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
->>>>>>> main
     if (list.empty()) return json(0);
 
     double total = 0.0;
@@ -3013,15 +2677,9 @@ json evaluate_sum_function(const std::vector<json>& args)
 json evaluate_min_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
->>>>>>> main
     if (list.empty()) return nullptr;
 
     double result = std::numeric_limits<double>::infinity();
@@ -3038,15 +2696,9 @@ json evaluate_min_function(const std::vector<json>& args)
 json evaluate_max_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
->>>>>>> main
     if (list.empty()) return nullptr;
 
     double result = -std::numeric_limits<double>::infinity();
@@ -3063,15 +2715,9 @@ json evaluate_max_function(const std::vector<json>& args)
 json evaluate_mean_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
->>>>>>> main
     if (list.empty()) return nullptr;
 
     double total = 0.0;
@@ -3087,15 +2733,9 @@ json evaluate_mean_function(const std::vector<json>& args)
 json evaluate_product_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
->>>>>>> main
     if (list.empty()) return nullptr;
 
     double result = 1.0;
@@ -3111,14 +2751,6 @@ json evaluate_product_function(const std::vector<json>& args)
 json evaluate_median_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-    if (list.empty()) return nullptr;
-
-    std::vector<double> values;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
@@ -3126,7 +2758,6 @@ json evaluate_median_function(const std::vector<json>& args)
 
     std::vector<double> values;
     values.reserve(list.size());  // Reserve capacity upfront
->>>>>>> main
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
@@ -3146,16 +2777,6 @@ json evaluate_median_function(const std::vector<json>& args)
 json evaluate_stddev_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-    if (list.size() < 2) return nullptr;
-
-    // Calculate mean
-    double total = 0.0;
-    std::vector<double> values;
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
@@ -3165,7 +2786,6 @@ json evaluate_stddev_function(const std::vector<json>& args)
     double total = 0.0;
     std::vector<double> values;
     values.reserve(list.size());  // Reserve capacity upfront
->>>>>>> main
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
@@ -3176,11 +2796,7 @@ json evaluate_stddev_function(const std::vector<json>& args)
     }
     double mean = total / static_cast<double>(values.size());
 
-<<<<<<< HEAD
-    // Calculate sample standard deviation
-=======
     // Calculate sample standard deviation (single pass with cached mean)
->>>>>>> main
     double sum_sq_diff = 0.0;
     for (double v : values)
     {
@@ -3194,41 +2810,6 @@ json evaluate_stddev_function(const std::vector<json>& args)
 json evaluate_mode_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
-<<<<<<< HEAD
-    auto list = normalize_to_list(args);
-    if (list.is_null()) return nullptr;
-    if (!list.is_array()) return nullptr;
-    if (list.empty()) return json::array();
-
-    // Count frequencies
-    std::vector<double> values;
-    for (const auto& item : list)
-    {
-        if (item.is_null()) return nullptr;
-        if (!item.is_number()) return nullptr;
-        values.push_back(item.get<double>());
-    }
-
-    std::sort(values.begin(), values.end());
-    std::map<double, int> freq;
-    for (double v : values)
-    {
-        freq[v]++;
-    }
-
-    int max_freq = 0;
-    for (const auto& [val, count] : freq)
-    {
-        if (count > max_freq) max_freq = count;
-    }
-
-    json result = json::array();
-    for (const auto& [val, count] : freq)
-    {
-        if (count == max_freq)
-        {
-            result.push_back(val);
-=======
     const auto list_opt = normalize_to_list(args);
     if (!list_opt) return nullptr;
     const json& list = *list_opt;
@@ -3262,7 +2843,6 @@ json evaluate_mode_function(const std::vector<json>& args)
         if (info.first == max_freq)
         {
             result.push_back(list[info.second]);
->>>>>>> main
         }
     }
     return result;
@@ -3279,15 +2859,7 @@ json evaluate_list_contains_function(const std::vector<json>& args)
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
 
-<<<<<<< HEAD
-    for (const auto& item : list)
-    {
-        if (item == element) return true;
-    }
-    return false;
-=======
     return array_contains_value(list, element);
->>>>>>> main
 }
 
 json evaluate_append_function(const std::vector<json>& args)
@@ -3321,8 +2893,6 @@ json evaluate_concatenate_function(const std::vector<json>& args)
     if (args.empty()) return nullptr;
 
     json result = json::array();
-<<<<<<< HEAD
-=======
     auto& elements = result.get_ref<json::array_t&>();
     size_t expected = 0;
     for (const auto& arg : args)
@@ -3332,7 +2902,6 @@ json evaluate_concatenate_function(const std::vector<json>& args)
     }
     elements.reserve(expected);
 
->>>>>>> main
     for (const auto& arg : args)
     {
         if (arg.is_null()) continue;
@@ -3359,15 +2928,6 @@ json evaluate_insert_before_function(const std::vector<json>& args)
     const auto& new_item = args[2];
 
     if (list.is_null() || !list.is_array()) return nullptr;
-<<<<<<< HEAD
-    if (position.is_null() || !position.is_number()) return nullptr;
-
-    int pos = static_cast<int>(position.get<double>());
-    int size = static_cast<int>(list.size());
-
-    // FEEL uses 1-based indexing, negative from end
-    int idx;
-=======
     if (position.is_null()) return nullptr;
 
     const auto pos_opt = to_list_index(position);
@@ -3377,7 +2937,6 @@ json evaluate_insert_before_function(const std::vector<json>& args)
 
     // FEEL uses 1-based indexing, negative from end
     long long idx;
->>>>>>> main
     if (pos > 0)
     {
         idx = pos - 1;
@@ -3394,11 +2953,7 @@ json evaluate_insert_before_function(const std::vector<json>& args)
     if (idx < 0 || idx > size) return nullptr;
 
     json result = list;
-<<<<<<< HEAD
-    result.insert(result.begin() + idx, new_item);
-=======
     result.insert(result.begin() + static_cast<json::difference_type>(idx), new_item);
->>>>>>> main
     return result;
 }
 
@@ -3409,14 +2964,6 @@ json evaluate_remove_function(const std::vector<json>& args)
     const auto& position = args[1];
 
     if (list.is_null() || !list.is_array()) return nullptr;
-<<<<<<< HEAD
-    if (position.is_null() || !position.is_number()) return nullptr;
-
-    int pos = static_cast<int>(position.get<double>());
-    int size = static_cast<int>(list.size());
-
-    int idx;
-=======
     if (position.is_null()) return nullptr;
 
     const auto pos_opt = to_list_index(position);
@@ -3425,7 +2972,6 @@ json evaluate_remove_function(const std::vector<json>& args)
     const long long size = static_cast<long long>(list.size());
 
     long long idx;
->>>>>>> main
     if (pos > 0)
     {
         idx = pos - 1;
@@ -3442,11 +2988,7 @@ json evaluate_remove_function(const std::vector<json>& args)
     if (idx < 0 || idx >= size) return nullptr;
 
     json result = list;
-<<<<<<< HEAD
-    result.erase(result.begin() + idx);
-=======
     result.erase(result.begin() + static_cast<json::difference_type>(idx));
->>>>>>> main
     return result;
 }
 
@@ -3459,10 +3001,7 @@ json evaluate_reverse_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
-<<<<<<< HEAD
-=======
     result.get_ref<json::array_t&>().reserve(list.size());  // Reserve capacity
->>>>>>> main
     for (auto it = list.rbegin(); it != list.rend(); ++it)
     {
         result.push_back(*it);
@@ -3496,14 +3035,6 @@ json evaluate_sublist_function(const std::vector<json>& args)
     const auto& start_pos = args[1];
 
     if (list.is_null() || !list.is_array()) return nullptr;
-<<<<<<< HEAD
-    if (start_pos.is_null() || !start_pos.is_number()) return nullptr;
-
-    int pos = static_cast<int>(start_pos.get<double>());
-    int size = static_cast<int>(list.size());
-
-    int start;
-=======
     if (start_pos.is_null()) return nullptr;
 
     const auto pos_opt = to_list_index(start_pos);
@@ -3512,7 +3043,6 @@ json evaluate_sublist_function(const std::vector<json>& args)
     const long long size = static_cast<long long>(list.size());
 
     long long start;
->>>>>>> main
     if (pos > 0)
     {
         start = pos - 1;
@@ -3528,20 +3058,6 @@ json evaluate_sublist_function(const std::vector<json>& args)
 
     if (start < 0 || start >= size) return nullptr;
 
-<<<<<<< HEAD
-    int length = size - start; // default: rest of list
-    if (args.size() == 3 && !args[2].is_null())
-    {
-        if (!args[2].is_number()) return nullptr;
-        length = static_cast<int>(args[2].get<double>());
-        if (length < 0) return nullptr;
-    }
-
-    json result = json::array();
-    for (int i = start; i < start + length && i < size; ++i)
-    {
-        result.push_back(list[i]);
-=======
     long long length = size - start; // default: rest of list
     if (args.size() == 3 && !args[2].is_null())
     {
@@ -3559,7 +3075,6 @@ json evaluate_sublist_function(const std::vector<json>& args)
     for (long long i = start; i < end; ++i)
     {
         result.push_back(list[static_cast<size_t>(i)]);
->>>>>>> main
     }
     return result;
 }
@@ -3576,31 +3091,12 @@ json evaluate_union_function(const std::vector<json>& args)
         {
             for (const auto& item : arg)
             {
-<<<<<<< HEAD
-                // Add only if not already present
-                bool found = false;
-                for (const auto& existing : result)
-                {
-                    if (existing == item) { found = true; break; }
-                }
-                if (!found) result.push_back(item);
-=======
                 if (!array_contains_value(result, item)) result.push_back(item);
->>>>>>> main
             }
         }
         else
         {
-<<<<<<< HEAD
-            bool found = false;
-            for (const auto& existing : result)
-            {
-                if (existing == arg) { found = true; break; }
-            }
-            if (!found) result.push_back(arg);
-=======
             if (!array_contains_value(result, arg)) result.push_back(arg);
->>>>>>> main
         }
     }
     return result;
@@ -3615,21 +3111,10 @@ json evaluate_distinct_values_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
-<<<<<<< HEAD
-    for (const auto& item : list)
-    {
-        bool found = false;
-        for (const auto& existing : result)
-        {
-            if (existing == item) { found = true; break; }
-        }
-        if (!found) result.push_back(item);
-=======
     result.get_ref<json::array_t&>().reserve(list.size());
     for (const auto& item : list)
     {
         if (!array_contains_value(result, item)) result.push_back(item);
->>>>>>> main
     }
     return result;
 }
@@ -3658,61 +3143,22 @@ json evaluate_flatten_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
-<<<<<<< HEAD
-=======
     result.get_ref<json::array_t&>().reserve(list.size());  // Lower bound for nested lists
->>>>>>> main
     flatten_recursive(list, result);
     return result;
 }
 
 json evaluate_sort_function(const std::vector<json>& args)
 {
-<<<<<<< HEAD
-    if (args.empty()) return nullptr;
-=======
     // The sort(list, precedes) overload needs first-class functions (Phase 7B).
     // Reject it explicitly rather than silently ignoring the comparator.
     if (args.size() != 1) return nullptr;
->>>>>>> main
     const auto& list = args[0];
 
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
     if (list.empty()) return json::array();
 
-<<<<<<< HEAD
-    // Check if all elements are numbers
-    std::vector<double> numbers;
-    bool all_numbers = true;
-    bool all_strings = true;
-    std::vector<std::string> strings;
-
-    for (const auto& item : list)
-    {
-        if (item.is_number())
-        {
-            numbers.push_back(item.get<double>());
-            all_strings = false;
-        }
-        else if (item.is_string())
-        {
-            strings.push_back(item.get<std::string>());
-            all_numbers = false;
-        }
-        else
-        {
-            all_numbers = false;
-            all_strings = false;
-        }
-    }
-
-    if (all_numbers)
-    {
-        std::sort(numbers.begin(), numbers.end());
-        json result = json::array();
-        for (double v : numbers) result.push_back(v);
-=======
     // Single pass to determine element type
     bool all_numbers = true;
     bool all_strings = true;
@@ -3732,21 +3178,10 @@ json evaluate_sort_function(const std::vector<json>& args)
         std::sort(elements.begin(), elements.end(), [](const json& a, const json& b) {
             return a.get<double>() < b.get<double>();
         });
->>>>>>> main
         return result;
     }
     if (all_strings)
     {
-<<<<<<< HEAD
-        std::sort(strings.begin(), strings.end());
-        json result = json::array();
-        for (const auto& s : strings) result.push_back(s);
-        return result;
-    }
-
-    // Mixed types or unsupported: return null
-    // Full sort with precedes function requires Phase 7B (user-defined functions)
-=======
         json result = list;
         auto& elements = result.get_ref<json::array_t&>();
         std::sort(elements.begin(), elements.end(), [](const json& a, const json& b) {
@@ -3756,7 +3191,6 @@ json evaluate_sort_function(const std::vector<json>& args)
     }
 
     // Mixed types or unsupported element types: return null
->>>>>>> main
     return nullptr;
 }
 
@@ -3769,17 +3203,8 @@ json evaluate_list_replace_function(const std::vector<json>& args)
 
     if (list_arg.is_null()) return nullptr;
 
-<<<<<<< HEAD
-    json list = list_arg;
-    if (!list.is_array())
-    {
-        // FEEL singleton coercion: a scalar value is treated as a one-item list.
-        list = json::array({list_arg});
-    }
-=======
     // Single copy: either the list itself or the singleton-coerced wrapper.
     json list = list_arg.is_array() ? list_arg : json::array({list_arg});
->>>>>>> main
 
     // FEEL overload: list replace(list, match(item, newItem), newItem)
     // Current parser/evaluator does not represent first-class functions yet.
@@ -3790,22 +3215,6 @@ json evaluate_list_replace_function(const std::vector<json>& args)
         {
             return list; // Predicate never matches
         }
-<<<<<<< HEAD
-        json result = list;
-        for (auto& item : result)
-        {
-            item = new_item; // Predicate always matches
-        }
-        return result;
-    }
-
-    if (position_or_match.is_null() || !position_or_match.is_number()) return nullptr;
-
-    int pos = static_cast<int>(position_or_match.get<double>());
-    int size = static_cast<int>(list.size());
-
-    int idx;
-=======
         for (auto& item : list)
         {
             item = new_item; // Predicate always matches
@@ -3821,7 +3230,6 @@ json evaluate_list_replace_function(const std::vector<json>& args)
     const long long size = static_cast<long long>(list.size());
 
     long long idx;
->>>>>>> main
     if (pos > 0)
     {
         idx = pos - 1;
@@ -3837,14 +3245,8 @@ json evaluate_list_replace_function(const std::vector<json>& args)
 
     if (idx < 0 || idx >= size) return nullptr;
 
-<<<<<<< HEAD
-    json result = list;
-    result[idx] = new_item;
-    return result;
-=======
     list[static_cast<size_t>(idx)] = new_item;
     return list;
->>>>>>> main
 }
 
 // ========== PHASE 3: CONTEXT FUNCTIONS ==========
@@ -3919,10 +3321,6 @@ json evaluate_context_function(const std::vector<json>& args)
         auto value_it = entry.find("value");
         if (key_it == entry.end() || value_it == entry.end()) return nullptr;
         if (!key_it->is_string()) return nullptr;
-<<<<<<< HEAD
-        if (key_it->is_null()) return nullptr;
-=======
->>>>>>> main
 
         std::string key_str = key_it->get<std::string>();
 
@@ -4029,9 +3427,6 @@ json evaluate_context_merge_function(const std::vector<json>& args)
     return result;
 }
 
-<<<<<<< HEAD
-} // namespace orion::bre
-=======
 // ========== BUILT-IN FUNCTION DISPATCH ==========
 
 namespace {
@@ -4157,5 +3552,4 @@ const BuiltinHandler* find_builtin_handler(std::string_view name)
 }
 
 } // namespace orion::bre::feel
->>>>>>> main
 

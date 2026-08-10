@@ -347,25 +347,18 @@ namespace orion::bre::feel {
                     {
                         int depth = 1;
                         advance(); // consume <
-<<<<<<< HEAD
-                        while (depth > 0 && position_ < tokens_->size())
-=======
                         // Note: advance() is a no-op at END_OF_INPUT, so the loop
                         // must terminate on is_at_end() rather than on position_.
                         while (depth > 0 && !is_at_end())
->>>>>>> main
                         {
                             if (check(TokenType::OPERATOR) && peek().text == "<") depth++;
                             else if (check(TokenType::OPERATOR) && peek().text == ">") depth--;
                             if (depth > 0) advance();
                         }
-<<<<<<< HEAD
-=======
                         if (depth > 0)
                         {
                             throw std::runtime_error("Unterminated parameterized type after 'instance of'");
                         }
->>>>>>> main
                         if (check(TokenType::OPERATOR) && peek().text == ">")
                             advance(); // consume final >
                     }
@@ -511,31 +504,17 @@ namespace orion::bre::feel {
             }
         }
         
-        // Check for filter expression: expr[condition] or expr[index]
-         while (check(TokenType::LBRACKET) &&
-             !(position_ + 1 < tokens_->size() && (*tokens_)[position_ + 1].type == TokenType::DOT))
-        {
-            advance(); // consume '['
-            auto filter = parse_logical_or();
-            expect(TokenType::RBRACKET, "Expected ']' after filter expression");
-            
-            auto node = std::make_unique<ASTNode>(ASTNodeType::FILTER_EXPR, "filter");
-            node->children.push_back(std::move(left));
-            node->children.push_back(std::move(filter));
-            left = std::move(node);
-        }
-        
-        // FEEL/TCK expects left-associative exponentiation:
-        // 3 ** 4 ** 5 == (3 ** 4) ** 5
-        while (check(TokenType::OPERATOR) && check_text("**"))
+        // Right-associative: 2**3**4 = 2**(3**4)
+        if (check(TokenType::OPERATOR) && check_text("**"))
         {
             advance(); // consume "**"
-            auto right = parse_primary();
-
+            auto right = parse_exponentiation(); // Recursive call for right-associativity
+            
+            // Create binary exponentiation node
             auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "**");
             node->children.push_back(std::move(left));
             node->children.push_back(std::move(right));
-            left = std::move(node);
+            return node;
         }
         
         return left;
@@ -573,42 +552,15 @@ namespace orion::bre::feel {
     {
         return parse_parenthesized_expression();
     }
-
-    // FEEL also allows ]a..b] as an alias for (a..b]
-    if (check(TokenType::RBRACKET))
-    {
-        advance(); // consume opening ']'
-        auto start_expr = parse_logical_or();
-        expect(TokenType::DOTDOT, "Expected '..' in range expression");
-        auto end_expr = parse_additive();
-
-        std::string range_type = "(";
-        if (check(TokenType::RBRACKET)) {
-            range_type += "]";
-            advance();
-        } else if (check(TokenType::RPAREN) || check(TokenType::LBRACKET)) {
-            range_type += ")";
-            advance();
-        } else {
-            throw std::runtime_error("Expected ']', ')' or '[' to close range");
-        }
-
-        auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
-        node->children.push_back(std::move(start_expr));
-        node->children.push_back(std::move(end_expr));
-        return parse_postfix(std::move(node));
-    }
     
     if (check(TokenType::LBRACKET))
     {
-        return parse_postfix(parse_list_literal());
+        return parse_list_literal();
     }
     
     if (check(TokenType::LBRACE))
     {
-        // A context literal may be followed by property access or a filter,
-        // e.g. `{a: 1}.a` (DMN 1.5 §10.3.2.5)
-        return parse_postfix(parse_context_literal());
+        return parse_context_literal();
     }
     
     if (check(TokenType::OPERATOR) && check_text("-"))
@@ -671,9 +623,6 @@ std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
     {
         return parse_quantified_expression(token.text);
     }
-<<<<<<< HEAD
-    
-=======
 
     // Handle 'if' so conditionals are legal in every expression position
     // (DMN 1.5 section 10.3.2.1), e.g. 1 + (if x then 2 else 3).
@@ -682,7 +631,6 @@ std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
         return parse_conditional();
     }
 
->>>>>>> main
     // Other keywords should not appear as primary expressions
     std::ostringstream oss;
     oss << "Unexpected keyword '" << token.text << "' at position " << token.position;
@@ -926,87 +874,25 @@ void Parser::parse_function_parameters(ASTNode* func_node, std::string_view func
 
 std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(std::string_view var_name)
 {
-    std::string merged_name(var_name);
-
-    bool has_uppercase = false;
-    for (char c : merged_name)
-    {
-        if (std::isupper(static_cast<unsigned char>(c)))
-        {
-            has_uppercase = true;
-            break;
-        }
-    }
-
-    // FEEL names may contain additional name symbols (+,-,*,/).
-    // We only merge contiguous tokens (no surrounding whitespace), which preserves
-    // normal arithmetic like "a - b" while allowing names such as "Date-Time".
-    size_t prev_end = peek().position;
-    if (!merged_name.empty())
-    {
-        prev_end = prev_end; // keep compiler happy for older toolchains
-    }
-    // Recompute from the already-consumed first token.
-    if (position_ > 0)
-    {
-        const Token& first_tok = (*tokens_)[position_ - 1];
-        prev_end = first_tok.position + first_tok.text.size();
-    }
-
-    auto is_additional_name_symbol = [this]() {
-        if (!check(TokenType::OPERATOR)) return false;
-        const std::string_view op = peek().text;
-        return op == "+" || op == "-" || op == "*" || op == "/";
-    };
-
-    while (has_uppercase && is_additional_name_symbol() && position_ + 1 < tokens_->size())
-    {
-        const Token& op = peek();
-        const Token& next = (*tokens_)[position_ + 1];
-        if (!(next.type == TokenType::IDENTIFIER || next.type == TokenType::KEYWORD || next.type == TokenType::NUMBER))
-        {
-            break;
-        }
-
-        const bool contiguous = (op.position == prev_end) &&
-                                (next.position == op.position + op.text.size());
-        if (!contiguous)
-        {
-            break;
-        }
-
-        merged_name += std::string(op.text);
-        merged_name += std::string(next.text);
-        prev_end = next.position + next.text.size();
-
-        advance(); // operator
-        advance(); // following identifier/keyword/number
-    }
-
-    auto node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, merged_name);
+    auto node = std::make_unique<ASTNode>(ASTNodeType::VARIABLE, std::string(var_name));
     
     // Check for property access (.property)
     while (check(TokenType::DOT))
     {
         advance(); // consume '.'
         
-        // Expect property name after dot
-        if (!check(TokenType::IDENTIFIER) && !check(TokenType::KEYWORD))
+        // Expect identifier after dot
+        if (!check(TokenType::IDENTIFIER))
         {
             std::ostringstream oss;
             oss << "Expected property name after '.' at position " << peek().position;
             throw std::runtime_error(oss.str());
         }
         
-        std::string prop_name = std::string(advance().text);
-        while (check(TokenType::IDENTIFIER) || check(TokenType::KEYWORD))
-        {
-            prop_name += " ";
-            prop_name += std::string(advance().text);
-        }
+        const Token& prop_token = advance();
         
         // Create property access node
-        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, prop_name);
+        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, std::string(prop_token.text));
         prop_access->children.push_back(std::move(node));
         node = std::move(prop_access);
     }
@@ -1017,58 +903,7 @@ std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(std::string_view
 std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
 {
     advance(); // consume '('
-<<<<<<< HEAD
-
-    // Unary interval forms: (<x), (<=x), (>x), (>=x), (=x)
-    if (check(TokenType::OPERATOR))
-    {
-        const std::string op = std::string(peek().text);
-        if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "=" || op == "==")
-        {
-            advance();
-            auto bound_expr = parse_additive();
-            expect(TokenType::RPAREN, "Expected ')' after unary interval test");
-
-            auto null_node = []() {
-                return std::make_unique<ASTNode>(ASTNodeType::VARIABLE, "__orion_null_range_bound__");
-            };
-
-            std::string range_type;
-            auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, "");
-
-            if (op == "<" || op == "<=")
-            {
-                range_type = (op == "<=") ? "(]" : "()";
-                node->children.push_back(null_node());
-                node->children.push_back(std::move(bound_expr));
-            }
-            else if (op == ">" || op == ">=")
-            {
-                range_type = (op == ">=") ? "[)" : "()";
-                node->children.push_back(std::move(bound_expr));
-                node->children.push_back(null_node());
-            }
-            else
-            {
-                range_type = "[]";
-                auto clone_simple = [](const ASTNode& src) -> std::unique_ptr<ASTNode> {
-                    auto cloned = std::make_unique<ASTNode>(src.type, src.value);
-                    return cloned;
-                };
-                auto end_expr = clone_simple(*bound_expr);
-                node->children.push_back(std::move(bound_expr));
-                node->children.push_back(std::move(end_expr));
-            }
-
-            node->value = range_type;
-            return parse_postfix(std::move(node));
-        }
-    }
-
-    auto expr = parse_logical_or(); // Parse inner expression (start from lowest precedence)
-=======
     auto expr = parse_conditional(); // Parse inner expression (start from lowest precedence)
->>>>>>> main
     
     // Check if this is a range: (expr..expr] or (expr..expr)
     if (check(TokenType::DOTDOT)) {
@@ -1089,11 +924,7 @@ std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
         auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
         node->children.push_back(std::move(expr));
         node->children.push_back(std::move(end_expr));
-<<<<<<< HEAD
-        return parse_postfix(std::move(node));
-=======
         return node;
->>>>>>> main
     }
     
     expect(TokenType::RPAREN, "Expected ')' after expression");
@@ -1103,23 +934,18 @@ std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
     {
         advance(); // consume '.'
         
-        // Expect property name after dot
-        if (!check(TokenType::IDENTIFIER) && !check(TokenType::KEYWORD))
+        // Expect identifier after dot
+        if (!check(TokenType::IDENTIFIER))
         {
             std::ostringstream oss;
             oss << "Expected property name after '.' at position " << peek().position;
             throw std::runtime_error(oss.str());
         }
         
-        std::string prop_name = std::string(advance().text);
-        while (check(TokenType::IDENTIFIER) || check(TokenType::KEYWORD))
-        {
-            prop_name += " ";
-            prop_name += std::string(advance().text);
-        }
+        const Token& prop_token = advance();
         
         // Create property access node
-        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, prop_name);
+        auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, std::string(prop_token.text));
         prop_access->children.push_back(std::move(expr));
         expr = std::move(prop_access);
     }
@@ -1139,31 +965,15 @@ std::unique_ptr<ASTNode> Parser::parse_postfix(std::unique_ptr<ASTNode> node)
             {
                 return node; // no valid property name
             }
-<<<<<<< HEAD
-
-            std::string prop_name = std::string(advance().text);
-            while (check(TokenType::IDENTIFIER) || check(TokenType::KEYWORD))
-            {
-                prop_name += " ";
-                prop_name += std::string(advance().text);
-            }
-
-            auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, prop_name);
-=======
             const Token& prop_token = advance();
             auto prop_access = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS, std::string(prop_token.text));
->>>>>>> main
             prop_access->children.push_back(std::move(node));
             node = std::move(prop_access);
         }
         else if (check(TokenType::LBRACKET))
         {
             advance(); // consume '['
-<<<<<<< HEAD
-            auto filter = parse_logical_or();
-=======
             auto filter = parse_conditional();
->>>>>>> main
             if (!check(TokenType::RBRACKET))
                 throw std::runtime_error("Expected ']' in filter expression");
             advance(); // consume ']'
@@ -1184,11 +994,7 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
     // Parse first element, then check for ..
     if (!check(TokenType::RBRACKET))
     {
-<<<<<<< HEAD
-        auto first = parse_logical_or();
-=======
         auto first = parse_conditional();
->>>>>>> main
         
         // If we see .., this is a range not a list
         if (check(TokenType::DOTDOT)) {
@@ -1202,16 +1008,8 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
             } else if (check(TokenType::RPAREN)) {
                 range_type += ")";
                 advance();
-<<<<<<< HEAD
-            } else if (check(TokenType::LBRACKET)) {
-                range_type += ")";
-                advance();
-            } else {
-                throw std::runtime_error("Expected ']', ')' or '[' to close range");
-=======
             } else {
                 throw std::runtime_error("Expected ']' or ')' to close range");
->>>>>>> main
             }
             
             auto node = std::make_unique<ASTNode>(ASTNodeType::RANGE, range_type);
@@ -1232,11 +1030,7 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
             {
                 break;
             }
-<<<<<<< HEAD
-            list_node->children.push_back(parse_logical_or());
-=======
             list_node->children.push_back(parse_conditional());
->>>>>>> main
         }
         
         expect(TokenType::RBRACKET, "Expected ']' after list elements");
@@ -1269,28 +1063,7 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
         position_ + 1 < tokens_->size() &&
         (*tokens_)[position_ + 1].type == TokenType::COLON)
     {
-        std::string key(advance().text);
-
-        // DMN 1.5 §10.3.1.2 (grammar rule 26): a FEEL name may contain "additional
-        // name symbols" (. / - + *) between name parts. The lexer emits those as
-        // separate operator/dot tokens, so re-assemble them here. This is safe
-        // because a context key is always terminated by ':'.
-        auto is_additional_name_symbol = [this]() {
-            if (check(TokenType::DOT)) return true;
-            if (!check(TokenType::OPERATOR)) return false;
-            const std::string_view op = peek().text;
-            return op == "+" || op == "-" || op == "*" || op == "/";
-        };
-
-        while (is_additional_name_symbol())
-        {
-            key += std::string(advance().text);
-            if (check(TokenType::IDENTIFIER) || check(TokenType::NUMBER) || check(TokenType::KEYWORD))
-            {
-                key += std::string(advance().text);
-            }
-        }
-        return key;
+        return std::string(advance().text);
     }
 
     if (check(TokenType::STRING))
@@ -1439,11 +1212,7 @@ std::unique_ptr<ASTNode> Parser::parse_for_expression()
     advance(); // consume 'return'
     
     // Parse the return expression
-<<<<<<< HEAD
-    auto return_expr = parse_logical_or();
-=======
     auto return_expr = parse_conditional();
->>>>>>> main
     node->children.push_back(std::move(return_expr));
     
     return node;
@@ -1489,11 +1258,7 @@ std::unique_ptr<ASTNode> Parser::parse_quantified_expression(std::string_view qu
     advance(); // consume 'satisfies'
     
     // Parse the condition expression
-<<<<<<< HEAD
-    auto condition = parse_logical_or();
-=======
     auto condition = parse_conditional();
->>>>>>> main
     node->children.push_back(std::move(condition));
     
     return node;

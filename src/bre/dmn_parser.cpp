@@ -375,21 +375,6 @@ namespace orion::bre
         return (colon == std::string_view::npos) ? name : name.substr(colon + 1);
     }
 
-<<<<<<< HEAD
-    // Helper to render a context entry name as a quoted FEEL string key
-    [[nodiscard]] static std::string quote_feel_key(std::string_view name)
-    {
-        std::string quoted;
-        quoted.reserve(name.size() + 2);
-        quoted.push_back('"');
-        for (const char character : name)
-        {
-            if (character == '"' || character == '\\') quoted.push_back('\\');
-            quoted.push_back(character);
-        }
-        quoted.push_back('"');
-        return quoted;
-=======
     // Helper to append a context entry name as a quoted FEEL string key.
     static void append_quoted_feel_key(std::string& output, std::string_view name)
     {
@@ -400,7 +385,6 @@ namespace orion::bre
             output.push_back(character);
         }
         output.push_back('"');
->>>>>>> main
     }
 
     [[nodiscard]] static std::string boxed_context_to_feel(rapidxml::xml_node<>* context_node);
@@ -432,28 +416,6 @@ namespace orion::bre
             return boxed_context_to_feel(expr_node);
         }
 
-<<<<<<< HEAD
-        if (element_name == "list")
-        {
-            // DMN boxed list maps to FEEL list literal: [item1, item2, ...]
-            std::string feel_list = "[";
-            bool first = true;
-
-            for (auto* item = expr_node->first_node(); item != nullptr; item = item->next_sibling())
-            {
-                const std::string item_expr = boxed_expression_to_feel(item);
-                if (item_expr.empty()) return {};
-                if (!first) feel_list += ", ";
-                first = false;
-                feel_list += item_expr;
-            }
-
-            feel_list += "]";
-            return feel_list;
-        }
-
-=======
->>>>>>> main
         return {};
     }
 
@@ -526,9 +488,6 @@ namespace orion::bre
             while (collides(result_key)) result_key.push_back('_');
         }
 
-<<<<<<< HEAD
-        std::string feel_expression = "{";
-=======
         std::string feel_expression;
         size_t reserved_size = 2; // "{}"
         for (const auto& [name, expression] : entries)
@@ -542,17 +501,12 @@ namespace orion::bre
         feel_expression.reserve(reserved_size);
 
         feel_expression.push_back('{');
->>>>>>> main
         bool first_entry = true;
         for (const auto& [name, expression] : entries)
         {
             if (!first_entry) feel_expression += ", ";
             first_entry = false;
-<<<<<<< HEAD
-            feel_expression += quote_feel_key(name);
-=======
             append_quoted_feel_key(feel_expression, name);
->>>>>>> main
             feel_expression += ": ";
             feel_expression += expression;
         }
@@ -765,18 +719,6 @@ namespace orion::bre
                 if (context_node != nullptr)
                 {
                     decision.expression = boxed_context_to_feel(context_node);
-<<<<<<< HEAD
-                }
-            }
-
-            // Parse boxed list if present (converted to equivalent FEEL list literal)
-            if (!decision.decisionTable.has_value() && decision.expression.empty())
-            {
-                auto* list_node = find_node(decision_node, "dmn:list", "list");
-                if (list_node != nullptr)
-                {
-                    decision.expression = boxed_expression_to_feel(list_node);
-=======
                     if (decision.expression.empty())
                     {
                         warn("DMN: boxed <context> in decision '{}' could not be converted to a "
@@ -784,7 +726,6 @@ namespace orion::bre
                              "logic unless another expression form is present",
                              decision.name.empty() ? decision.id : decision.name);
                     }
->>>>>>> main
                 }
             }
 

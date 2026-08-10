@@ -26,10 +26,6 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
-<<<<<<< HEAD
-#include <optional>
-=======
->>>>>>> main
 
 namespace orion::bre
 {
@@ -64,8 +60,6 @@ namespace orion::bre
             return oss.str();
         }
 
-<<<<<<< HEAD
-=======
         // Days since 1970-01-01 for a proleptic Gregorian calendar date.
         // Howard Hinnant's days_from_civil: correct for negative years and does
         // not mis-count the current year's leap day (a naive y/4 - y/100 + y/400
@@ -80,16 +74,11 @@ namespace orion::bre
             return era * 146097LL + static_cast<long long>(doe) - 719468LL;
         }
 
->>>>>>> main
         // Duration arithmetic helpers
         bool is_duration_string(const json& val)
         {
             if (!val.is_string()) return false;
-<<<<<<< HEAD
-            auto s = val.get<std::string>();
-=======
             const std::string& s = val.get_ref<const std::string&>();
->>>>>>> main
             if (s.empty()) return false;
             return s[0] == 'P' || (s[0] == '-' && s.size() > 1 && s[1] == 'P');
         }
@@ -162,26 +151,6 @@ namespace orion::bre
             if (m == 2 && ((y%4==0 && y%100!=0) || y%400==0)) return 29;
             return days[m];
         }
-<<<<<<< HEAD
-
-        long long date_to_serial_days(const feel::Date& d)
-        {
-            long long y = d.y;
-            long long days = (y - 1) * 365LL + (y - 1) / 4 - (y - 1) / 100 + (y - 1) / 400;
-            for (int mm = 1; mm < d.m; mm++)
-            {
-                static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                days += md[mm];
-            }
-            if (d.m > 2 && ((d.y % 4 == 0 && d.y % 100 != 0) || d.y % 400 == 0))
-            {
-                days++;
-            }
-            days += d.d;
-            return days;
-        }
-=======
->>>>>>> main
         
         std::string add_duration_to_date(const std::string& date_str, const feel::Duration& dur, bool subtract = false)
         {
@@ -285,38 +254,6 @@ namespace orion::bre
             return format_time_hms(h, m, s) + suffix;
         }
 
-<<<<<<< HEAD
-        std::optional<long long> datetime_to_epoch_seconds(const std::string& dt_input)
-        {
-            auto dt = feel::parse_datetime(dt_input);
-            if (!dt) return std::nullopt;
-
-            long long local = date_to_serial_days(dt->date) * 86400LL +
-                              dt->time.h * 3600LL +
-                              dt->time.m * 60LL +
-                              dt->time.s;
-
-            if (!dt->has_tz)
-            {
-                return local;
-            }
-
-            int offset_seconds = dt->tz_offset_seconds;
-            auto at_pos = dt_input.find('@');
-            if (at_pos != std::string::npos)
-            {
-                std::string tz_name = dt_input.substr(at_pos + 1);
-                if (tz_name == "Etc/UTC") offset_seconds = 0;
-                else if (tz_name == "Europe/Paris") offset_seconds = 3600;
-                else if (tz_name == "Asia/Dhaka") offset_seconds = 21600;
-                else if (tz_name == "Australia/Melbourne") offset_seconds = 39600;
-            }
-
-            return local - offset_seconds;
-        }
-
-=======
->>>>>>> main
         /**
          * @brief Resolve a variable from context with multiple naming variants
          * 
@@ -329,12 +266,6 @@ namespace orion::bre
          */
         json resolveVariable(std::string_view name, const json& context)
         {
-            // Internal parser sentinel used for open-ended range bounds.
-            if (name == "__orion_null_range_bound__")
-            {
-                return nullptr;
-            }
-
             // Try exact match first (hot path — avoids all string allocations)
             if (auto it = context.find(name); it != context.end())
             {
@@ -452,21 +383,6 @@ namespace orion::bre
         
         case ASTNodeType::LITERAL_CONTEXT:
         {
-<<<<<<< HEAD
-            // DMN 1.5 §10.3.1.2: context entry names SHALL be unique; a duplicate
-            // name makes the whole context literal invalid (null).
-            // DMN 1.5 clause 10.4: when evaluating an entry value, the scope includes
-            // the previous entries of the same context, so `{a: 1, b: a + 1}` works.
-            json contextObject = json::object();
-
-            // Only a context with more than one entry can reference a previous entry,
-            // so avoid copying the input scope for the common single-entry case.
-            const bool needs_local_scope = children.size() > 2;
-            json local_scope = needs_local_scope ? input : json(nullptr);
-            const json& entry_scope = needs_local_scope ? local_scope : input;
-
-            // Children are stored as pairs: [key_node, value_node, key_node, value_node, ...]
-=======
             if (children.empty())
             {
                 return json::object();
@@ -492,23 +408,9 @@ namespace orion::bre
             // Use a local scope that starts from input and is extended per entry.
             json local_scope = input.is_object() ? input : json::object();
 
->>>>>>> main
             for (size_t i = 0; i + 1 < children.size(); i += 2)
             {
                 const std::string& key = children[i]->value;
-<<<<<<< HEAD
-                if (contextObject.contains(key))
-                {
-                    return nullptr; // Duplicate context entry name
-                }
-                // Value is any expression
-                json val = children[i + 1]->evaluate(entry_scope, eval_ctx);
-                if (needs_local_scope)
-                {
-                    local_scope[key] = val;
-                }
-                contextObject[key] = std::move(val);
-=======
 
                 // Insert first to avoid a second key lookup via contains()+operator[].
                 auto [entry_it, inserted] = context_object.emplace(key, nullptr);
@@ -517,7 +419,6 @@ namespace orion::bre
                 json entry_value = children[i + 1]->evaluate(local_scope, eval_ctx);
                 local_scope[key] = entry_value;             // scope needs its own copy for later entries
                 entry_it.value() = std::move(entry_value);  // move the now-unneeded copy into the result
->>>>>>> main
             }
 
             return context_object;
@@ -586,13 +487,8 @@ namespace orion::bre
                     // String concatenation: both must be strings
                     if (left.is_string() && right.is_string())
                     {
-<<<<<<< HEAD
-                        auto ls = left.get<std::string>();
-                        auto rs = right.get<std::string>();
-=======
                         const std::string& ls = left.get_ref<const std::string&>();
                         const std::string& rs = right.get_ref<const std::string&>();
->>>>>>> main
                         // Duration + Duration
                         if (is_duration_string(left) && is_duration_string(right))
                         {
@@ -692,13 +588,8 @@ namespace orion::bre
                     if (left.is_null() || right.is_null()) return nullptr;
                     if (left.is_string() && right.is_string())
                     {
-<<<<<<< HEAD
-                        auto ls = left.get<std::string>();
-                        auto rs = right.get<std::string>();
-=======
                         const std::string& ls = left.get_ref<const std::string&>();
                         const std::string& rs = right.get_ref<const std::string&>();
->>>>>>> main
                         // Duration - Duration
                         if (is_duration_string(left) && is_duration_string(right))
                         {
@@ -753,12 +644,6 @@ namespace orion::bre
                             {
                                 // Both or neither must have timezone info
                                 if (dt1->has_tz != dt2->has_tz) return nullptr;
-<<<<<<< HEAD
-                                auto lhs_epoch = datetime_to_epoch_seconds(ls);
-                                auto rhs_epoch = datetime_to_epoch_seconds(rs);
-                                if (!lhs_epoch || !rhs_epoch) return nullptr;
-                                long long diff = *lhs_epoch - *rhs_epoch;
-=======
                                 // Convert both to total seconds from epoch-ish (UTC-normalized)
                                 auto to_secs = [](const feel::DateTime& dt) -> long long {
                                     const long long days = days_from_civil(dt.date.y,
@@ -767,7 +652,6 @@ namespace orion::bre
                                     return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
                                 };
                                 long long diff = to_secs(*dt1) - to_secs(*dt2);
->>>>>>> main
                                 feel::Duration dur;
                                 dur.total_seconds = diff;
                                 return format_duration(dur);
@@ -779,16 +663,12 @@ namespace orion::bre
                             auto d2 = feel::parse_date(rs);
                             if (d1 && d2)
                             {
-<<<<<<< HEAD
-                                long long diff = date_to_serial_days(*d1) - date_to_serial_days(*d2);
-=======
                                 auto to_days = [](const feel::Date& d) -> long long {
                                     return days_from_civil(d.y,
                                                            static_cast<unsigned>(d.m),
                                                            static_cast<unsigned>(d.d));
                                 };
                                 long long diff = to_days(*d1) - to_days(*d2);
->>>>>>> main
                                 feel::Duration dur;
                                 dur.total_seconds = diff * 86400LL;
                                 return format_duration(dur);
@@ -801,21 +681,6 @@ namespace orion::bre
                             std::string dt_str = is_datetime_string(ls) ? ls : rs;
                             auto dt_check = feel::parse_datetime(dt_str);
                             if (!dt_check || !dt_check->has_tz) return nullptr;
-<<<<<<< HEAD
-
-                            std::string ldt = ls;
-                            std::string rdt = rs;
-                            if (is_date_string(ls)) ldt = ls + "T00:00:00Z";
-                            if (is_date_string(rs)) rdt = rs + "T00:00:00Z";
-
-                            auto lhs_epoch = datetime_to_epoch_seconds(ldt);
-                            auto rhs_epoch = datetime_to_epoch_seconds(rdt);
-                            if (!lhs_epoch || !rhs_epoch) return nullptr;
-
-                            feel::Duration dur;
-                            dur.total_seconds = *lhs_epoch - *rhs_epoch;
-                            return format_duration(dur);
-=======
                             
                             std::string ldt = ls, rdt = rs;
                             if (is_date_string(ls)) ldt = ls + "T00:00:00Z";
@@ -835,7 +700,6 @@ namespace orion::bre
                                 dur.total_seconds = diff;
                                 return format_duration(dur);
                             }
->>>>>>> main
                         }
                         if (is_time_string(ls) && is_time_string(rs))
                         {
@@ -1204,12 +1068,6 @@ namespace orion::bre
                     }
                     
                     // Right is a range object
-<<<<<<< HEAD
-                    if (right.is_object() && right.contains("__range__")) {
-                        std::string type = right["__range__"].get<std::string>();
-                        auto start_val = right["__start__"];
-                        auto end_val = right["__end__"];
-=======
                     if (auto range_it = right.is_object() ? right.find("__range__") : right.end();
                         right.is_object() && range_it != right.end()) {
                         const std::string& type = range_it->get_ref<const std::string&>();
@@ -1218,7 +1076,6 @@ namespace orion::bre
                         if (start_it == right.end() || end_it == right.end()) return nullptr;
                         const json& start_val = *start_it;
                         const json& end_val = *end_it;
->>>>>>> main
                         bool start_incl = (type[0] == '[');
                         bool end_incl = (type[1] == ']');
                         
@@ -1229,15 +1086,9 @@ namespace orion::bre
                             return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
                         }
                         if (left.is_string() && start_val.is_string() && end_val.is_string()) {
-<<<<<<< HEAD
-                            auto v = left.get<std::string>();
-                            auto s = start_val.get<std::string>();
-                            auto e = end_val.get<std::string>();
-=======
                             const std::string& v = left.get_ref<const std::string&>();
                             const std::string& s = start_val.get_ref<const std::string&>();
                             const std::string& e = end_val.get_ref<const std::string&>();
->>>>>>> main
                             return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
                         }
                         return nullptr;
@@ -1341,28 +1192,6 @@ namespace orion::bre
                     }
                     // Not a temporal property - fall through to error
                 }
-<<<<<<< HEAD
-
-                // Handle range properties
-                if (obj.is_object() && obj.contains("__range__"))
-                {
-                    const std::string range_type = obj.value("__range__", "");
-                    if (propertyName == "start") return obj.value("__start__", json(nullptr));
-                    if (propertyName == "end") return obj.value("__end__", json(nullptr));
-                    if (propertyName == "start included")
-                    {
-                        if (range_type.empty()) return nullptr;
-                        return range_type[0] == '[';
-                    }
-                    if (propertyName == "end included")
-                    {
-                        if (range_type.size() < 2) return nullptr;
-                        return range_type[1] == ']';
-                    }
-                    return nullptr;
-                }
-                
-=======
                 
                 // DMN 1.5 §10.3.2.5: a path expression applied to a list
                 // projects the property over every element, preserving
@@ -1390,7 +1219,6 @@ namespace orion::bre
                     return projected;
                 }
 
->>>>>>> main
                 // Obj must be an object/dict to have properties
                 if (!obj.is_object())
                 {
@@ -1526,7 +1354,6 @@ namespace orion::bre
                 {
                     if (p.name == "keys") { context_put_keys_variant = true; break; }
                 }
-<<<<<<< HEAD
             }
             
             if (context_put_keys_variant)
@@ -1542,354 +1369,6 @@ namespace orion::bre
                     else if (p.name == "value") val_arg = p.valueExpr->evaluate(input, eval_ctx);
                 }
                 args = {std::move(ctx_arg), std::move(key_arg), std::move(val_arg)};
-            }
-            else
-            {
-                try {
-                    args = feel::bind_parameters(funcName, parameters, input, eval_ctx);
-                } catch (const std::runtime_error&) {
-                    // Parameter validation failed (wrong param names, wrong count, etc.)
-                    // Return null as per DMN 1.5 spec
-                    return json(nullptr);
-                }
-            }
-            
-            // For "context put" with named param "key": validate key is string (not list)
-            // DMN spec: key param requires string; keys param requires list
-            if (funcName == "context put" && !context_put_keys_variant && args.size() >= 2)
-            {
-                // Check if "key" named param was used with a non-string value
-                bool has_key_param = false;
-                for (const auto& p : parameters)
-                {
-                    if (p.name == "key") { has_key_param = true; break; }
-                }
-                if (has_key_param && args[1].is_array())
-                {
-                    return json(nullptr); // Type mismatch: "key" expects string, got list
-                }
-=======
->>>>>>> main
-            }
-            
-            if (context_put_keys_variant)
-            {
-<<<<<<< HEAD
-                return feel::evaluate_not_function(args);
-            }
-            else if (funcName == "all")
-            {
-                return feel::evaluate_all_function(args);
-            }
-            else if (funcName == "any")
-            {
-                return feel::evaluate_any_function(args);
-            }
-            else if (funcName == "contains")
-            {
-                return feel::evaluate_contains_function(args);
-            }
-            // Math functions
-            else if (funcName == "abs")
-            {
-                return feel::evaluate_abs_function(args);
-            }
-            else if (funcName == "sqrt")
-            {
-                return feel::evaluate_sqrt_function(args);
-            }
-            else if (funcName == "floor")
-            {
-                return feel::evaluate_floor_function(args);
-            }
-            else if (funcName == "ceiling")
-            {
-                return feel::evaluate_ceiling_function(args);
-            }
-            else if (funcName == "exp")
-            {
-                return feel::evaluate_exp_function(args);
-            }
-            else if (funcName == "log")
-            {
-                return feel::evaluate_log_function(args);
-            }
-            else if (funcName == "modulo")
-            {
-                return feel::evaluate_modulo_function(args);
-            }
-            else if (funcName == "decimal")
-            {
-                return feel::evaluate_decimal_function(args);
-            }
-            else if (funcName == "round")
-            {
-                return feel::evaluate_round_function(args);
-            }
-            else if (funcName == "round up")
-            {
-                return feel::evaluate_round_up_function(args);
-            }
-            else if (funcName == "round down")
-            {
-                return feel::evaluate_round_down_function(args);
-            }
-            else if (funcName == "round half up")
-            {
-                return feel::evaluate_round_half_up_function(args);
-            }
-            else if (funcName == "round half down")
-            {
-                return feel::evaluate_round_half_down_function(args);
-            }
-            // String functions
-            else if (funcName == "substring before")
-            {
-                return feel::evaluate_substring_before_function(args);
-            }
-            else if (funcName == "substring after")
-            {
-                return feel::evaluate_substring_after_function(args);
-            }
-            else if (funcName == "substring")
-            {
-                return feel::evaluate_substring_function(args);
-            }
-            else if (funcName == "string length")
-            {
-                return feel::evaluate_string_length_function(args);
-            }
-            else if (funcName == "upper case")
-            {
-                return feel::evaluate_upper_case_function(args);
-            }
-            else if (funcName == "lower case")
-            {
-                return feel::evaluate_lower_case_function(args);
-            }
-            else if (funcName == "starts with")
-            {
-                return feel::evaluate_starts_with_function(args);
-            }
-            else if (funcName == "ends with")
-            {
-                return feel::evaluate_ends_with_function(args);
-            }
-            else if (funcName == "replace")
-            {
-                return feel::evaluate_replace_function(args);
-            }
-            else if (funcName == "matches")
-            {
-                return feel::evaluate_matches_function(args, eval_ctx);
-            }
-            else if (funcName == "split")
-            {
-                return feel::evaluate_split_function(args);
-            }
-            else if (funcName == "string join")
-            {
-                return feel::evaluate_string_join_function(args);
-            }
-            else if (funcName == "date")
-            {
-                return feel::evaluate_date_function(args);
-            }
-            else if (funcName == "duration")
-            {
-                return feel::evaluate_duration_function(args);
-            }
-            else if (funcName == "time")
-            {
-                return feel::evaluate_time_function(args);
-            }
-            else if (funcName == "date and time")
-            {
-                return feel::evaluate_date_and_time_function(args);
-            }
-            else if (funcName == "years and months duration")
-            {
-                return feel::evaluate_years_and_months_duration_function(args);
-            }
-            else if (funcName == "day of year")
-            {
-                return feel::evaluate_day_of_year_function(args);
-            }
-            else if (funcName == "day of week")
-            {
-                return feel::evaluate_day_of_week_function(args);
-            }
-            else if (funcName == "month of year")
-            {
-                return feel::evaluate_month_of_year_function(args);
-            }
-            else if (funcName == "week of year")
-            {
-                return feel::evaluate_week_of_year_function(args);
-            }
-            else if (funcName == "now")
-            {
-                return feel::evaluate_now_function(args);
-            }
-            else if (funcName == "today")
-            {
-                return feel::evaluate_today_function(args);
-            }
-            // Phase 1: Trivial functions
-            else if (funcName == "odd")
-            {
-                return feel::evaluate_odd_function(args);
-            }
-            else if (funcName == "even")
-            {
-                return feel::evaluate_even_function(args);
-            }
-            else if (funcName == "number")
-            {
-                return feel::evaluate_number_function(args);
-            }
-            else if (funcName == "string")
-            {
-                return feel::evaluate_string_function(args);
-            }
-            else if (funcName == "is")
-            {
-                return feel::evaluate_is_function(args);
-=======
-                // Manually bind: evaluate params by name
-                json ctx_arg = nullptr;
-                json key_arg = nullptr;
-                json val_arg = nullptr;
-                for (const auto& p : parameters)
-                {
-                    if (p.name == "context") ctx_arg = p.valueExpr->evaluate(input, eval_ctx);
-                    else if (p.name == "keys") key_arg = p.valueExpr->evaluate(input, eval_ctx);
-                    else if (p.name == "value") val_arg = p.valueExpr->evaluate(input, eval_ctx);
-                }
-                args = {std::move(ctx_arg), std::move(key_arg), std::move(val_arg)};
->>>>>>> main
-            }
-            // Phase 2A: Aggregation functions
-            else if (funcName == "count")
-            {
-                return feel::evaluate_count_function(args);
-            }
-            else if (funcName == "sum")
-            {
-                return feel::evaluate_sum_function(args);
-            }
-            else if (funcName == "min")
-            {
-                return feel::evaluate_min_function(args);
-            }
-            else if (funcName == "max")
-            {
-                return feel::evaluate_max_function(args);
-            }
-            else if (funcName == "mean")
-            {
-                return feel::evaluate_mean_function(args);
-            }
-            else if (funcName == "product")
-            {
-                return feel::evaluate_product_function(args);
-            }
-            else if (funcName == "median")
-            {
-                return feel::evaluate_median_function(args);
-            }
-            else if (funcName == "stddev")
-            {
-                return feel::evaluate_stddev_function(args);
-            }
-            else if (funcName == "mode")
-            {
-                return feel::evaluate_mode_function(args);
-            }
-            // Phase 2B: List manipulation functions
-            else if (funcName == "list contains")
-            {
-                return feel::evaluate_list_contains_function(args);
-            }
-            else if (funcName == "append")
-            {
-                return feel::evaluate_append_function(args);
-            }
-            else if (funcName == "concatenate")
-            {
-                return feel::evaluate_concatenate_function(args);
-            }
-            else if (funcName == "insert before")
-            {
-                return feel::evaluate_insert_before_function(args);
-            }
-            else if (funcName == "remove")
-            {
-                return feel::evaluate_remove_function(args);
-            }
-            else if (funcName == "reverse")
-            {
-                return feel::evaluate_reverse_function(args);
-            }
-            else if (funcName == "index of")
-            {
-                return feel::evaluate_index_of_function(args);
-            }
-            else if (funcName == "sublist")
-            {
-                return feel::evaluate_sublist_function(args);
-            }
-            else if (funcName == "union")
-            {
-                return feel::evaluate_union_function(args);
-            }
-            else if (funcName == "distinct values")
-            {
-                return feel::evaluate_distinct_values_function(args);
-            }
-            else if (funcName == "flatten")
-            {
-                return feel::evaluate_flatten_function(args);
-            }
-            else if (funcName == "sort")
-            {
-                return feel::evaluate_sort_function(args);
-            }
-            else if (funcName == "list replace")
-            {
-                return feel::evaluate_list_replace_function(args);
-            }
-            // ========== PHASE 3: CONTEXT FUNCTIONS ==========
-            else if (funcName == "get value")
-            {
-                return feel::evaluate_get_value_function(args);
-            }
-            else if (funcName == "get entries")
-            {
-                return feel::evaluate_get_entries_function(args);
-            }
-            else if (funcName == "context")
-            {
-                return feel::evaluate_context_function(args);
-            }
-            else if (funcName == "context put")
-            {
-                return feel::evaluate_context_put_function(args);
-            }
-            else if (funcName == "context merge")
-            {
-                return feel::evaluate_context_merge_function(args);
-            }
-            else if (eval_ctx.bkm_map)
-            {
-                auto bkm_it = eval_ctx.bkm_map->find(funcName);
-                if (bkm_it != eval_ctx.bkm_map->end())
-                {
-                    return bkm_it->second->invoke(args, input, *eval_ctx.bkm_map, eval_ctx);
-                }
-                std::ostringstream oss;
-                oss << "Unknown function: " << funcName;
-                throw std::runtime_error(oss.str());
             }
             else
             {
@@ -2224,14 +1703,6 @@ namespace orion::bre
                 
                 // Filter by condition
                 json result = json::array();
-<<<<<<< HEAD
-                json local_ctx = input;
-                for (size_t i = 0; i < list_val.size(); ++i)
-                {
-                    const auto& item = list_val[i];
-                    local_ctx["item"] = item;
-                    
-=======
                 json local_ctx = input.is_object() ? input : json::object();
 
                 // Keys injected by the previous item, so they can be undone before
@@ -2260,17 +1731,13 @@ namespace orion::bre
 
                     local_ctx["item"] = item;
 
->>>>>>> main
                     // If item is context, merge its keys into local scope
                     if (item.is_object())
                     {
                         for (auto it = item.begin(); it != item.end(); ++it)
                         {
                             local_ctx[it.key()] = it.value();
-<<<<<<< HEAD
-=======
                             injected_keys.push_back(it.key());
->>>>>>> main
                         }
                     }
                     
