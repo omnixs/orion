@@ -719,6 +719,13 @@ namespace orion::bre
                 if (context_node != nullptr)
                 {
                     decision.expression = boxed_context_to_feel(context_node);
+                    if (decision.expression.empty())
+                    {
+                        warn("DMN: boxed <context> in decision '{}' could not be converted to a "
+                             "FEEL expression (unsupported entry kind); the decision will have no "
+                             "logic unless another expression form is present",
+                             decision.name.empty() ? decision.id : decision.name);
+                    }
                 }
             }
 

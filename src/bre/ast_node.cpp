@@ -388,6 +388,17 @@ namespace orion::bre
                 return json::object();
             }
 
+            // Single-entry contexts (the common case, e.g. `{result: x + 1}`)
+            // never need to see a "previous entry", so skip the local-scope
+            // copy of input that entry-scoping requires once there are 2+
+            // entries.
+            if (children.size() == 2)
+            {
+                json context_object = json::object();
+                context_object.emplace(children[0]->value, children[1]->evaluate(input, eval_ctx));
+                return context_object;
+            }
+
             json context_object = json::object();
 
             // DMN 1.5 context semantics:
@@ -406,8 +417,8 @@ namespace orion::bre
                 if (!inserted) return nullptr;
 
                 json entry_value = children[i + 1]->evaluate(local_scope, eval_ctx);
-                entry_it.value() = entry_value;
-                local_scope[key] = entry_value;
+                local_scope[key] = entry_value;             // scope needs its own copy for later entries
+                entry_it.value() = std::move(entry_value);  // move the now-unneeded copy into the result
             }
 
             return context_object;
