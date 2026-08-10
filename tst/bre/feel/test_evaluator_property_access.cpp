@@ -287,8 +287,9 @@ BOOST_AUTO_TEST_CASE(test_eval_missing_property)
             {"principal", 100000}
         }}
     };
-    
-    BOOST_CHECK_THROW((void)ast->evaluate(input, get_test_eval_ctx()), std::runtime_error);
+
+    // FEEL semantics: missing property access evaluates to null.
+    BOOST_CHECK(ast->evaluate(input, get_test_eval_ctx()).is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_on_non_object)
