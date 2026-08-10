@@ -1056,12 +1056,16 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
 
 [[nodiscard]] std::string Parser::parse_context_key()
 {
-    // Parse key (must be identifier or string)
-    if (check(TokenType::IDENTIFIER))
+    // Fast path for the common FEEL case: simple identifier key directly
+    // followed by ':'. Keep the generic path for additional-name-symbol keys
+    // such as foo+bar.
+    if (check(TokenType::IDENTIFIER) &&
+        position_ + 1 < tokens_->size() &&
+        (*tokens_)[position_ + 1].type == TokenType::COLON)
     {
         return std::string(advance().text);
     }
-    
+
     if (check(TokenType::STRING))
     {
         std::string_view key = advance().text;
@@ -1071,6 +1075,40 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
             key = key.substr(1, key.size() - 2);
         }
         return decode_string_escapes(key);
+    }
+
+    // Unquoted context keys may include FEEL additional-name-symbols.
+    // Consume tokens verbatim until ':' and then trim leading/trailing spaces.
+    std::string key;
+    key.reserve(32);
+    while (!is_at_end() && !check(TokenType::COLON))
+    {
+        if (check(TokenType::COMMA) || check(TokenType::RBRACE))
+        {
+            break;
+        }
+        const Token& token = advance();
+        key.append(token.text.data(), token.text.size());
+    }
+
+    if (!key.empty())
+    {
+        size_t begin = 0;
+        while (begin < key.size() && std::isspace(static_cast<unsigned char>(key[begin])) != 0)
+        {
+            ++begin;
+        }
+
+        size_t end = key.size();
+        while (end > begin && std::isspace(static_cast<unsigned char>(key[end - 1])) != 0)
+        {
+            --end;
+        }
+
+        if (begin < end)
+        {
+            return key.substr(begin, end - begin);
+        }
     }
     
     std::ostringstream oss;

@@ -383,17 +383,45 @@ namespace orion::bre
         
         case ASTNodeType::LITERAL_CONTEXT:
         {
-            json contextObject = json::object();
-            // Children are stored as pairs: [key_node, value_node, key_node, value_node, ...]
+            if (children.empty())
+            {
+                return json::object();
+            }
+
+            // Single-entry contexts (the common case, e.g. `{result: x + 1}`)
+            // never need to see a "previous entry", so skip the local-scope
+            // copy of input that entry-scoping requires once there are 2+
+            // entries.
+            if (children.size() == 2)
+            {
+                json context_object = json::object();
+                context_object.emplace(children[0]->value, children[1]->evaluate(input, eval_ctx));
+                return context_object;
+            }
+
+            json context_object = json::object();
+
+            // DMN 1.5 context semantics:
+            // - entries are evaluated left-to-right
+            // - each entry can reference previously computed entries
+            // - duplicate keys make the whole context null
+            // Use a local scope that starts from input and is extended per entry.
+            json local_scope = input.is_object() ? input : json::object();
+
             for (size_t i = 0; i + 1 < children.size(); i += 2)
             {
-                // Key is stored in a LITERAL_STRING node
                 const std::string& key = children[i]->value;
-                // Value is any expression
-                json val = children[i + 1]->evaluate(input, eval_ctx);
-                contextObject[key] = val;
+
+                // Insert first to avoid a second key lookup via contains()+operator[].
+                auto [entry_it, inserted] = context_object.emplace(key, nullptr);
+                if (!inserted) return nullptr;
+
+                json entry_value = children[i + 1]->evaluate(local_scope, eval_ctx);
+                local_scope[key] = entry_value;             // scope needs its own copy for later entries
+                entry_it.value() = std::move(entry_value);  // move the now-unneeded copy into the result
             }
-            return contextObject;
+
+            return context_object;
         }
         
         case ASTNodeType::VARIABLE:
