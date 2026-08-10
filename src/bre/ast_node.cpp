@@ -26,7 +26,10 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
+<<<<<<< HEAD
 #include <optional>
+=======
+>>>>>>> main
 
 namespace orion::bre
 {
@@ -61,11 +64,32 @@ namespace orion::bre
             return oss.str();
         }
 
+<<<<<<< HEAD
+=======
+        // Days since 1970-01-01 for a proleptic Gregorian calendar date.
+        // Howard Hinnant's days_from_civil: correct for negative years and does
+        // not mis-count the current year's leap day (a naive y/4 - y/100 + y/400
+        // term treats 29 February as already elapsed on 1 January).
+        long long days_from_civil(long long year, unsigned month, unsigned day)
+        {
+            year -= month <= 2;
+            const long long era = (year >= 0 ? year : year - 399) / 400;
+            const unsigned long long yoe = static_cast<unsigned long long>(year - era * 400);          // [0, 399]
+            const unsigned long long doy = (153ULL * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // [0, 365]
+            const unsigned long long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;                       // [0, 146096]
+            return era * 146097LL + static_cast<long long>(doe) - 719468LL;
+        }
+
+>>>>>>> main
         // Duration arithmetic helpers
         bool is_duration_string(const json& val)
         {
             if (!val.is_string()) return false;
+<<<<<<< HEAD
             auto s = val.get<std::string>();
+=======
+            const std::string& s = val.get_ref<const std::string&>();
+>>>>>>> main
             if (s.empty()) return false;
             return s[0] == 'P' || (s[0] == '-' && s.size() > 1 && s[1] == 'P');
         }
@@ -138,6 +162,7 @@ namespace orion::bre
             if (m == 2 && ((y%4==0 && y%100!=0) || y%400==0)) return 29;
             return days[m];
         }
+<<<<<<< HEAD
 
         long long date_to_serial_days(const feel::Date& d)
         {
@@ -155,6 +180,8 @@ namespace orion::bre
             days += d.d;
             return days;
         }
+=======
+>>>>>>> main
         
         std::string add_duration_to_date(const std::string& date_str, const feel::Duration& dur, bool subtract = false)
         {
@@ -258,6 +285,7 @@ namespace orion::bre
             return format_time_hms(h, m, s) + suffix;
         }
 
+<<<<<<< HEAD
         std::optional<long long> datetime_to_epoch_seconds(const std::string& dt_input)
         {
             auto dt = feel::parse_datetime(dt_input);
@@ -287,6 +315,8 @@ namespace orion::bre
             return local - offset_seconds;
         }
 
+=======
+>>>>>>> main
         /**
          * @brief Resolve a variable from context with multiple naming variants
          * 
@@ -401,37 +431,9 @@ namespace orion::bre
         {
             case ASTNodeType::LITERAL_NUMBER:
             {
-                // Handle special keywords
-                if (value == "true") return true;
-                if (value == "false") return false;
-                if (value == "null") return nullptr;
-                
-                // Parse numeric literal
-                try
-                {
-                    // Try integer first
-                    if (value.find('.') == std::string::npos && 
-                        value.find('e') == std::string::npos && 
-                        value.find('E') == std::string::npos)
-                    {
-                        return std::stoll(value);
-                    }
-                    // Parse as double
-                    return std::stod(value);
-                }
-                catch (const std::invalid_argument&)
-                {
-                    std::ostringstream oss;
-                    oss << "Invalid number literal: '" << value << "'";
-                    throw std::runtime_error(oss.str());
-                }
-                catch (const std::out_of_range&)
-                {
-                    std::ostringstream oss;
-                    oss << "Number literal out of range: '" << value << "'";
-                    throw std::runtime_error(oss.str());
+                // Resolved once at construction (see ASTNode::literal_value)
+                return literal_value;
             }
-        }
         
         case ASTNodeType::LITERAL_STRING:
         {
@@ -450,6 +452,7 @@ namespace orion::bre
         
         case ASTNodeType::LITERAL_CONTEXT:
         {
+<<<<<<< HEAD
             // DMN 1.5 §10.3.1.2: context entry names SHALL be unique; a duplicate
             // name makes the whole context literal invalid (null).
             // DMN 1.5 clause 10.4: when evaluating an entry value, the scope includes
@@ -463,10 +466,37 @@ namespace orion::bre
             const json& entry_scope = needs_local_scope ? local_scope : input;
 
             // Children are stored as pairs: [key_node, value_node, key_node, value_node, ...]
+=======
+            if (children.empty())
+            {
+                return json::object();
+            }
+
+            // Single-entry contexts (the common case, e.g. `{result: x + 1}`)
+            // never need to see a "previous entry", so skip the local-scope
+            // copy of input that entry-scoping requires once there are 2+
+            // entries.
+            if (children.size() == 2)
+            {
+                json context_object = json::object();
+                context_object.emplace(children[0]->value, children[1]->evaluate(input, eval_ctx));
+                return context_object;
+            }
+
+            json context_object = json::object();
+
+            // DMN 1.5 context semantics:
+            // - entries are evaluated left-to-right
+            // - each entry can reference previously computed entries
+            // - duplicate keys make the whole context null
+            // Use a local scope that starts from input and is extended per entry.
+            json local_scope = input.is_object() ? input : json::object();
+
+>>>>>>> main
             for (size_t i = 0; i + 1 < children.size(); i += 2)
             {
-                // Key is stored in a LITERAL_STRING node
                 const std::string& key = children[i]->value;
+<<<<<<< HEAD
                 if (contextObject.contains(key))
                 {
                     return nullptr; // Duplicate context entry name
@@ -478,8 +508,19 @@ namespace orion::bre
                     local_scope[key] = val;
                 }
                 contextObject[key] = std::move(val);
+=======
+
+                // Insert first to avoid a second key lookup via contains()+operator[].
+                auto [entry_it, inserted] = context_object.emplace(key, nullptr);
+                if (!inserted) return nullptr;
+
+                json entry_value = children[i + 1]->evaluate(local_scope, eval_ctx);
+                local_scope[key] = entry_value;             // scope needs its own copy for later entries
+                entry_it.value() = std::move(entry_value);  // move the now-unneeded copy into the result
+>>>>>>> main
             }
-            return contextObject;
+
+            return context_object;
         }
         
         case ASTNodeType::VARIABLE:
@@ -545,8 +586,13 @@ namespace orion::bre
                     // String concatenation: both must be strings
                     if (left.is_string() && right.is_string())
                     {
+<<<<<<< HEAD
                         auto ls = left.get<std::string>();
                         auto rs = right.get<std::string>();
+=======
+                        const std::string& ls = left.get_ref<const std::string&>();
+                        const std::string& rs = right.get_ref<const std::string&>();
+>>>>>>> main
                         // Duration + Duration
                         if (is_duration_string(left) && is_duration_string(right))
                         {
@@ -646,8 +692,13 @@ namespace orion::bre
                     if (left.is_null() || right.is_null()) return nullptr;
                     if (left.is_string() && right.is_string())
                     {
+<<<<<<< HEAD
                         auto ls = left.get<std::string>();
                         auto rs = right.get<std::string>();
+=======
+                        const std::string& ls = left.get_ref<const std::string&>();
+                        const std::string& rs = right.get_ref<const std::string&>();
+>>>>>>> main
                         // Duration - Duration
                         if (is_duration_string(left) && is_duration_string(right))
                         {
@@ -702,10 +753,21 @@ namespace orion::bre
                             {
                                 // Both or neither must have timezone info
                                 if (dt1->has_tz != dt2->has_tz) return nullptr;
+<<<<<<< HEAD
                                 auto lhs_epoch = datetime_to_epoch_seconds(ls);
                                 auto rhs_epoch = datetime_to_epoch_seconds(rs);
                                 if (!lhs_epoch || !rhs_epoch) return nullptr;
                                 long long diff = *lhs_epoch - *rhs_epoch;
+=======
+                                // Convert both to total seconds from epoch-ish (UTC-normalized)
+                                auto to_secs = [](const feel::DateTime& dt) -> long long {
+                                    const long long days = days_from_civil(dt.date.y,
+                                                                           static_cast<unsigned>(dt.date.m),
+                                                                           static_cast<unsigned>(dt.date.d));
+                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
+                                };
+                                long long diff = to_secs(*dt1) - to_secs(*dt2);
+>>>>>>> main
                                 feel::Duration dur;
                                 dur.total_seconds = diff;
                                 return format_duration(dur);
@@ -717,7 +779,16 @@ namespace orion::bre
                             auto d2 = feel::parse_date(rs);
                             if (d1 && d2)
                             {
+<<<<<<< HEAD
                                 long long diff = date_to_serial_days(*d1) - date_to_serial_days(*d2);
+=======
+                                auto to_days = [](const feel::Date& d) -> long long {
+                                    return days_from_civil(d.y,
+                                                           static_cast<unsigned>(d.m),
+                                                           static_cast<unsigned>(d.d));
+                                };
+                                long long diff = to_days(*d1) - to_days(*d2);
+>>>>>>> main
                                 feel::Duration dur;
                                 dur.total_seconds = diff * 86400LL;
                                 return format_duration(dur);
@@ -730,6 +801,7 @@ namespace orion::bre
                             std::string dt_str = is_datetime_string(ls) ? ls : rs;
                             auto dt_check = feel::parse_datetime(dt_str);
                             if (!dt_check || !dt_check->has_tz) return nullptr;
+<<<<<<< HEAD
 
                             std::string ldt = ls;
                             std::string rdt = rs;
@@ -743,6 +815,27 @@ namespace orion::bre
                             feel::Duration dur;
                             dur.total_seconds = *lhs_epoch - *rhs_epoch;
                             return format_duration(dur);
+=======
+                            
+                            std::string ldt = ls, rdt = rs;
+                            if (is_date_string(ls)) ldt = ls + "T00:00:00Z";
+                            if (is_date_string(rs)) rdt = rs + "T00:00:00Z";
+                            auto dt1 = feel::parse_datetime(ldt);
+                            auto dt2 = feel::parse_datetime(rdt);
+                            if (dt1 && dt2)
+                            {
+                                auto to_secs = [](const feel::DateTime& dt) -> long long {
+                                    const long long days = days_from_civil(dt.date.y,
+                                                                           static_cast<unsigned>(dt.date.m),
+                                                                           static_cast<unsigned>(dt.date.d));
+                                    return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
+                                };
+                                long long diff = to_secs(*dt1) - to_secs(*dt2);
+                                feel::Duration dur;
+                                dur.total_seconds = diff;
+                                return format_duration(dur);
+                            }
+>>>>>>> main
                         }
                         if (is_time_string(ls) && is_time_string(rs))
                         {
@@ -1111,10 +1204,21 @@ namespace orion::bre
                     }
                     
                     // Right is a range object
+<<<<<<< HEAD
                     if (right.is_object() && right.contains("__range__")) {
                         std::string type = right["__range__"].get<std::string>();
                         auto start_val = right["__start__"];
                         auto end_val = right["__end__"];
+=======
+                    if (auto range_it = right.is_object() ? right.find("__range__") : right.end();
+                        right.is_object() && range_it != right.end()) {
+                        const std::string& type = range_it->get_ref<const std::string&>();
+                        const auto start_it = right.find("__start__");
+                        const auto end_it = right.find("__end__");
+                        if (start_it == right.end() || end_it == right.end()) return nullptr;
+                        const json& start_val = *start_it;
+                        const json& end_val = *end_it;
+>>>>>>> main
                         bool start_incl = (type[0] == '[');
                         bool end_incl = (type[1] == ']');
                         
@@ -1125,9 +1229,15 @@ namespace orion::bre
                             return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
                         }
                         if (left.is_string() && start_val.is_string() && end_val.is_string()) {
+<<<<<<< HEAD
                             auto v = left.get<std::string>();
                             auto s = start_val.get<std::string>();
                             auto e = end_val.get<std::string>();
+=======
+                            const std::string& v = left.get_ref<const std::string&>();
+                            const std::string& s = start_val.get_ref<const std::string&>();
+                            const std::string& e = end_val.get_ref<const std::string&>();
+>>>>>>> main
                             return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
                         }
                         return nullptr;
@@ -1231,6 +1341,7 @@ namespace orion::bre
                     }
                     // Not a temporal property - fall through to error
                 }
+<<<<<<< HEAD
 
                 // Handle range properties
                 if (obj.is_object() && obj.contains("__range__"))
@@ -1251,6 +1362,35 @@ namespace orion::bre
                     return nullptr;
                 }
                 
+=======
+                
+                // DMN 1.5 §10.3.2.5: a path expression applied to a list
+                // projects the property over every element, preserving
+                // positions. Missing properties project as null.
+                if (obj.is_array())
+                {
+                    json projected = json::array();
+                    projected.get_ref<json::array_t&>().reserve(obj.size());
+                    for (const auto& element : obj)
+                    {
+                        if (!element.is_object())
+                        {
+                            projected.push_back(nullptr);
+                            continue;
+                        }
+                        if (auto it = element.find(propertyName); it != element.end())
+                        {
+                            projected.push_back(*it);
+                        }
+                        else
+                        {
+                            projected.push_back(nullptr);
+                        }
+                    }
+                    return projected;
+                }
+
+>>>>>>> main
                 // Obj must be an object/dict to have properties
                 if (!obj.is_object())
                 {
@@ -1386,6 +1526,7 @@ namespace orion::bre
                 {
                     if (p.name == "keys") { context_put_keys_variant = true; break; }
                 }
+<<<<<<< HEAD
             }
             
             if (context_put_keys_variant)
@@ -1427,11 +1568,13 @@ namespace orion::bre
                 {
                     return json(nullptr); // Type mismatch: "key" expects string, got list
                 }
+=======
+>>>>>>> main
             }
             
-            // Dispatch to appropriate function
-            if (funcName == "not")
+            if (context_put_keys_variant)
             {
+<<<<<<< HEAD
                 return feel::evaluate_not_function(args);
             }
             else if (funcName == "all")
@@ -1612,6 +1755,19 @@ namespace orion::bre
             else if (funcName == "is")
             {
                 return feel::evaluate_is_function(args);
+=======
+                // Manually bind: evaluate params by name
+                json ctx_arg = nullptr;
+                json key_arg = nullptr;
+                json val_arg = nullptr;
+                for (const auto& p : parameters)
+                {
+                    if (p.name == "context") ctx_arg = p.valueExpr->evaluate(input, eval_ctx);
+                    else if (p.name == "keys") key_arg = p.valueExpr->evaluate(input, eval_ctx);
+                    else if (p.name == "value") val_arg = p.valueExpr->evaluate(input, eval_ctx);
+                }
+                args = {std::move(ctx_arg), std::move(key_arg), std::move(val_arg)};
+>>>>>>> main
             }
             // Phase 2A: Aggregation functions
             else if (funcName == "count")
@@ -1736,6 +1892,50 @@ namespace orion::bre
                 throw std::runtime_error(oss.str());
             }
             else
+            {
+                try {
+                    args = feel::bind_parameters(funcName, parameters, input, eval_ctx);
+                } catch (const std::runtime_error&) {
+                    // Parameter validation failed (wrong param names, wrong count, etc.)
+                    // Return null as per DMN 1.5 spec
+                    return json(nullptr);
+                }
+            }
+            
+            // For "context put" with named param "key": validate key is string (not list)
+            // DMN spec: key param requires string; keys param requires list
+            if (funcName == "context put" && !context_put_keys_variant && args.size() >= 2)
+            {
+                // Check if "key" named param was used with a non-string value
+                bool has_key_param = false;
+                for (const auto& p : parameters)
+                {
+                    if (p.name == "key") { has_key_param = true; break; }
+                }
+                if (has_key_param && args[1].is_array())
+                {
+                    return json(nullptr); // Type mismatch: "key" expects string, got list
+                }
+            }
+            
+            // Dispatch to appropriate function via an O(1) lookup table.
+            // A linear if/else-if chain over ~72 names made every call pay for
+            // the position of its name in the chain, and pushed user-defined
+            // BKM invocations (the common case in real DRGs) to the very end.
+            if (const auto* handler = feel::find_builtin_handler(funcName))
+            {
+                return (*handler)(args, input, eval_ctx);
+            }
+
+            if (eval_ctx.bkm_map)
+            {
+                auto bkm_it = eval_ctx.bkm_map->find(funcName);
+                if (bkm_it != eval_ctx.bkm_map->end())
+                {
+                    return bkm_it->second->invoke(args, input, *eval_ctx.bkm_map, eval_ctx);
+                }
+            }
+
             {
                 std::ostringstream oss;
                 oss << "Unknown function: " << funcName;
@@ -2024,18 +2224,53 @@ namespace orion::bre
                 
                 // Filter by condition
                 json result = json::array();
+<<<<<<< HEAD
                 json local_ctx = input;
                 for (size_t i = 0; i < list_val.size(); ++i)
                 {
                     const auto& item = list_val[i];
                     local_ctx["item"] = item;
                     
+=======
+                json local_ctx = input.is_object() ? input : json::object();
+
+                // Keys injected by the previous item, so they can be undone before
+                // the next iteration. Without this, an item's properties leak into
+                // the predicate evaluation of subsequent items.
+                std::vector<std::string> injected_keys;
+
+                for (size_t i = 0; i < list_val.size(); ++i)
+                {
+                    const auto& item = list_val[i];
+
+                    // Undo the previous item's injections: restore the original
+                    // value where the input shadowed one, otherwise remove the key.
+                    for (const auto& key : injected_keys)
+                    {
+                        if (auto original = input.find(key); original != input.end())
+                        {
+                            local_ctx[key] = *original;
+                        }
+                        else
+                        {
+                            local_ctx.erase(key);
+                        }
+                    }
+                    injected_keys.clear();
+
+                    local_ctx["item"] = item;
+
+>>>>>>> main
                     // If item is context, merge its keys into local scope
                     if (item.is_object())
                     {
                         for (auto it = item.begin(); it != item.end(); ++it)
                         {
                             local_ctx[it.key()] = it.value();
+<<<<<<< HEAD
+=======
+                            injected_keys.push_back(it.key());
+>>>>>>> main
                         }
                     }
                     

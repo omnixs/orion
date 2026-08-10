@@ -720,6 +720,7 @@ static bool json_values_equal(const nlohmann::json& expected, const nlohmann::js
         return true;
     }
     return expected == actual;
+<<<<<<< HEAD
 }
 
 static bool equivalent_duration_strings(std::string_view expected, std::string_view actual)
@@ -731,11 +732,14 @@ static bool equivalent_duration_strings(std::string_view expected, std::string_v
     // Both parsed: compare normalized internal representation.
     return exp->total_months == act->total_months &&
            exp->total_seconds == act->total_seconds;
+=======
+>>>>>>> main
 }
 
 // Helper: Compare expected vs actual values with numeric tolerance
 static bool compare_values(std::string_view expected, std::string_view actual)
 {
+<<<<<<< HEAD
     // TCK may encode equivalent durations with different lexical forms.
     // Compare as durations first so P1Y and P1Y0M are treated as equal.
     std::string expected_unquoted(expected);
@@ -753,6 +757,8 @@ static bool compare_values(std::string_view expected, std::string_view actual)
         return true;
     }
 
+=======
+>>>>>>> main
     // Try JSON-aware comparison first
     try
     {

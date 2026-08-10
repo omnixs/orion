@@ -5,6 +5,13 @@ build-*/
 # Visual Studio Code settings
 .vscode/
 
+# Visual Studio local settings/cache
+.vs/
+
+# DMN TCK reference runners' build output (submodule working files)
+dat/dmn-tck/runners/**/obj/
+dat/dmn-tck/runners/**/bin/
+
 # Documentation (excluding from repo, but keeping examples and key standards)
 docs/*
 !docs/examples/

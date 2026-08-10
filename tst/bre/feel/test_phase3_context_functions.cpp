@@ -467,4 +467,43 @@ BOOST_AUTO_TEST_CASE(test_nested_boxed_context_decision)
     BOOST_CHECK_EQUAL(result["boxed"]["outer"]["inner"].get<double>(), 7.0);
 }
 
+// A boxed context entry using an unsupported boxed expression kind (anything
+// other than literalExpression or a nested context, e.g. a <relation>) makes
+// the whole context unconvertible. The decision is then registered with no
+// expression and no decision table, so the DRG evaluator falls back to a
+// null result for it rather than throwing. A warning is logged (see the
+// boxed_context_to_feel call site in dmn_parser.cpp) so this is discoverable
+// instead of a silent failure.
+BOOST_AUTO_TEST_CASE(test_boxed_context_with_unsupported_entry_is_not_converted)
+{
+    orion::api::BusinessRulesEngine engine;
+    const std::string dmn_xml = R"(
+    <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" namespace="boxed-context-unsupported-test">
+        <decision name="boxed" id="_boxed">
+            <variable name="boxed"/>
+            <context>
+                <contextEntry>
+                    <variable name="a"/>
+                    <literalExpression><text>1 + 1</text></literalExpression>
+                </contextEntry>
+                <contextEntry>
+                    <variable name="b"/>
+                    <relation>
+                        <column name="col1"/>
+                        <row>
+                            <literalExpression><text>1</text></literalExpression>
+                        </row>
+                    </relation>
+                </contextEntry>
+            </context>
+        </decision>
+    </definitions>
+    )";
+
+    BOOST_REQUIRE(engine.load_dmn_model(dmn_xml).has_value());
+    json result = engine.evaluate(json::object());
+    BOOST_REQUIRE(result.contains("boxed"));
+    BOOST_CHECK(result["boxed"].is_null());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

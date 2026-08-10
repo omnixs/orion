@@ -30,10 +30,74 @@
 #include <iostream>
 #include <chrono>
 #include <map>
+<<<<<<< HEAD
 #include <limits>
 #include <regex>
+=======
+#include <optional>
+#include <string_view>
+#include <unordered_map>
+#include <limits>
+>>>>>>> main
 
 namespace orion::bre::feel {
+
+namespace {
+    /// True if the byte is a UTF-8 continuation byte (10xxxxxx).
+    inline bool is_utf8_continuation(unsigned char byte)
+    {
+        return (byte & 0xC0U) == 0x80U;
+    }
+
+    /**
+     * @brief Count Unicode code points in a UTF-8 string.
+     *
+     * DMN defines the string functions in terms of characters, not bytes, so
+     * string length("hello") and string length("h\u00e9llo") must both be 5.
+     * Malformed input degrades gracefully: stray continuation bytes are simply
+     * not counted as starts.
+     */
+    size_t utf8_length(std::string_view text)
+    {
+        size_t count = 0;
+        for (const char ch : text)
+        {
+            if (!is_utf8_continuation(static_cast<unsigned char>(ch))) ++count;
+        }
+        return count;
+    }
+
+    /// Byte offset of the given code point index, or text.size() if past the end.
+    size_t utf8_offset_of(std::string_view text, size_t char_index)
+    {
+        size_t chars_seen = 0;
+        for (size_t offset = 0; offset < text.size(); ++offset)
+        {
+            if (is_utf8_continuation(static_cast<unsigned char>(text[offset]))) continue;
+            if (chars_seen == char_index) return offset;
+            ++chars_seen;
+        }
+        return text.size();
+    }
+
+    /**
+     * @brief Substring by code point index and code point count.
+     *
+     * @param text Source string (UTF-8)
+     * @param start_char 0-based code point index to start from
+     * @param char_count Maximum number of code points to take
+     */
+    std::string utf8_substr(std::string_view text, size_t start_char, long long char_count)
+    {
+        if (char_count <= 0) return std::string();
+
+        const size_t begin = utf8_offset_of(text, start_char);
+        if (begin >= text.size()) return std::string();
+
+        const size_t end = utf8_offset_of(text, start_char + static_cast<size_t>(char_count));
+        return std::string(text.substr(begin, end - begin));
+    }
+} // namespace
 
 json evaluate_not_function(const std::vector<json>& args)
 {
@@ -811,19 +875,22 @@ json evaluate_substring_function(const std::vector<json>& args)
         return nullptr; // DMN spec: return null for invalid argument type
     }
 
-    std::string string_val = str.get<std::string>();
-    
+    const std::string& string_val = str.get_ref<const std::string&>();
+
+    // DMN counts characters (Unicode code points), not bytes
+    const long long char_count = static_cast<long long>(utf8_length(string_val));
+
     // DMN uses 1-based indexing
-    int start_index = static_cast<int>(start_pos.get<double>()) - 1;
+    long long start_index = static_cast<long long>(start_pos.get<double>()) - 1;
 
     // Handle negative start position (from end)
     if (start_index < 0)
     {
-        start_index = static_cast<int>(string_val.length()) + start_index + 1;
+        start_index = char_count + start_index + 1;
     }
 
     // Validate bounds
-    if (start_index < 0 || start_index >= static_cast<int>(string_val.length()))
+    if (start_index < 0 || start_index >= char_count)
     {
         return std::string(""); // Return empty string for out of bounds
     }
@@ -836,7 +903,7 @@ json evaluate_substring_function(const std::vector<json>& args)
         if (length.is_null())
         {
             // If length is null, return substring from start to end
-            return string_val.substr(start_index);
+            return utf8_substr(string_val, static_cast<size_t>(start_index), char_count);
         }
 
         if (!length.is_number())
@@ -844,7 +911,7 @@ json evaluate_substring_function(const std::vector<json>& args)
             return nullptr; // DMN spec: return null for invalid argument type
         }
 
-        int len = static_cast<int>(length.get<double>());
+        const long long len = static_cast<long long>(length.get<double>());
         
         // Negative length returns empty string
         if (len < 0)
@@ -852,11 +919,11 @@ json evaluate_substring_function(const std::vector<json>& args)
             return std::string("");
         }
 
-        return string_val.substr(start_index, len);
+        return utf8_substr(string_val, static_cast<size_t>(start_index), len);
     }
 
     // No length provided - return from start to end
-    return string_val.substr(start_index);
+    return utf8_substr(string_val, static_cast<size_t>(start_index), char_count);
 }
 
 json evaluate_string_length_function(const std::vector<json>& args)
@@ -881,8 +948,8 @@ json evaluate_string_length_function(const std::vector<json>& args)
         return nullptr; // DMN spec: return null for invalid argument type
     }
 
-    std::string string_val = str.get<std::string>();
-    return static_cast<int>(string_val.length());
+    // DMN counts characters (Unicode code points), not bytes
+    return static_cast<int>(utf8_length(str.get_ref<const std::string&>()));
 }
 
 json evaluate_upper_case_function(const std::vector<json>& args)
@@ -908,7 +975,8 @@ json evaluate_upper_case_function(const std::vector<json>& args)
     }
 
     std::string string_val = str.get<std::string>();
-    std::transform(string_val.begin(), string_val.end(), string_val.begin(), ::toupper);
+    std::transform(string_val.begin(), string_val.end(), string_val.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
     return string_val;
 }
 
@@ -935,7 +1003,8 @@ json evaluate_lower_case_function(const std::vector<json>& args)
     }
 
     std::string string_val = str.get<std::string>();
-    std::transform(string_val.begin(), string_val.end(), string_val.begin(), ::tolower);
+    std::transform(string_val.begin(), string_val.end(), string_val.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     return string_val;
 }
 
@@ -999,7 +1068,7 @@ json evaluate_ends_with_function(const std::vector<json>& args)
     return string_val.ends_with(suffix_val);
 }
 
-json evaluate_replace_function(const std::vector<json>& args)
+json evaluate_replace_function(const std::vector<json>& args, const EvaluationContext& eval_ctx)
 {
     // Validate argument count (3 or 4 - flags is optional)
     if (args.size() < 3 || args.size() > 4)
@@ -1023,9 +1092,9 @@ json evaluate_replace_function(const std::vector<json>& args)
         return nullptr; // DMN spec: return null for invalid argument type
     }
 
-    std::string input_val = input.get<std::string>();
-    std::string pattern_val = pattern.get<std::string>();
-    std::string replacement_val = replacement.get<std::string>();
+    const std::string& input_val = input.get_ref<const std::string&>();
+    const std::string& pattern_val = pattern.get_ref<const std::string&>();
+    const std::string& replacement_val = replacement.get_ref<const std::string&>();
 
     // Handle optional flags parameter
     std::string flags_val;
@@ -1039,6 +1108,7 @@ json evaluate_replace_function(const std::vector<json>& args)
         }
     }
 
+<<<<<<< HEAD
     // Convert XPath/FEEL replacement syntax ($1, $2) to std::regex syntax ($1, $2) - same
     // But FEEL uses $0 for whole match - std::regex uses $& or $0 depending on implementation
     // Actually std::regex_replace uses $1, $2 etc. which matches FEEL spec
@@ -1109,6 +1179,24 @@ json evaluate_replace_function(const std::vector<json>& args)
     {
         return nullptr; // Invalid regex pattern
     }
+=======
+    // Share the compiled-pattern cache, the JIT and the regex flavour with
+    // matches(). std::regex would recompile on every call, use ECMAScript
+    // semantics instead of the XPath flavour DMN mandates, and can exhaust the
+    // stack on adversarial patterns.
+    auto compiled = eval_ctx.regex_cache.get_or_compile(pattern_val, flags_val);
+    if (!compiled)
+    {
+        return nullptr; // Invalid pattern or flags
+    }
+
+    auto result = compiled->replace_all(input_val, replacement_val);
+    if (!result)
+    {
+        return nullptr;
+    }
+    return *result;
+>>>>>>> main
 }
 
 json evaluate_matches_function(const std::vector<json>& args, const EvaluationContext& eval_ctx)
@@ -1211,12 +1299,14 @@ json evaluate_split_function(const std::vector<json>& args)
 
     json result_array = json::array();
 
-    // Handle empty delimiter - return array with each character
+    // Handle empty delimiter - return array with each character (code point)
     if (delimiter_val.empty())
     {
-        for (char ch : string_val)
+        const size_t char_count = utf8_length(string_val);
+        result_array.get_ref<json::array_t&>().reserve(char_count);
+        for (size_t i = 0; i < char_count; ++i)
         {
-            result_array.push_back(std::string(1, ch));
+            result_array.push_back(utf8_substr(string_val, i, 1));
         }
         return result_array;
     }
@@ -1329,8 +1419,11 @@ struct DateComponents {
     bool valid = false;
 };
 
+<<<<<<< HEAD
 static bool is_datetime_string(const std::string& s);
 
+=======
+>>>>>>> main
 static DateComponents parse_date_components(const std::string& s)
 {
     DateComponents dc;
@@ -1397,6 +1490,7 @@ json evaluate_date_function(const std::vector<json>& args)
         std::string s = args[0].get<std::string>();
 
         // If it's a datetime string, extract date part
+<<<<<<< HEAD
         if (is_datetime_string(s)) {
             auto tpos = s.find('T');
             s = s.substr(0, tpos);
@@ -1432,6 +1526,34 @@ json evaluate_date_function(const std::vector<json>& args)
             return nullptr;
         }
 
+=======
+        auto tpos = s.find('T');
+        if (tpos != std::string::npos) {
+            s = s.substr(0, tpos);
+        }
+
+        // Strict DMN date validation:
+        // Must be [-]YYYY-MM-DD where YYYY is exactly 4 digits (or more without leading zeros)
+        // Leading + is NOT allowed
+        // 3-digit years NOT allowed
+        // 5-digit years with leading zero NOT allowed
+        size_t pos = 0;
+        if (!s.empty() && s[0] == '-') pos = 1;
+        if (!s.empty() && s[0] == '+') return nullptr; // Leading + not allowed
+
+        auto dash1 = s.find('-', pos);
+        if (dash1 == std::string::npos || dash1 == pos) return nullptr;
+        
+        std::string year_str = s.substr(pos, dash1 - pos);
+        // Year must be at least 4 digits; if more than 4, no leading zeros
+        if (year_str.size() < 4) return nullptr;
+        if (year_str.size() > 4 && year_str[0] == '0') return nullptr;
+        // All characters must be digits
+        for (char c : year_str) {
+            if (!std::isdigit(static_cast<unsigned char>(c))) return nullptr;
+        }
+
+>>>>>>> main
         auto dc = parse_date_components(s);
         if (!dc.valid) return nullptr;
 
@@ -1443,6 +1565,7 @@ json evaluate_date_function(const std::vector<json>& args)
         if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
         if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
 
+<<<<<<< HEAD
         auto to_integral = [](const json& v, int& out) -> bool {
             if (v.is_number_integer()) {
                 out = v.get<int>();
@@ -1469,6 +1592,11 @@ json evaluate_date_function(const std::vector<json>& args)
         if (!to_integral(args[0], year_num) || !to_integral(args[1], month_num) || !to_integral(args[2], day_num)) {
             return nullptr;
         }
+=======
+        int year_num = args[0].get<int>();
+        int month_num = args[1].get<int>();
+        int day_num = args[2].get<int>();
+>>>>>>> main
 
         if (year_num < -999999999 || year_num > 999999999) return nullptr;
         if (month_num < 1 || month_num > 12 || day_num < 1 || day_num > 31) return nullptr;
@@ -1615,7 +1743,15 @@ static bool is_date_string(const std::string& s)
 // Detect if a string is a datetime: contains T or is date + T + time
 static bool is_datetime_string(const std::string& s)
 {
+<<<<<<< HEAD
     return parse_datetime(s).has_value();
+=======
+    // Look for T separator between date and time parts
+    auto tpos = s.find('T');
+    if (tpos == std::string::npos) return false;
+    if (tpos < 8) return false; // Need at least YYYY-MM-DD before T
+    return true;
+>>>>>>> main
 }
 
 // Detect if a string looks like a time: HH:MM:SS or HH:MM:SS.fff or with timezone
@@ -1692,7 +1828,11 @@ static TimeComponents parse_time_components(const std::string& s)
             } else if (tz_part[0] == '+' || tz_part[0] == '-') {
                 // Must not also have @timezone
                 if (tz_part.find('@') != std::string::npos) return tc;
+<<<<<<< HEAD
                 // Validate offset format: +-HH:MM (exactly)
+=======
+                // Validate offset format: ±HH:MM (exactly)
+>>>>>>> main
                 if (tz_part.size() != 6) return tc;
                 if (!std::isdigit(static_cast<unsigned char>(tz_part[1])) ||
                     !std::isdigit(static_cast<unsigned char>(tz_part[2]))) return tc;
@@ -1768,6 +1908,7 @@ static std::string normalize_time_string(const std::string& s)
     return oss.str();
 }
 
+<<<<<<< HEAD
 static std::string offset_to_duration_string(const std::string& offset)
 {
     if (offset.empty()) return {};
@@ -1809,6 +1950,8 @@ static std::string offset_to_duration_string(const std::string& offset)
     return oss.str();
 }
 
+=======
+>>>>>>> main
 // Parse duration components
 struct DurationComponents {
     bool negative = false;
@@ -1909,6 +2052,7 @@ json get_temporal_property(const std::string& val, const std::string& prop)
         if (prop == "minute" && tcomp.valid) return tcomp.minute;
         if (prop == "second" && tcomp.valid) return tcomp.second;
         if (prop == "time offset" || prop == "timezone") {
+<<<<<<< HEAD
             if (tcomp.offset.empty()) return nullptr;
             if (prop == "time offset") {
                 if (tcomp.offset[0] == '@') return nullptr;
@@ -1918,6 +2062,9 @@ json get_temporal_property(const std::string& val, const std::string& prop)
             return nullptr;
         }
         if (prop == "year" || prop == "month" || prop == "day") {
+=======
+            if (!tcomp.offset.empty()) return tcomp.offset;
+>>>>>>> main
             return nullptr;
         }
         if (prop == "date") {
@@ -1965,12 +2112,16 @@ json get_temporal_property(const std::string& val, const std::string& prop)
         if (prop == "minute") return tcomp.minute;
         if (prop == "second") return tcomp.second;
         if (prop == "time offset" || prop == "timezone") {
+<<<<<<< HEAD
             if (tcomp.offset.empty()) return nullptr;
             if (prop == "time offset") {
                 if (tcomp.offset[0] == '@') return nullptr;
                 return offset_to_duration_string(tcomp.offset);
             }
             if (tcomp.offset[0] == '@') return tcomp.offset.substr(1);
+=======
+            if (!tcomp.offset.empty()) return tcomp.offset;
+>>>>>>> main
             return nullptr;
         }
         return nullptr;
@@ -1991,6 +2142,7 @@ json evaluate_time_function(const std::vector<json>& args)
             std::string s = args[0].get<std::string>();
             // Could be a time string or a datetime string
             // If datetime, extract time part
+<<<<<<< HEAD
             if (is_datetime_string(s)) {
                 auto tpos = s.find('T');
                 s = s.substr(tpos + 1);
@@ -2000,6 +2152,11 @@ json evaluate_time_function(const std::vector<json>& args)
                 if (dcomp.valid && is_date_string(s)) {
                     return std::string("00:00:00Z");
                 }
+=======
+            auto tpos = s.find('T');
+            if (tpos != std::string::npos) {
+                s = s.substr(tpos + 1);
+>>>>>>> main
             }
             // Validate it parses as a time
             auto tc = parse_time_components(s);
@@ -2014,6 +2171,7 @@ json evaluate_time_function(const std::vector<json>& args)
         if (args[0].is_null() || args[1].is_null() || args[2].is_null()) return nullptr;
         if (!args[0].is_number() || !args[1].is_number() || !args[2].is_number()) return nullptr;
 
+<<<<<<< HEAD
         auto to_integral = [](const json& v, int& out) -> bool {
             if (v.is_number_integer()) {
                 out = v.get<int>();
@@ -2042,6 +2200,11 @@ json evaluate_time_function(const std::vector<json>& args)
         if (!std::isfinite(sec_value) || sec_value < 0.0 || sec_value >= 60.0) return nullptr;
         int sec = static_cast<int>(std::floor(sec_value));
         double sec_fraction = sec_value - static_cast<double>(sec);
+=======
+        int h = args[0].get<int>();
+        int m = args[1].get<int>();
+        int sec = args[2].get<int>();
+>>>>>>> main
 
         if (h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59) return nullptr;
 
@@ -2050,6 +2213,7 @@ json evaluate_time_function(const std::vector<json>& args)
             << std::setw(2) << std::setfill('0') << m << ':'
             << std::setw(2) << std::setfill('0') << sec;
 
+<<<<<<< HEAD
         if (sec_fraction > 1e-12) {
             std::ostringstream frac;
             frac << std::fixed << std::setprecision(9) << sec_fraction;
@@ -2065,6 +2229,8 @@ json evaluate_time_function(const std::vector<json>& args)
             }
         }
 
+=======
+>>>>>>> main
         if (args.size() >= 4 && !args[3].is_null()) {
             if (args[3].is_string()) {
                 std::string offset_str = args[3].get<std::string>();
@@ -2110,11 +2276,14 @@ json evaluate_time_function(const std::vector<json>& args)
                     }
                 } else {
                     // Assume it's already a timezone string (e.g., "@Europe/Paris" or "+02:00")
+<<<<<<< HEAD
                     if (!offset_str.empty() && (offset_str[0] == '+' || offset_str[0] == '-')) {
                         if (offset_str == "+00:00" || offset_str == "-00:00") {
                             offset_str = "Z";
                         }
                     }
+=======
+>>>>>>> main
                     oss << offset_str;
                 }
             } else {
@@ -2614,7 +2783,13 @@ json evaluate_string_function(const std::vector<json>& args)
                 first = false;
                 if (elem.is_string())
                 {
+<<<<<<< HEAD
                     result += "\"" + elem.get<std::string>() + "\"";
+=======
+                    // Re-escape embedded quotes/backslashes so the rendered
+                    // literal round-trips (e.g. `"foo"` -> "\"foo\"").
+                    result += elem.dump(-1, ' ', false, json::error_handler_t::replace);
+>>>>>>> main
                 }
                 else if (elem.is_null())
                 {
@@ -2654,7 +2829,11 @@ json evaluate_string_function(const std::vector<json>& args)
                     }
                 }
                 if (needs_quotes)
+<<<<<<< HEAD
                     result += "\"" + key + "\": ";
+=======
+                    result += json(key).dump(-1, ' ', false, json::error_handler_t::replace) + ": ";
+>>>>>>> main
                 else
                     result += key + ": ";
                 
@@ -2718,13 +2897,52 @@ json evaluate_is_function(const std::vector<json>& args)
 
 // ========== PHASE 2A: AGGREGATION FUNCTIONS ==========
 
+<<<<<<< HEAD
 // Helper: Normalize variadic args to a single flat list of numbers
 // min(1,2,3) or min([1,2,3]) → [1,2,3]
 static json normalize_to_list(const std::vector<json>& args)
+=======
+// Helper: FEEL value equality over a JSON array.
+// Uses json::operator==, which compares numbers numerically (1 == 1.0) as
+// required by DMN. Do not substitute a serialization-based key: dump() would
+// distinguish 1 from 1.0, map NaN/Infinity onto "null", and throw on invalid
+// UTF-8. Linear scan is also faster than hashing for the small lists typical
+// of decision tables.
+static bool array_contains_value(const json& array_value, const json& element)
+{
+    for (const auto& item : array_value)
+    {
+        if (item == element) return true;
+    }
+    return false;
+}
+
+// Helper: Convert a FEEL number to a list index safely.
+// Fractional positions are truncated toward zero, as required by DMN
+// (e.g. list replace([1,2,3], 2.5, 4) addresses position 2). Non-numbers,
+// non-finite values and magnitudes that would make the float->int conversion
+// undefined behaviour are rejected.
+static std::optional<long long> to_list_index(const json& value)
+{
+    if (!value.is_number()) return std::nullopt;
+    const double raw = value.get<double>();
+    if (!std::isfinite(raw)) return std::nullopt;
+    if (raw < -9.0e15 || raw > 9.0e15) return std::nullopt;
+    return static_cast<long long>(raw);
+}
+
+// Helper: Normalize variadic args to a single flat list of numbers
+// min(1,2,3) or min([1,2,3]) → [1,2,3]
+//
+// Postcondition: on success the result is always an array, so callers must not
+// re-test for that. Returns nullopt only for a single null argument.
+static std::optional<json> normalize_to_list(const std::vector<json>& args)
+>>>>>>> main
 {
     if (args.size() == 1)
     {
         const auto& arg = args[0];
+<<<<<<< HEAD
         if (arg.is_null()) return nullptr;
         if (arg.is_array()) return arg;
         // Single scalar → wrap in array
@@ -2732,28 +2950,54 @@ static json normalize_to_list(const std::vector<json>& args)
     }
     // Multiple args → treat as list
     json result = json::array();
+=======
+        if (arg.is_null()) return std::nullopt;
+        if (arg.is_array()) return std::optional<json>(arg);
+        // Single scalar → wrap in array
+        return std::optional<json>(json::array({arg}));
+    }
+    // Multiple args → treat as list
+    json result = json::array();
+    result.get_ref<json::array_t&>().reserve(args.size());
+>>>>>>> main
     for (const auto& a : args)
     {
         result.push_back(a);
     }
+<<<<<<< HEAD
     return result;
+=======
+    return std::optional<json>(std::move(result));
+>>>>>>> main
 }
 
 json evaluate_count_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return json(1); // single element
     return json(static_cast<double>(list.size()));
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    return json(static_cast<double>(list_opt->size()));
+>>>>>>> main
 }
 
 json evaluate_sum_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+>>>>>>> main
     if (list.empty()) return json(0);
 
     double total = 0.0;
@@ -2769,9 +3013,15 @@ json evaluate_sum_function(const std::vector<json>& args)
 json evaluate_min_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+>>>>>>> main
     if (list.empty()) return nullptr;
 
     double result = std::numeric_limits<double>::infinity();
@@ -2788,9 +3038,15 @@ json evaluate_min_function(const std::vector<json>& args)
 json evaluate_max_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+>>>>>>> main
     if (list.empty()) return nullptr;
 
     double result = -std::numeric_limits<double>::infinity();
@@ -2807,9 +3063,15 @@ json evaluate_max_function(const std::vector<json>& args)
 json evaluate_mean_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+>>>>>>> main
     if (list.empty()) return nullptr;
 
     double total = 0.0;
@@ -2825,9 +3087,15 @@ json evaluate_mean_function(const std::vector<json>& args)
 json evaluate_product_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+>>>>>>> main
     if (list.empty()) return nullptr;
 
     double result = 1.0;
@@ -2843,12 +3111,22 @@ json evaluate_product_function(const std::vector<json>& args)
 json evaluate_median_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
     if (list.empty()) return nullptr;
 
     std::vector<double> values;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+    if (list.empty()) return nullptr;
+
+    std::vector<double> values;
+    values.reserve(list.size());  // Reserve capacity upfront
+>>>>>>> main
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
@@ -2868,6 +3146,7 @@ json evaluate_median_function(const std::vector<json>& args)
 json evaluate_stddev_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
@@ -2876,6 +3155,17 @@ json evaluate_stddev_function(const std::vector<json>& args)
     // Calculate mean
     double total = 0.0;
     std::vector<double> values;
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+    if (list.size() < 2) return nullptr;
+
+    // Single pass: validate, calculate sum, and build values vector
+    double total = 0.0;
+    std::vector<double> values;
+    values.reserve(list.size());  // Reserve capacity upfront
+>>>>>>> main
     for (const auto& item : list)
     {
         if (item.is_null()) return nullptr;
@@ -2886,7 +3176,11 @@ json evaluate_stddev_function(const std::vector<json>& args)
     }
     double mean = total / static_cast<double>(values.size());
 
+<<<<<<< HEAD
     // Calculate sample standard deviation
+=======
+    // Calculate sample standard deviation (single pass with cached mean)
+>>>>>>> main
     double sum_sq_diff = 0.0;
     for (double v : values)
     {
@@ -2900,6 +3194,7 @@ json evaluate_stddev_function(const std::vector<json>& args)
 json evaluate_mode_function(const std::vector<json>& args)
 {
     if (args.empty()) return nullptr;
+<<<<<<< HEAD
     auto list = normalize_to_list(args);
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
@@ -2933,6 +3228,41 @@ json evaluate_mode_function(const std::vector<json>& args)
         if (count == max_freq)
         {
             result.push_back(val);
+=======
+    const auto list_opt = normalize_to_list(args);
+    if (!list_opt) return nullptr;
+    const json& list = *list_opt;
+    if (list.empty()) return json::array();
+
+    // Count frequencies keyed by numeric value. std::map keeps keys ordered, so
+    // the result comes out ascending without sorting the input separately. The
+    // index of the first occurrence is retained so the original JSON numeric
+    // representation (integer vs float) is preserved in the output.
+    std::map<double, std::pair<int, size_t>> freq;
+    for (size_t i = 0; i < list.size(); ++i)
+    {
+        const auto& item = list[i];
+        if (item.is_null()) return nullptr;
+        if (!item.is_number()) return nullptr;
+        auto [entry, inserted] = freq.try_emplace(item.get<double>(), 0, i);
+        entry->second.first++;
+    }
+
+    // Find max frequency
+    int max_freq = 0;
+    for (const auto& [val, info] : freq)
+    {
+        if (info.first > max_freq) max_freq = info.first;
+    }
+
+    // Return values with max frequency from the ordered map
+    json result = json::array();
+    for (const auto& [val, info] : freq)
+    {
+        if (info.first == max_freq)
+        {
+            result.push_back(list[info.second]);
+>>>>>>> main
         }
     }
     return result;
@@ -2949,11 +3279,15 @@ json evaluate_list_contains_function(const std::vector<json>& args)
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
 
+<<<<<<< HEAD
     for (const auto& item : list)
     {
         if (item == element) return true;
     }
     return false;
+=======
+    return array_contains_value(list, element);
+>>>>>>> main
 }
 
 json evaluate_append_function(const std::vector<json>& args)
@@ -2987,6 +3321,18 @@ json evaluate_concatenate_function(const std::vector<json>& args)
     if (args.empty()) return nullptr;
 
     json result = json::array();
+<<<<<<< HEAD
+=======
+    auto& elements = result.get_ref<json::array_t&>();
+    size_t expected = 0;
+    for (const auto& arg : args)
+    {
+        if (arg.is_null()) continue;
+        expected += arg.is_array() ? arg.size() : 1;
+    }
+    elements.reserve(expected);
+
+>>>>>>> main
     for (const auto& arg : args)
     {
         if (arg.is_null()) continue;
@@ -3013,6 +3359,7 @@ json evaluate_insert_before_function(const std::vector<json>& args)
     const auto& new_item = args[2];
 
     if (list.is_null() || !list.is_array()) return nullptr;
+<<<<<<< HEAD
     if (position.is_null() || !position.is_number()) return nullptr;
 
     int pos = static_cast<int>(position.get<double>());
@@ -3020,6 +3367,17 @@ json evaluate_insert_before_function(const std::vector<json>& args)
 
     // FEEL uses 1-based indexing, negative from end
     int idx;
+=======
+    if (position.is_null()) return nullptr;
+
+    const auto pos_opt = to_list_index(position);
+    if (!pos_opt) return nullptr;
+    const long long pos = *pos_opt;
+    const long long size = static_cast<long long>(list.size());
+
+    // FEEL uses 1-based indexing, negative from end
+    long long idx;
+>>>>>>> main
     if (pos > 0)
     {
         idx = pos - 1;
@@ -3036,7 +3394,11 @@ json evaluate_insert_before_function(const std::vector<json>& args)
     if (idx < 0 || idx > size) return nullptr;
 
     json result = list;
+<<<<<<< HEAD
     result.insert(result.begin() + idx, new_item);
+=======
+    result.insert(result.begin() + static_cast<json::difference_type>(idx), new_item);
+>>>>>>> main
     return result;
 }
 
@@ -3047,12 +3409,23 @@ json evaluate_remove_function(const std::vector<json>& args)
     const auto& position = args[1];
 
     if (list.is_null() || !list.is_array()) return nullptr;
+<<<<<<< HEAD
     if (position.is_null() || !position.is_number()) return nullptr;
 
     int pos = static_cast<int>(position.get<double>());
     int size = static_cast<int>(list.size());
 
     int idx;
+=======
+    if (position.is_null()) return nullptr;
+
+    const auto pos_opt = to_list_index(position);
+    if (!pos_opt) return nullptr;
+    const long long pos = *pos_opt;
+    const long long size = static_cast<long long>(list.size());
+
+    long long idx;
+>>>>>>> main
     if (pos > 0)
     {
         idx = pos - 1;
@@ -3069,7 +3442,11 @@ json evaluate_remove_function(const std::vector<json>& args)
     if (idx < 0 || idx >= size) return nullptr;
 
     json result = list;
+<<<<<<< HEAD
     result.erase(result.begin() + idx);
+=======
+    result.erase(result.begin() + static_cast<json::difference_type>(idx));
+>>>>>>> main
     return result;
 }
 
@@ -3082,6 +3459,10 @@ json evaluate_reverse_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
+<<<<<<< HEAD
+=======
+    result.get_ref<json::array_t&>().reserve(list.size());  // Reserve capacity
+>>>>>>> main
     for (auto it = list.rbegin(); it != list.rend(); ++it)
     {
         result.push_back(*it);
@@ -3115,12 +3496,23 @@ json evaluate_sublist_function(const std::vector<json>& args)
     const auto& start_pos = args[1];
 
     if (list.is_null() || !list.is_array()) return nullptr;
+<<<<<<< HEAD
     if (start_pos.is_null() || !start_pos.is_number()) return nullptr;
 
     int pos = static_cast<int>(start_pos.get<double>());
     int size = static_cast<int>(list.size());
 
     int start;
+=======
+    if (start_pos.is_null()) return nullptr;
+
+    const auto pos_opt = to_list_index(start_pos);
+    if (!pos_opt) return nullptr;
+    const long long pos = *pos_opt;
+    const long long size = static_cast<long long>(list.size());
+
+    long long start;
+>>>>>>> main
     if (pos > 0)
     {
         start = pos - 1;
@@ -3136,6 +3528,7 @@ json evaluate_sublist_function(const std::vector<json>& args)
 
     if (start < 0 || start >= size) return nullptr;
 
+<<<<<<< HEAD
     int length = size - start; // default: rest of list
     if (args.size() == 3 && !args[2].is_null())
     {
@@ -3148,6 +3541,25 @@ json evaluate_sublist_function(const std::vector<json>& args)
     for (int i = start; i < start + length && i < size; ++i)
     {
         result.push_back(list[i]);
+=======
+    long long length = size - start; // default: rest of list
+    if (args.size() == 3 && !args[2].is_null())
+    {
+        const auto len_opt = to_list_index(args[2]);
+        if (!len_opt) return nullptr;
+        length = *len_opt;
+        if (length < 0) return nullptr;
+    }
+
+    // Clamp before adding so the bound cannot overflow
+    const long long end = (length > size - start) ? size : start + length;
+
+    json result = json::array();
+    result.get_ref<json::array_t&>().reserve(static_cast<size_t>(end - start));
+    for (long long i = start; i < end; ++i)
+    {
+        result.push_back(list[static_cast<size_t>(i)]);
+>>>>>>> main
     }
     return result;
 }
@@ -3164,6 +3576,7 @@ json evaluate_union_function(const std::vector<json>& args)
         {
             for (const auto& item : arg)
             {
+<<<<<<< HEAD
                 // Add only if not already present
                 bool found = false;
                 for (const auto& existing : result)
@@ -3171,16 +3584,23 @@ json evaluate_union_function(const std::vector<json>& args)
                     if (existing == item) { found = true; break; }
                 }
                 if (!found) result.push_back(item);
+=======
+                if (!array_contains_value(result, item)) result.push_back(item);
+>>>>>>> main
             }
         }
         else
         {
+<<<<<<< HEAD
             bool found = false;
             for (const auto& existing : result)
             {
                 if (existing == arg) { found = true; break; }
             }
             if (!found) result.push_back(arg);
+=======
+            if (!array_contains_value(result, arg)) result.push_back(arg);
+>>>>>>> main
         }
     }
     return result;
@@ -3195,6 +3615,7 @@ json evaluate_distinct_values_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
+<<<<<<< HEAD
     for (const auto& item : list)
     {
         bool found = false;
@@ -3203,6 +3624,12 @@ json evaluate_distinct_values_function(const std::vector<json>& args)
             if (existing == item) { found = true; break; }
         }
         if (!found) result.push_back(item);
+=======
+    result.get_ref<json::array_t&>().reserve(list.size());
+    for (const auto& item : list)
+    {
+        if (!array_contains_value(result, item)) result.push_back(item);
+>>>>>>> main
     }
     return result;
 }
@@ -3231,19 +3658,30 @@ json evaluate_flatten_function(const std::vector<json>& args)
     if (!list.is_array()) return json::array({list});
 
     json result = json::array();
+<<<<<<< HEAD
+=======
+    result.get_ref<json::array_t&>().reserve(list.size());  // Lower bound for nested lists
+>>>>>>> main
     flatten_recursive(list, result);
     return result;
 }
 
 json evaluate_sort_function(const std::vector<json>& args)
 {
+<<<<<<< HEAD
     if (args.empty()) return nullptr;
+=======
+    // The sort(list, precedes) overload needs first-class functions (Phase 7B).
+    // Reject it explicitly rather than silently ignoring the comparator.
+    if (args.size() != 1) return nullptr;
+>>>>>>> main
     const auto& list = args[0];
 
     if (list.is_null()) return nullptr;
     if (!list.is_array()) return nullptr;
     if (list.empty()) return json::array();
 
+<<<<<<< HEAD
     // Check if all elements are numbers
     std::vector<double> numbers;
     bool all_numbers = true;
@@ -3274,10 +3712,32 @@ json evaluate_sort_function(const std::vector<json>& args)
         std::sort(numbers.begin(), numbers.end());
         json result = json::array();
         for (double v : numbers) result.push_back(v);
+=======
+    // Single pass to determine element type
+    bool all_numbers = true;
+    bool all_strings = true;
+    for (const auto& item : list)
+    {
+        if (!item.is_number()) all_numbers = false;
+        if (!item.is_string()) all_strings = false;
+        if (!all_numbers && !all_strings) break;  // Early exit if mixed
+    }
+
+    // Sort the JSON values in place so the original numeric representation
+    // (integer vs float) and full integer precision are preserved.
+    if (all_numbers)
+    {
+        json result = list;
+        auto& elements = result.get_ref<json::array_t&>();
+        std::sort(elements.begin(), elements.end(), [](const json& a, const json& b) {
+            return a.get<double>() < b.get<double>();
+        });
+>>>>>>> main
         return result;
     }
     if (all_strings)
     {
+<<<<<<< HEAD
         std::sort(strings.begin(), strings.end());
         json result = json::array();
         for (const auto& s : strings) result.push_back(s);
@@ -3286,6 +3746,17 @@ json evaluate_sort_function(const std::vector<json>& args)
 
     // Mixed types or unsupported: return null
     // Full sort with precedes function requires Phase 7B (user-defined functions)
+=======
+        json result = list;
+        auto& elements = result.get_ref<json::array_t&>();
+        std::sort(elements.begin(), elements.end(), [](const json& a, const json& b) {
+            return a.get_ref<const std::string&>() < b.get_ref<const std::string&>();
+        });
+        return result;
+    }
+
+    // Mixed types or unsupported element types: return null
+>>>>>>> main
     return nullptr;
 }
 
@@ -3298,12 +3769,17 @@ json evaluate_list_replace_function(const std::vector<json>& args)
 
     if (list_arg.is_null()) return nullptr;
 
+<<<<<<< HEAD
     json list = list_arg;
     if (!list.is_array())
     {
         // FEEL singleton coercion: a scalar value is treated as a one-item list.
         list = json::array({list_arg});
     }
+=======
+    // Single copy: either the list itself or the singleton-coerced wrapper.
+    json list = list_arg.is_array() ? list_arg : json::array({list_arg});
+>>>>>>> main
 
     // FEEL overload: list replace(list, match(item, newItem), newItem)
     // Current parser/evaluator does not represent first-class functions yet.
@@ -3314,6 +3790,7 @@ json evaluate_list_replace_function(const std::vector<json>& args)
         {
             return list; // Predicate never matches
         }
+<<<<<<< HEAD
         json result = list;
         for (auto& item : result)
         {
@@ -3328,6 +3805,23 @@ json evaluate_list_replace_function(const std::vector<json>& args)
     int size = static_cast<int>(list.size());
 
     int idx;
+=======
+        for (auto& item : list)
+        {
+            item = new_item; // Predicate always matches
+        }
+        return list;
+    }
+
+    if (position_or_match.is_null()) return nullptr;
+
+    const auto pos_opt = to_list_index(position_or_match);
+    if (!pos_opt) return nullptr;
+    const long long pos = *pos_opt;
+    const long long size = static_cast<long long>(list.size());
+
+    long long idx;
+>>>>>>> main
     if (pos > 0)
     {
         idx = pos - 1;
@@ -3343,9 +3837,14 @@ json evaluate_list_replace_function(const std::vector<json>& args)
 
     if (idx < 0 || idx >= size) return nullptr;
 
+<<<<<<< HEAD
     json result = list;
     result[idx] = new_item;
     return result;
+=======
+    list[static_cast<size_t>(idx)] = new_item;
+    return list;
+>>>>>>> main
 }
 
 // ========== PHASE 3: CONTEXT FUNCTIONS ==========
@@ -3420,7 +3919,10 @@ json evaluate_context_function(const std::vector<json>& args)
         auto value_it = entry.find("value");
         if (key_it == entry.end() || value_it == entry.end()) return nullptr;
         if (!key_it->is_string()) return nullptr;
+<<<<<<< HEAD
         if (key_it->is_null()) return nullptr;
+=======
+>>>>>>> main
 
         std::string key_str = key_it->get<std::string>();
 
@@ -3527,5 +4029,133 @@ json evaluate_context_merge_function(const std::vector<json>& args)
     return result;
 }
 
+<<<<<<< HEAD
 } // namespace orion::bre
+=======
+// ========== BUILT-IN FUNCTION DISPATCH ==========
+
+namespace {
+    /// Adapt a plain `json(const std::vector<json>&)` builtin to BuiltinHandler.
+    template <json (*Fn)(const std::vector<json>&)>
+    json adapt_args_only(const std::vector<json>& args, const json&, const EvaluationContext&)
+    {
+        return Fn(args);
+    }
+
+    /// `matches` additionally needs the evaluation context for the regex cache.
+    json adapt_matches(const std::vector<json>& args, const json&, const EvaluationContext& eval_ctx)
+    {
+        return evaluate_matches_function(args, eval_ctx);
+    }
+
+    /// `replace` also needs the evaluation context for the regex cache.
+    json adapt_replace(const std::vector<json>& args, const json&, const EvaluationContext& eval_ctx)
+    {
+        return evaluate_replace_function(args, eval_ctx);
+    }
+
+    const std::unordered_map<std::string_view, BuiltinHandler>& builtin_table()
+    {
+        static const std::unordered_map<std::string_view, BuiltinHandler> table = {
+            // Boolean / list predicates
+            {"not",                       adapt_args_only<&evaluate_not_function>},
+            {"all",                       adapt_args_only<&evaluate_all_function>},
+            {"any",                       adapt_args_only<&evaluate_any_function>},
+            {"contains",                  adapt_args_only<&evaluate_contains_function>},
+
+            // Math functions
+            {"abs",                       adapt_args_only<&evaluate_abs_function>},
+            {"sqrt",                      adapt_args_only<&evaluate_sqrt_function>},
+            {"floor",                     adapt_args_only<&evaluate_floor_function>},
+            {"ceiling",                   adapt_args_only<&evaluate_ceiling_function>},
+            {"exp",                       adapt_args_only<&evaluate_exp_function>},
+            {"log",                       adapt_args_only<&evaluate_log_function>},
+            {"modulo",                    adapt_args_only<&evaluate_modulo_function>},
+            {"decimal",                   adapt_args_only<&evaluate_decimal_function>},
+            {"round",                     adapt_args_only<&evaluate_round_function>},
+            {"round up",                  adapt_args_only<&evaluate_round_up_function>},
+            {"round down",                adapt_args_only<&evaluate_round_down_function>},
+            {"round half up",             adapt_args_only<&evaluate_round_half_up_function>},
+            {"round half down",           adapt_args_only<&evaluate_round_half_down_function>},
+
+            // String functions
+            {"substring before",          adapt_args_only<&evaluate_substring_before_function>},
+            {"substring after",           adapt_args_only<&evaluate_substring_after_function>},
+            {"substring",                 adapt_args_only<&evaluate_substring_function>},
+            {"string length",             adapt_args_only<&evaluate_string_length_function>},
+            {"upper case",                adapt_args_only<&evaluate_upper_case_function>},
+            {"lower case",                adapt_args_only<&evaluate_lower_case_function>},
+            {"starts with",               adapt_args_only<&evaluate_starts_with_function>},
+            {"ends with",                 adapt_args_only<&evaluate_ends_with_function>},
+            {"replace",                   adapt_replace},
+            {"matches",                   adapt_matches},
+            {"split",                     adapt_args_only<&evaluate_split_function>},
+            {"string join",               adapt_args_only<&evaluate_string_join_function>},
+
+            // Date / time functions
+            {"date",                      adapt_args_only<&evaluate_date_function>},
+            {"duration",                  adapt_args_only<&evaluate_duration_function>},
+            {"time",                      adapt_args_only<&evaluate_time_function>},
+            {"date and time",             adapt_args_only<&evaluate_date_and_time_function>},
+            {"years and months duration", adapt_args_only<&evaluate_years_and_months_duration_function>},
+            {"day of year",               adapt_args_only<&evaluate_day_of_year_function>},
+            {"day of week",               adapt_args_only<&evaluate_day_of_week_function>},
+            {"month of year",             adapt_args_only<&evaluate_month_of_year_function>},
+            {"week of year",              adapt_args_only<&evaluate_week_of_year_function>},
+            {"now",                       adapt_args_only<&evaluate_now_function>},
+            {"today",                     adapt_args_only<&evaluate_today_function>},
+
+            // Phase 1: Trivial functions
+            {"odd",                       adapt_args_only<&evaluate_odd_function>},
+            {"even",                      adapt_args_only<&evaluate_even_function>},
+            {"number",                    adapt_args_only<&evaluate_number_function>},
+            {"string",                    adapt_args_only<&evaluate_string_function>},
+            {"is",                        adapt_args_only<&evaluate_is_function>},
+
+            // Phase 2A: Aggregation functions
+            {"count",                     adapt_args_only<&evaluate_count_function>},
+            {"sum",                       adapt_args_only<&evaluate_sum_function>},
+            {"min",                       adapt_args_only<&evaluate_min_function>},
+            {"max",                       adapt_args_only<&evaluate_max_function>},
+            {"mean",                      adapt_args_only<&evaluate_mean_function>},
+            {"product",                   adapt_args_only<&evaluate_product_function>},
+            {"median",                    adapt_args_only<&evaluate_median_function>},
+            {"stddev",                    adapt_args_only<&evaluate_stddev_function>},
+            {"mode",                      adapt_args_only<&evaluate_mode_function>},
+
+            // Phase 2B: List manipulation functions
+            {"list contains",             adapt_args_only<&evaluate_list_contains_function>},
+            {"append",                    adapt_args_only<&evaluate_append_function>},
+            {"concatenate",               adapt_args_only<&evaluate_concatenate_function>},
+            {"insert before",             adapt_args_only<&evaluate_insert_before_function>},
+            {"remove",                    adapt_args_only<&evaluate_remove_function>},
+            {"reverse",                   adapt_args_only<&evaluate_reverse_function>},
+            {"index of",                  adapt_args_only<&evaluate_index_of_function>},
+            {"sublist",                   adapt_args_only<&evaluate_sublist_function>},
+            {"union",                     adapt_args_only<&evaluate_union_function>},
+            {"distinct values",           adapt_args_only<&evaluate_distinct_values_function>},
+            {"flatten",                   adapt_args_only<&evaluate_flatten_function>},
+            {"sort",                      adapt_args_only<&evaluate_sort_function>},
+            {"list replace",              adapt_args_only<&evaluate_list_replace_function>},
+
+            // Phase 3: Context functions
+            {"get value",                 adapt_args_only<&evaluate_get_value_function>},
+            {"get entries",               adapt_args_only<&evaluate_get_entries_function>},
+            {"context",                   adapt_args_only<&evaluate_context_function>},
+            {"context put",               adapt_args_only<&evaluate_context_put_function>},
+            {"context merge",             adapt_args_only<&evaluate_context_merge_function>},
+        };
+        return table;
+    }
+} // namespace
+
+const BuiltinHandler* find_builtin_handler(std::string_view name)
+{
+    const auto& table = builtin_table();
+    const auto it = table.find(name);
+    return it != table.end() ? &it->second : nullptr;
+}
+
+} // namespace orion::bre::feel
+>>>>>>> main
 

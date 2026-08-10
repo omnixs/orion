@@ -375,6 +375,7 @@ namespace orion::bre
         return (colon == std::string_view::npos) ? name : name.substr(colon + 1);
     }
 
+<<<<<<< HEAD
     // Helper to render a context entry name as a quoted FEEL string key
     [[nodiscard]] static std::string quote_feel_key(std::string_view name)
     {
@@ -388,6 +389,18 @@ namespace orion::bre
         }
         quoted.push_back('"');
         return quoted;
+=======
+    // Helper to append a context entry name as a quoted FEEL string key.
+    static void append_quoted_feel_key(std::string& output, std::string_view name)
+    {
+        output.push_back('"');
+        for (const char character : name)
+        {
+            if (character == '"' || character == '\\') output.push_back('\\');
+            output.push_back(character);
+        }
+        output.push_back('"');
+>>>>>>> main
     }
 
     [[nodiscard]] static std::string boxed_context_to_feel(rapidxml::xml_node<>* context_node);
@@ -419,6 +432,7 @@ namespace orion::bre
             return boxed_context_to_feel(expr_node);
         }
 
+<<<<<<< HEAD
         if (element_name == "list")
         {
             // DMN boxed list maps to FEEL list literal: [item1, item2, ...]
@@ -438,6 +452,8 @@ namespace orion::bre
             return feel_list;
         }
 
+=======
+>>>>>>> main
         return {};
     }
 
@@ -510,13 +526,33 @@ namespace orion::bre
             while (collides(result_key)) result_key.push_back('_');
         }
 
+<<<<<<< HEAD
         std::string feel_expression = "{";
+=======
+        std::string feel_expression;
+        size_t reserved_size = 2; // "{}"
+        for (const auto& [name, expression] : entries)
+        {
+            reserved_size += name.size() + expression.size() + 6; // quotes, colon+space, separator slack
+        }
+        if (has_result)
+        {
+            reserved_size += result_key.size() + result_expression.size() + 10;
+        }
+        feel_expression.reserve(reserved_size);
+
+        feel_expression.push_back('{');
+>>>>>>> main
         bool first_entry = true;
         for (const auto& [name, expression] : entries)
         {
             if (!first_entry) feel_expression += ", ";
             first_entry = false;
+<<<<<<< HEAD
             feel_expression += quote_feel_key(name);
+=======
+            append_quoted_feel_key(feel_expression, name);
+>>>>>>> main
             feel_expression += ": ";
             feel_expression += expression;
         }
@@ -729,6 +765,7 @@ namespace orion::bre
                 if (context_node != nullptr)
                 {
                     decision.expression = boxed_context_to_feel(context_node);
+<<<<<<< HEAD
                 }
             }
 
@@ -739,6 +776,15 @@ namespace orion::bre
                 if (list_node != nullptr)
                 {
                     decision.expression = boxed_expression_to_feel(list_node);
+=======
+                    if (decision.expression.empty())
+                    {
+                        warn("DMN: boxed <context> in decision '{}' could not be converted to a "
+                             "FEEL expression (unsupported entry kind); the decision will have no "
+                             "logic unless another expression form is present",
+                             decision.name.empty() ? decision.id : decision.name);
+                    }
+>>>>>>> main
                 }
             }
 
