@@ -473,7 +473,7 @@ namespace orion::bre::feel {
         return left;
     }
     
-    // Precedence level 6 (highest binary): Exponentiation (right-associative)
+    // Precedence level 6 (highest binary): Exponentiation (left-associative)
     std::unique_ptr<ASTNode> Parser::parse_exponentiation()
     {
         auto left = parse_primary();
@@ -504,17 +504,42 @@ namespace orion::bre::feel {
             }
         }
         
-        // Right-associative: 2**3**4 = 2**(3**4)
-        if (check(TokenType::OPERATOR) && check_text("**"))
+        // Left-associative: 2**3**2 = (2**3)**2
+        while (check(TokenType::OPERATOR) && check_text("**"))
         {
             advance(); // consume "**"
-            auto right = parse_exponentiation(); // Recursive call for right-associativity
+            auto right = parse_primary();
+
+            // Postfix chain on the right operand (e.g. 2**a.b, 2**list[1])
+            while (check(TokenType::LBRACKET) || check(TokenType::DOT))
+            {
+                if (check(TokenType::LBRACKET))
+                {
+                    advance(); // consume '['
+                    auto filter = parse_conditional();
+                    expect(TokenType::RBRACKET, "Expected ']' after filter expression");
+
+                    auto node = std::make_unique<ASTNode>(ASTNodeType::FILTER_EXPR, "filter");
+                    node->children.push_back(std::move(right));
+                    node->children.push_back(std::move(filter));
+                    right = std::move(node);
+                }
+                else
+                {
+                    advance(); // consume '.'
+                    const Token& property = advance();
+                    auto node = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS,
+                                                          std::string(property.text));
+                    node->children.push_back(std::move(right));
+                    right = std::move(node);
+                }
+            }
             
             // Create binary exponentiation node
             auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "**");
             node->children.push_back(std::move(left));
             node->children.push_back(std::move(right));
-            return node;
+            left = std::move(node);
         }
         
         return left;

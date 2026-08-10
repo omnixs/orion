@@ -30,7 +30,7 @@
  * 
  * **Precedence Levels** (highest to lowest):
  * 1. **Primary**: Literals, identifiers, parenthesized expressions
- * 2. **Exponentiation**: `**` (right-associative)
+ * 2. **Exponentiation**: `**` (left-associative)
  * 3. **Multiplicative**: `*`, `/`
  * 4. **Additive**: `+`, `-`
  * 5. **Comparison**: `<`, `>`, `<=`, `>=`, `=`, `!=`
@@ -230,8 +230,8 @@ namespace orion::bre::feel {
         std::unique_ptr<ASTNode> parse_multiplicative();
         
         /**
-         * @brief Parse exponentiation expression (right-associative)
-         * Grammar: exponentiation → primary ( "**" exponentiation )?
+         * @brief Parse exponentiation expression (left-associative)
+         * Grammar: exponentiation → primary ( "**" primary )*
          */
         std::unique_ptr<ASTNode> parse_exponentiation();
         
