@@ -77,7 +77,16 @@ namespace orion::bre::feel {
             case '}': type = TokenType::RBRACE; break;
             case ',': type = TokenType::COMMA; break;
             case ':': type = TokenType::COLON; break;
-            case '.': type = TokenType::DOT; break;
+            case '.':
+                // Check for '..' (range operator)
+                if (position_ + 1 < input_.size() && input_[position_ + 1] == '.') {
+                    tokens.emplace_back(TokenType::DOTDOT, input_.substr(position_, 2), position_);
+                    advance();
+                    advance();
+                    return;
+                }
+                type = TokenType::DOT;
+                break;
             default: return; // Not punctuation
         }
         tokens.emplace_back(type, input_.substr(position_, 1), position_);
@@ -97,6 +106,27 @@ namespace orion::bre::feel {
             
             if (position_ >= input_.length()) {
                 break;
+            }
+
+            // Skip comments
+            if (peek() == '/' && position_ + 1 < input_.length())
+            {
+                if (input_[position_ + 1] == '/')
+                {
+                    // Line comment: skip to end of line
+                    while (position_ < input_.length() && input_[position_] != '\n')
+                        position_++;
+                    continue;
+                }
+                if (input_[position_ + 1] == '*')
+                {
+                    // Block comment: skip to */
+                    position_ += 2;
+                    while (position_ + 1 < input_.length() && !(input_[position_] == '*' && input_[position_ + 1] == '/'))
+                        position_++;
+                    if (position_ + 1 < input_.length()) position_ += 2; // skip */
+                    continue;
+                }
             }
 
             char current = peek();
@@ -128,6 +158,12 @@ namespace orion::bre::feel {
             {
                 tokens.push_back(tokenize_operator());
             }
+            // At-literals: @"..." → parse as string value (temporal/duration literal)
+            else if (current == '@' && position_ + 1 < input_.length() && input_[position_ + 1] == '"')
+            {
+                position_++; // skip '@'
+                tokens.push_back(tokenize_string());
+            }
             else
             {
                 // Unknown character
@@ -147,7 +183,8 @@ namespace orion::bre::feel {
                text == "and" || text == "or" || text == "not" ||
                text == "if" || text == "then" || text == "else" ||
                text == "in" || text == "for" || text == "some" || text == "every" ||
-               text == "return" || text == "between" || text == "instance" || text == "of";
+               text == "return" || text == "between" || text == "instance" || text == "of" ||
+               text == "satisfies";
     }
 
     char Lexer::peek() const
@@ -190,8 +227,8 @@ namespace orion::bre::feel {
             advance();
         }
 
-        // Decimal part
-        if (peek() == '.')
+        // Decimal part - but NOT if it's a range operator (..)
+        if (peek() == '.' && (position_ + 1 >= input_.length() || input_[position_ + 1] != '.'))
         {
             advance();
             while (std::isdigit(static_cast<unsigned char>(peek())))

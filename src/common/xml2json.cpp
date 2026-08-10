@@ -32,6 +32,10 @@ namespace orion::common
                 {
                     return json::array();
                 }
+                if (xsiType.find("string") != std::string::npos)
+                {
+                    return json("");
+                }
                 return json{};
             }
 
@@ -169,6 +173,51 @@ namespace orion::common
         {
             pc.input[name] = nestedObject;
         }
+        else if (auto* listNode = inputNode->first_node("list"))
+        {
+            // Handle list input structure
+            nlohmann::json listArray = nlohmann::json::array();
+            for (auto* item = listNode->first_node("item"); item; item = item->next_sibling("item"))
+            {
+                // Check for nested list within item
+                auto* nestedList = item->first_node("list");
+                if (nestedList)
+                {
+                    nlohmann::json innerArray = nlohmann::json::array();
+                    for (auto* innerItem = nestedList->first_node("item"); innerItem; innerItem = innerItem->next_sibling("item"))
+                    {
+                        auto* iv = innerItem->first_node("value");
+                        if (iv && iv->value())
+                        {
+                            std::string xsiType;
+                            if (auto* t = iv->first_attribute("xsi:type")) xsiType = t->value();
+                            innerArray.push_back(parse_xml_value(iv->value(), xsiType));
+                        }
+                    }
+                    listArray.push_back(innerArray);
+                }
+                else
+                {
+                    // Check for component structure within item
+                    nlohmann::json itemComponents = parse_components(item, "component", "value");
+                    if (!itemComponents.empty())
+                    {
+                        listArray.push_back(itemComponents);
+                    }
+                    else
+                    {
+                        auto* v = item->first_node("value");
+                        if (v && v->value())
+                        {
+                            std::string xsiType;
+                            if (auto* t = v->first_attribute("xsi:type")) xsiType = t->value();
+                            listArray.push_back(parse_xml_value(v->value(), xsiType));
+                        }
+                    }
+                }
+            }
+            pc.input[name] = listArray;
+        }
         else
         {
             // Handle simple value structure
@@ -222,6 +271,9 @@ namespace orion::common
         return parse_xml_value(valNode->value(), xsiType);
     }
 
+    // Forward declaration
+    static std::string parse_expected_list(rapidxml::xml_node<>* listNode);
+
     // Helper function to parse component-based expected value (object structure)
     static std::string parse_expected_components(rapidxml::xml_node<>* expNode)
     {
@@ -238,6 +290,17 @@ namespace orion::common
                 if (valNode != nullptr)
                 {
                     componentObj[compName] = parse_value_with_nil(valNode);
+                }
+                else if (comp->first_node("component"))
+                {
+                    // Nested components — recurse
+                    auto nested = nlohmann::json::parse(parse_expected_components(comp));
+                    componentObj[compName] = nested;
+                }
+                else if (auto* listNode = comp->first_node("list"))
+                {
+                    auto nested = nlohmann::json::parse(parse_expected_list(listNode));
+                    componentObj[compName] = nested;
                 }
             }
         }
@@ -257,6 +320,12 @@ namespace orion::common
             if (directValueNode != nullptr)
             {
                 listArray.push_back(parse_value_with_nil(directValueNode));
+            }
+            else if (auto* nestedList = item->first_node("list"))
+            {
+                // Nested list within item — recurse
+                auto nested = nlohmann::json::parse(parse_expected_list(nestedList));
+                listArray.push_back(nested);
             }
             else
             {

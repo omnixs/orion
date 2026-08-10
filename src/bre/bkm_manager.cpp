@@ -169,6 +169,8 @@ namespace orion::bre
             "abs", "ceiling", "floor", "round", "sqrt", "log", "exp",
             "date", "time", "date and time", "duration", "now", "today",
             "number", "string", "boolean", "list contains", "append", "concatenate",
+            "insert before", "remove", "reverse", "index of", "sublist", "union",
+            "distinct values", "flatten", "sort", "list replace", "product",
             "not" // Add logical NOT function
         };
         return builtin_functions;

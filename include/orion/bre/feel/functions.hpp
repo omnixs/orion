@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <string_view>
 #include <vector>
 #include <nlohmann/json.hpp>
 #include <orion/bre/evaluation_context.hpp>
@@ -362,13 +363,14 @@ namespace orion::bre::feel {
     /**
      * @brief Replace all occurrences of pattern in string
      * @param args Vector containing 3-4 arguments [input, pattern, replacement, flags?]
+     * @param eval_ctx Evaluation context providing the compiled-regex cache
      * @return String with replacements applied
      * 
      * DMN 1.5 Section 10.3.4.3: String functions
      * - replace("banana", "a", "o") → "bonono"
      * - replace("abcd", "x", "y") → "abcd"
      */
-    [[nodiscard]] json evaluate_replace_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_replace_function(const std::vector<json>& args, const EvaluationContext& eval_ctx);
 
     /**
      * @brief Test if string matches pattern
@@ -442,6 +444,18 @@ namespace orion::bre::feel {
      */
     [[nodiscard]] json evaluate_duration_function(const std::vector<json>& args);
 
+    // ========== TEMPORAL FUNCTIONS (DMN 1.5 §10.3.4) ==========
+    [[nodiscard]] json evaluate_time_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_date_and_time_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_years_and_months_duration_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_day_of_year_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_day_of_week_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_month_of_year_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_week_of_year_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_now_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_today_function(const std::vector<json>& args);
+    [[nodiscard]] json get_temporal_property(const std::string& val, const std::string& prop);
+
     // ========== PHASE 1: TRIVIAL FUNCTIONS (DMN 1.5 §10.3.4) ==========
 
     /**
@@ -489,5 +503,107 @@ namespace orion::bre::feel {
      */
     [[nodiscard]] json evaluate_is_function(const std::vector<json>& args);
 
-} // namespace orion::bre
+    // ========== PHASE 2A: AGGREGATION FUNCTIONS (DMN 1.5 §10.3.4.4) ==========
+    //
+    // All aggregation functions accept either a single list argument or the
+    // equivalent variadic form, e.g. `sum([1,2,3])` and `sum(1,2,3)`. They
+    // propagate null: a null argument, or any null or non-numeric element,
+    // yields null.
+
+    /// count(list) → number of elements. `count([1,2,3])` → 3
+    [[nodiscard]] json evaluate_count_function(const std::vector<json>& args);
+    /// sum(list) → total, 0 for an empty list. `sum([1,2,3])` → 6
+    [[nodiscard]] json evaluate_sum_function(const std::vector<json>& args);
+    /// min(list) → smallest element, null for an empty list. `min([1,2,3])` → 1
+    [[nodiscard]] json evaluate_min_function(const std::vector<json>& args);
+    /// max(list) → largest element, null for an empty list. `max([1,2,3])` → 3
+    [[nodiscard]] json evaluate_max_function(const std::vector<json>& args);
+    /// mean(list) → arithmetic mean, null for an empty list. `mean([1,2,3])` → 2
+    [[nodiscard]] json evaluate_mean_function(const std::vector<json>& args);
+    /// product(list) → product of elements. `product([2,3,4])` → 24
+    [[nodiscard]] json evaluate_product_function(const std::vector<json>& args);
+    /// median(list) → middle value, mean of the middle two when even. `median([8,2,5,3])` → 4
+    [[nodiscard]] json evaluate_median_function(const std::vector<json>& args);
+    /// stddev(list) → sample standard deviation (N-1); null for fewer than 2 elements
+    [[nodiscard]] json evaluate_stddev_function(const std::vector<json>& args);
+    /// mode(list) → ascending list of most frequent values. `mode([6,3,9,6,6])` → [6]
+    [[nodiscard]] json evaluate_mode_function(const std::vector<json>& args);
+
+    // ========== PHASE 2B: LIST MANIPULATION FUNCTIONS (DMN 1.5 §10.3.4.4) ==========
+    //
+    // Positions are 1-based; negative positions count from the end. Fractional
+    // positions are truncated toward zero. An out-of-range position yields null.
+
+    /// list contains(list, element) → boolean. `list contains([1,2,3], 2)` → true
+    [[nodiscard]] json evaluate_list_contains_function(const std::vector<json>& args);
+    /// append(list, item...) → list with items appended. `append([1], 2, 3)` → [1,2,3]
+    [[nodiscard]] json evaluate_append_function(const std::vector<json>& args);
+    /// concatenate(list...) → lists joined. `concatenate([1,2],[3])` → [1,2,3]
+    [[nodiscard]] json evaluate_concatenate_function(const std::vector<json>& args);
+    /// insert before(list, position, newItem). `insert before([1,3], 2, 2)` → [1,2,3]
+    [[nodiscard]] json evaluate_insert_before_function(const std::vector<json>& args);
+    /// remove(list, position) → list without that element. `remove([1,2,3], 2)` → [1,3]
+    [[nodiscard]] json evaluate_remove_function(const std::vector<json>& args);
+    /// reverse(list) → reversed list. `reverse([1,2,3])` → [3,2,1]
+    [[nodiscard]] json evaluate_reverse_function(const std::vector<json>& args);
+    /// index of(list, match) → 1-based positions of every match. `index of([1,2,1], 1)` → [1,3]
+    [[nodiscard]] json evaluate_index_of_function(const std::vector<json>& args);
+    /// sublist(list, start position, length?) → slice. `sublist([1,2,3], 2)` → [2,3]
+    [[nodiscard]] json evaluate_sublist_function(const std::vector<json>& args);
+    /// union(list...) → concatenation with duplicates removed, order preserved
+    [[nodiscard]] json evaluate_union_function(const std::vector<json>& args);
+    /// distinct values(list) → duplicates removed. `distinct values([1,2,3,2])` → [1,2,3]
+    [[nodiscard]] json evaluate_distinct_values_function(const std::vector<json>& args);
+    /// flatten(list) → nested lists flattened. `flatten([[1,2],[[3]]])` → [1,2,3]
+    [[nodiscard]] json evaluate_flatten_function(const std::vector<json>& args);
+    /// sort(list) → ascending sort of an all-number or all-string list; null otherwise.
+    /// The sort(list, precedes) overload requires first-class functions and returns null.
+    [[nodiscard]] json evaluate_sort_function(const std::vector<json>& args);
+    /// list replace(list, position, newItem) → list with the element replaced
+    [[nodiscard]] json evaluate_list_replace_function(const std::vector<json>& args);
+
+    // ========== PHASE 3: CONTEXT FUNCTIONS (DMN 1.5 §10.3.4.6) ==========
+
+    /// get value(context, key) → the entry's value, or null if absent
+    [[nodiscard]] json evaluate_get_value_function(const std::vector<json>& args);
+    /// get entries(context) → list of {key, value} contexts
+    [[nodiscard]] json evaluate_get_entries_function(const std::vector<json>& args);
+    /// context(entries) → context built from a list of {key, value} contexts
+    [[nodiscard]] json evaluate_context_function(const std::vector<json>& args);
+    /// context put(context, key(s), value) → context with the entry added or replaced
+    [[nodiscard]] json evaluate_context_put_function(const std::vector<json>& args);
+    /// context merge(contexts) → contexts merged left to right; later entries win
+    [[nodiscard]] json evaluate_context_merge_function(const std::vector<json>& args);
+
+    // ========== BUILT-IN FUNCTION DISPATCH ==========
+
+    /**
+     * @brief Uniform signature for a built-in FEEL function handler.
+     *
+     * Most built-ins only need the evaluated arguments; a few (currently
+     * `matches`) also need the evaluation context for the regex cache. The
+     * common signature lets every built-in live in one lookup table.
+     *
+     * @param args Evaluated positional arguments
+     * @param input Current input context (reserved for context-sensitive builtins)
+     * @param eval_ctx Evaluation context (regex cache, BKM map)
+     */
+    using BuiltinHandler = json (*)(const std::vector<json>& args,
+                                    const json& input,
+                                    const EvaluationContext& eval_ctx);
+
+    /**
+     * @brief Look up a built-in FEEL function by name.
+     *
+     * Backed by a static hash table built once on first use, so dispatch is
+     * O(1) regardless of how many built-ins exist. Returns nullptr when the
+     * name is not a built-in, letting the caller fall through to user-defined
+     * business knowledge models.
+     *
+     * @param name Function name as written in the FEEL expression
+     * @return Pointer to the handler, or nullptr if not a built-in
+     */
+    [[nodiscard]] const BuiltinHandler* find_builtin_handler(std::string_view name);
+
+} // namespace orion::bre::feel
 

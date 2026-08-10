@@ -547,6 +547,102 @@ namespace orion::bre
                 }
             }
 
+            // Parse relation if present (converts to FEEL list-of-contexts expression)
+            if (!decision.decisionTable.has_value() && decision.expression.empty())
+            {
+                auto* relation_node = find_node(decision_node, "dmn:relation", "relation");
+                if (relation_node != nullptr)
+                {
+                    // Collect column names
+                    std::vector<std::string> column_names;
+                    for (auto* col = relation_node->first_node("column"); col; col = col->next_sibling("column"))
+                    {
+                        if (auto* name_attr = col->first_attribute("name"))
+                            column_names.emplace_back(name_attr->value());
+                    }
+                    // Also try dmn:column prefix
+                    if (column_names.empty())
+                    {
+                        for (auto* col = relation_node->first_node("dmn:column"); col; col = col->next_sibling("dmn:column"))
+                        {
+                            if (auto* name_attr = col->first_attribute("name"))
+                                column_names.emplace_back(name_attr->value());
+                        }
+                    }
+
+                    // Build FEEL expression: [{col1: val1, col2: val2}, ...]
+                    std::string feel_expr = "[";
+                    bool first_row = true;
+                    for (auto* row = relation_node->first_node("row"); row; row = row->next_sibling("row"))
+                    {
+                        if (!first_row) feel_expr += ", ";
+                        first_row = false;
+                        feel_expr += "{";
+
+                        size_t col_idx = 0;
+                        for (auto* cell = row->first_node("literalExpression"); cell; cell = cell->next_sibling("literalExpression"))
+                        {
+                            if (col_idx > 0) feel_expr += ", ";
+                            auto* text = find_node(cell, "dmn:text", "text");
+                            std::string cell_text = (text && text->value()) ? text->value() : "null";
+                            if (col_idx < column_names.size())
+                                feel_expr += column_names[col_idx] + ": " + cell_text;
+                            col_idx++;
+                        }
+                        // Also try dmn:literalExpression prefix
+                        if (col_idx == 0)
+                        {
+                            for (auto* cell = row->first_node("dmn:literalExpression"); cell; cell = cell->next_sibling("dmn:literalExpression"))
+                            {
+                                if (col_idx > 0) feel_expr += ", ";
+                                auto* text = find_node(cell, "dmn:text", "text");
+                                std::string cell_text = (text && text->value()) ? text->value() : "null";
+                                if (col_idx < column_names.size())
+                                    feel_expr += column_names[col_idx] + ": " + cell_text;
+                                col_idx++;
+                            }
+                        }
+                        feel_expr += "}";
+                    }
+                    // Also try dmn:row prefix
+                    if (first_row)
+                    {
+                        for (auto* row = relation_node->first_node("dmn:row"); row; row = row->next_sibling("dmn:row"))
+                        {
+                            if (!first_row) feel_expr += ", ";
+                            first_row = false;
+                            feel_expr += "{";
+
+                            size_t col_idx = 0;
+                            for (auto* cell = row->first_node("literalExpression"); cell; cell = cell->next_sibling("literalExpression"))
+                            {
+                                if (col_idx > 0) feel_expr += ", ";
+                                auto* text = find_node(cell, "dmn:text", "text");
+                                std::string cell_text = (text && text->value()) ? text->value() : "null";
+                                if (col_idx < column_names.size())
+                                    feel_expr += column_names[col_idx] + ": " + cell_text;
+                                col_idx++;
+                            }
+                            if (col_idx == 0)
+                            {
+                                for (auto* cell = row->first_node("dmn:literalExpression"); cell; cell = cell->next_sibling("dmn:literalExpression"))
+                                {
+                                    if (col_idx > 0) feel_expr += ", ";
+                                    auto* text = find_node(cell, "dmn:text", "text");
+                                    std::string cell_text = (text && text->value()) ? text->value() : "null";
+                                    if (col_idx < column_names.size())
+                                        feel_expr += column_names[col_idx] + ": " + cell_text;
+                                    col_idx++;
+                                }
+                            }
+                            feel_expr += "}";
+                        }
+                    }
+                    feel_expr += "]";
+                    decision.expression = feel_expr;
+                }
+            }
+
             // Parse information requirements (decision dependencies)
             auto* info_req = find_node(decision_node, "dmn:informationRequirement", "informationRequirement");
             while (info_req != nullptr)

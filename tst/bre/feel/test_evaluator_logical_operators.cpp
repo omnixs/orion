@@ -37,10 +37,11 @@ BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
     };
     
     std::vector<TestCase> test_cases = {
-        {"VarA and VarB", true, "AND with string 'true' variables"},
-        {"A and B", true, "AND with simple string 'true' variables"}, 
-        {"VarA or VarB", true, "OR with string 'true' variables"},
-        {"A or B", true, "OR with simple string 'true' variables"}
+        // Per DMN spec, non-boolean operands in and/or return null
+        {"VarA and VarB", true, "AND with string 'true' variables (expect null per spec)"},
+        {"A and B", true, "AND with simple string 'true' variables (expect null per spec)"}, 
+        {"VarA or VarB", true, "OR with string 'true' variables (expect null per spec)"},
+        {"A or B", true, "OR with simple string 'true' variables (expect null per spec)"}
     };
     
     for (const auto& test_case : test_cases) {
@@ -48,20 +49,9 @@ BOOST_AUTO_TEST_CASE(test_logical_operators_with_string_booleans) {
         auto result = evaluator.evaluate(test_case.expression, input, get_test_eval_ctx());
         BOOST_TEST_MESSAGE("Result: " << result.dump());
         
-        // Check that result is not null
-        BOOST_CHECK_MESSAGE(!result.is_null(), 
-            "Expression '" << test_case.expression << "' should not return null, got: " << result.dump());
-        
-        // Check that result is boolean
-        if (!result.is_null()) {
-            BOOST_CHECK_MESSAGE(result.is_boolean(), 
-                "Expression '" << test_case.expression << "' should return boolean, got: " << result.dump());
-            
-            // Check expected value
-            if (result.is_boolean()) {
-                BOOST_CHECK_EQUAL(result.get<bool>(), test_case.expected_result);
-            }
-        }
+        // Per DMN spec, non-boolean operands in and/or produce null
+        BOOST_CHECK_MESSAGE(result.is_null(), 
+            "Expression '" << test_case.expression << "' should return null for non-boolean operands, got: " << result.dump());
     }
 }
 

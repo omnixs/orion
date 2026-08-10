@@ -624,6 +624,35 @@ static std::string extract_output_value(
         return "";
     }
     
+    // Try regular output first (by outputName)
+    auto it = actual.find(outputName);
+    if (it != actual.end())
+    {
+        try
+        {
+            nlohmann::json expectedObj = nlohmann::json::parse(expected);
+            
+            if (expectedObj.is_array() && it->is_array())
+            {
+                return it->dump();
+            }
+            else if (expectedObj.is_object() && it->is_object())
+            {
+                if (it->contains(outputName) && (*it)[outputName].is_object())
+                {
+                    return (*it)[outputName].dump();
+                }
+                return it->dump();
+            }
+            
+            return it->dump();
+        }
+        catch (const nlohmann::json::exception&)
+        {
+            return it->dump(); // JSON operation failed, return as-is
+        }
+    }
+    
     // Handle component-based outputs (like Approval_Status, Approval_Rate)
     if (outputId.find("_") != std::string::npos)
     {
@@ -656,41 +685,57 @@ static std::string extract_output_value(
         return "";
     }
     
-    // Regular output
-    auto it = actual.find(outputName);
-    if (it == actual.end())
+    return "";
+}
+
+// Helper: Deep JSON comparison with numeric tolerance
+static bool json_values_equal(const nlohmann::json& expected, const nlohmann::json& actual)
+{
+    if (expected.is_number() && actual.is_number())
     {
-        return "";
+        double e = expected.get<double>();
+        double a = actual.get<double>();
+        double tolerance = std::max(1e-10, std::abs(e) * 1e-10);
+        return std::abs(e - a) <= tolerance;
     }
-    
-    try
+    if (expected.is_array() && actual.is_array())
     {
-        nlohmann::json expectedObj = nlohmann::json::parse(expected);
-        
-        if (expectedObj.is_array() && it->is_array())
+        if (expected.size() != actual.size()) return false;
+        for (size_t i = 0; i < expected.size(); ++i)
         {
-            return it->dump();
+            if (!json_values_equal(expected[i], actual[i])) return false;
         }
-        else if (expectedObj.is_object() && it->is_object())
-        {
-            if (it->contains(outputName) && (*it)[outputName].is_object())
-            {
-                return (*it)[outputName].dump();
-            }
-            return it->dump();
-        }
-        
-        return it->dump();
+        return true;
     }
-    catch (const nlohmann::json::exception&)
+    if (expected.is_object() && actual.is_object())
     {
-        return it->dump(); // JSON operation failed, return as-is
+        if (expected.size() != actual.size()) return false;
+        for (auto it = expected.begin(); it != expected.end(); ++it)
+        {
+            auto ait = actual.find(it.key());
+            if (ait == actual.end()) return false;
+            if (!json_values_equal(it.value(), *ait)) return false;
+        }
+        return true;
     }
+    return expected == actual;
 }
 
 // Helper: Compare expected vs actual values with numeric tolerance
 static bool compare_values(std::string_view expected, std::string_view actual)
 {
+    // Try JSON-aware comparison first
+    try
+    {
+        auto expected_json = nlohmann::json::parse(expected);
+        auto actual_json = nlohmann::json::parse(actual);
+        return json_values_equal(expected_json, actual_json);
+    }
+    catch (const nlohmann::json::parse_error&)
+    {
+        // Fall through to legacy comparison
+    }
+
     try
     {
         double expected_num = std::stod(std::string(expected));
@@ -707,11 +752,9 @@ static bool compare_values(std::string_view expected, std::string_view actual)
     }
     catch (const std::invalid_argument&)
     {
-        // Not numeric values, fall through to string comparison
     }
     catch (const std::out_of_range&)
     {
-        // Out of range numeric values, fall through to string comparison
     }
     
     // String comparison fallback
@@ -758,7 +801,7 @@ static void write_csv_result(
 }
 
 static bool execute_single_test_case(
-    const std::string& dmn_xml, 
+    orion::api::BusinessRulesEngine& engine, 
     const ParsedCase& test_case,
     const std::string& test_dir,
     const std::string& test_case_id,
@@ -780,12 +823,6 @@ static bool execute_single_test_case(
     std::string errMsg;
     
     try {
-        // Use proper BusinessRulesEngine API
-        orion::api::BusinessRulesEngine engine;
-        auto load_result = engine.load_dmn_model(dmn_xml);
-        if (!load_result) {
-            throw std::runtime_error("Failed to load DMN model: " + load_result.error());
-        }
         actual = engine.evaluate(test_case.input);
         result = actual.dump();
         if (config.verbose) {
@@ -882,6 +919,20 @@ static TestStats execute_test_directory_set(
             continue; // File read error, skip this test
         }
         
+        // Load DMN model ONCE per test directory (load-once, evaluate-many pattern)
+        orion::api::BusinessRulesEngine engine;
+        try {
+            auto load_result = engine.load_dmn_model(dmn_xml);
+            if (!load_result) {
+                spdlog::warn("Failed to load DMN model for {}: {}", di.dir.string(), load_result.error());
+                continue;
+            }
+        }
+        catch (const std::exception& ex) {
+            spdlog::warn("Exception loading DMN model for {}: {}", di.dir.string(), ex.what());
+            continue;
+        }
+        
         bool feature_passed = true;
         std::size_t feature_cases_passed = 0;
         std::size_t feature_total_cases = 0;
@@ -914,7 +965,7 @@ static TestStats execute_test_directory_set(
                 int outputs_before = stats.total_outputs;
                 int ok_before = stats.ok;
                 
-                bool case_passed = execute_single_test_case(dmn_xml, c, test_dir, test_case_id, config, csv, stats);
+                bool case_passed = execute_single_test_case(engine, c, test_dir, test_case_id, config, csv, stats);
                 
                 // Update total test cases based on outputs processed
                 int outputs_processed = stats.total_outputs - outputs_before;

@@ -30,11 +30,14 @@ namespace orion::bre::feel {
     }
     std::optional<Date> parse_date(std::string_view str)
     {
-        // CTRE compile-time regex for date pattern
-        if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2}))">(str))
+        // CTRE compile-time regex for date pattern (with optional negative year)
+        if (auto match = ctre::match<R"(-?(\d{4,})-(\d{2})-(\d{2}))">(str))
         {
             Date date;
-            date.y = parse_int(match.get<1>().to_view());
+            // Parse year including potential negative sign
+            auto year_str = std::string(match.get<1>().to_view());
+            date.y = parse_int(year_str);
+            if (str[0] == '-') date.y = -date.y;
             date.m = parse_int(match.get<2>().to_view());
             date.d = parse_int(match.get<3>().to_view());
             return date;
@@ -58,18 +61,91 @@ namespace orion::bre::feel {
 
     std::optional<DateTime> parse_datetime(std::string_view str)
     {
-        // CTRE compile-time regex for datetime pattern
-        if (auto match = ctre::match<R"((\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}))">(str))
-        {
-            Date date{parse_int(match.get<1>().to_view()), parse_int(match.get<2>().to_view()), parse_int(match.get<3>().to_view())};
-            Time time_val{parse_int(match.get<4>().to_view()), parse_int(match.get<5>().to_view()), parse_int(match.get<6>().to_view())};
-            return DateTime{date, time_val};
+        // Find 'T' separator
+        auto tpos = str.find('T');
+        if (tpos == std::string_view::npos) return std::nullopt;
+        
+        auto date_part = str.substr(0, tpos);
+        auto time_and_tz = str.substr(tpos + 1);
+        
+        // Parse date part (handles negative years, 4+ digit years)
+        auto date_opt = parse_date(date_part);
+        if (!date_opt) return std::nullopt;
+        
+        // Parse time part - extract HH:MM:SS (ignore fractional seconds and timezone for now)
+        int h = 0, m = 0, s = 0;
+        size_t pos = 0;
+        // Hours
+        if (pos + 2 > time_and_tz.size()) return std::nullopt;
+        h = parse_int(time_and_tz.substr(pos, 2));
+        pos += 2;
+        if (pos >= time_and_tz.size() || time_and_tz[pos] != ':') return std::nullopt;
+        pos++;
+        // Minutes
+        if (pos + 2 > time_and_tz.size()) return std::nullopt;
+        m = parse_int(time_and_tz.substr(pos, 2));
+        pos += 2;
+        if (pos >= time_and_tz.size() || time_and_tz[pos] != ':') return std::nullopt;
+        pos++;
+        // Seconds
+        if (pos + 2 > time_and_tz.size()) return std::nullopt;
+        s = parse_int(time_and_tz.substr(pos, 2));
+        pos += 2;
+        // Skip fractional seconds
+        if (pos < time_and_tz.size() && time_and_tz[pos] == '.') {
+            pos++;
+            while (pos < time_and_tz.size() && std::isdigit(static_cast<unsigned char>(time_and_tz[pos])))
+                pos++;
         }
-        return std::nullopt;
+        
+        // Parse timezone offset for adjustment
+        int tz_offset_seconds = 0;
+        bool has_tz = false;
+        if (pos < time_and_tz.size()) {
+            if (time_and_tz[pos] == 'Z') {
+                tz_offset_seconds = 0;
+                has_tz = true;
+            } else if (time_and_tz[pos] == '+' || time_and_tz[pos] == '-') {
+                has_tz = true;
+                bool neg = (time_and_tz[pos] == '-');
+                pos++;
+                if (pos + 2 > time_and_tz.size()) return std::nullopt;
+                int tzh = parse_int(time_and_tz.substr(pos, 2));
+                pos += 2;
+                int tzm = 0;
+                if (pos < time_and_tz.size() && time_and_tz[pos] == ':') {
+                    pos++;
+                    if (pos + 2 <= time_and_tz.size())
+                        tzm = parse_int(time_and_tz.substr(pos, 2));
+                }
+                tz_offset_seconds = (tzh * 3600 + tzm * 60) * (neg ? -1 : 1);
+            } else if (time_and_tz[pos] == '@') {
+                has_tz = true; // named timezone
+            }
+        }
+        
+        Date date{date_opt->y, date_opt->m, date_opt->d};
+        Time time_val{h, m, s};
+        DateTime dt{date, time_val};
+        dt.tz_offset_seconds = tz_offset_seconds;
+        dt.has_tz = has_tz;
+        return dt;
     }
 
     std::optional<Duration> parse_duration(std::string_view str)
     {
+        if (str.empty())
+        {
+            return std::nullopt;
+        }
+        
+        bool negative = false;
+        if (str[0] == '-')
+        {
+            negative = true;
+            str = str.substr(1);
+        }
+        
         if (str.empty() || str[0] != 'P')
         {
             return std::nullopt;
@@ -141,6 +217,32 @@ namespace orion::bre::feel {
                 continue;
             }
 
+            // Handle fractional seconds (e.g., PT0.999S)
+            if (current_char == '.' && in_time)
+            {
+                // Skip fractional digits until we hit 'S'
+                ++i;
+                while (i < str.size() && std::isdigit(static_cast<unsigned char>(str[i])))
+                {
+                    ++i;
+                }
+                // Now str[i] should be 'S'
+                if (i < str.size() && str[i] == 'S')
+                {
+                    // Treat as whole seconds (fractional part ignored for now in total_seconds)
+                    // But mark that we had a number
+                    if (!flush('S'))
+                    {
+                        return std::nullopt;
+                    }
+                }
+                else
+                {
+                    return std::nullopt; // Fractional without 'S'
+                }
+                continue;
+            }
+
             if (!flush(current_char))
             {
                 return std::nullopt; // expects Y/M/D/H/S
@@ -161,6 +263,12 @@ namespace orion::bre::feel {
         total_sec += static_cast<long long>(minutes) * 60LL;
         total_sec += seconds;
         duration.total_seconds = total_sec;
+
+        if (negative)
+        {
+            duration.total_months = -duration.total_months;
+            duration.total_seconds = -duration.total_seconds;
+        }
 
         return duration;
     }

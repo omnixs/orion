@@ -86,6 +86,7 @@ namespace orion::bre::feel {
         RBRACE,           ///< Right brace }
         COMMA,            ///< Comma ,
         DOT,              ///< Dot . (for property access)
+        DOTDOT,           ///< Range operator .. (for ranges like [1..10])
         COLON,            ///< Colon : (for named parameters and context entries)
         
         // Special
@@ -278,6 +279,7 @@ namespace orion::bre::feel {
             case TokenType::RBRACKET: return output_stream << "RBRACKET";
             case TokenType::COMMA: return output_stream << "COMMA";
             case TokenType::DOT: return output_stream << "DOT";
+            case TokenType::DOTDOT: return output_stream << "DOTDOT";
             case TokenType::COLON: return output_stream << "COLON";
             case TokenType::END_OF_INPUT: return output_stream << "END_OF_INPUT";
             case TokenType::UNKNOWN: return output_stream << "UNKNOWN";

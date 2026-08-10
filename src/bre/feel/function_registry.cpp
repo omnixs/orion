@@ -88,12 +88,12 @@ void register_string_functions(FunctionRegistry& reg) {
 void register_list_functions(FunctionRegistry& reg) {
     reg.register_function({"list contains", {{"list"}, {"element"}}});
     reg.register_function({"count", {{"list"}}});
-    reg.register_function({"min", {{"list"}}});
-    reg.register_function({"max", {{"list"}}});
-    reg.register_function({"sum", {{"list"}}});
-    reg.register_function({"mean", {{"list"}}});
-    reg.register_function({"all", {{"list"}}});
-    reg.register_function({"any", {{"list"}}});
+    reg.register_function({"min", {{"list"}}, true});
+    reg.register_function({"max", {{"list"}}, true});
+    reg.register_function({"sum", {{"list"}}, true});
+    reg.register_function({"mean", {{"list"}}, true});
+    reg.register_function({"all", {{"list"}}, true});
+    reg.register_function({"any", {{"list"}}, true});
     
     reg.register_function({"sublist", {
         {"list"},
@@ -112,19 +112,19 @@ void register_list_functions(FunctionRegistry& reg) {
     reg.register_function({"union", {{"list"}}, true});
     reg.register_function({"distinct values", {{"list"}}});
     reg.register_function({"flatten", {{"list"}}});
-    reg.register_function({"product", {{"list"}}});
-    reg.register_function({"median", {{"list"}}});
-    reg.register_function({"stddev", {{"list"}}});
-    reg.register_function({"mode", {{"list"}}});
+    reg.register_function({"product", {{"list"}}, true});
+    reg.register_function({"median", {{"list"}}, true});
+    reg.register_function({"stddev", {{"list"}}, true});
+    reg.register_function({"mode", {{"list"}}, true});
     reg.register_function({"list replace", {{"list"}, {"position"}, {"newItem"}}});
 }
 
 // Helper: Register date/time and temporal functions
 void register_date_time_functions(FunctionRegistry& reg) {
-    // Date conversion functions
-    reg.register_function({"date", {{"from"}}});
-    reg.register_function({"time", {{"from"}}});
-    reg.register_function({"date and time", {{"from"}}});
+    // Date/time constructor functions NOT registered - they use fallback positional binding
+    // because they have multiple overloaded signatures with different param names
+    // (date: "from" OR "year,month,day"; time: "from" OR "hour,minute,second,offset")
+    // The evaluate_*_function() implementations handle all overloads internally.
     reg.register_function({"duration", {{"from"}}});
     
     reg.register_function({"number", {
@@ -141,6 +141,8 @@ void register_date_time_functions(FunctionRegistry& reg) {
     reg.register_function({"day of week", {{"date"}}});
     reg.register_function({"month of year", {{"date"}}});
     reg.register_function({"week of year", {{"date"}}});
+    reg.register_function({"now", {}});
+    reg.register_function({"today", {}});
 }
 
 // Helper: Register context and miscellaneous functions
@@ -196,14 +198,11 @@ void FunctionRegistry::register_function(const FunctionSignature& sig) {
     functions_[sig.name] = sig;
 }
 
-std::optional<FunctionSignature> FunctionRegistry::get_signature(
-    std::string_view name) const 
+const FunctionSignature* FunctionRegistry::get_signature(
+    std::string_view name) const noexcept
 {
     auto iter = functions_.find(name);
-    if (iter != functions_.end()) {
-        return iter->second;
-    }
-    return std::nullopt;
+    return iter != functions_.end() ? &iter->second : nullptr;
 }
 
 } // namespace orion::bre::feel

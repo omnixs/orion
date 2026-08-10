@@ -303,7 +303,8 @@ BOOST_AUTO_TEST_CASE(test_eval_property_on_non_object)
         {"x", 42} // x is a number, not an object
     };
     
-    BOOST_CHECK_THROW((void)ast->evaluate(input, get_test_eval_ctx()), std::runtime_error);
+    // DMN semantics: property access on non-object returns null
+    BOOST_CHECK(ast->evaluate(input, get_test_eval_ctx()).is_null());
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_property_on_null)

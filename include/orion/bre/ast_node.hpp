@@ -98,7 +98,14 @@ namespace orion::bre
         UNARY_OP, ///< Unary operation (e.g., -, not)
         FUNCTION_CALL, ///< Function call (e.g., sum(values))
         PROPERTY_ACCESS, ///< Property access (e.g., person.age)
-        CONDITIONAL ///< Conditional expression (e.g., if x > 10 then "high" else "low")
+        CONDITIONAL, ///< Conditional expression (e.g., if x > 10 then "high" else "low")
+        INSTANCE_OF, ///< Instance of check (e.g., x instance of number)
+        BETWEEN, ///< Between expression (e.g., x between 1 and 10)
+        FOR_EXPR, ///< For expression (e.g., for x in [1,2,3] return x+1)
+        QUANTIFIED_EXPR, ///< some/every expression (e.g., some x in list satisfies x > 0)
+        FILTER_EXPR, ///< Filter expression (e.g., list[x > 0] or list[1])
+        RANGE, ///< Range expression (e.g., [1..10], (1..10), [1..10), (1..10])
+        UNARY_TEST ///< Unary test (e.g., <= 10, > 5, used in 'in' expressions)
     };
 
     // Forward declaration for FunctionParameter
@@ -133,6 +140,44 @@ namespace orion::bre
     };
 
     /**
+     * @brief Convert a LITERAL_NUMBER node's source text to its JSON value.
+     *
+     * The parser also routes the `true`/`false`/`null` keywords through
+     * LITERAL_NUMBER, so those are handled here too. Integral text is kept as
+     * an integer to preserve exact precision and the original representation.
+     *
+     * @param text Literal source text
+     * @return The literal's JSON value
+     * @throws std::runtime_error if the text is not a valid number literal
+     */
+    [[nodiscard]] inline nlohmann::json parse_number_literal(const std::string& text)
+    {
+        if (text == "true") return true;
+        if (text == "false") return false;
+        if (text == "null") return nullptr;
+
+        try
+        {
+            // Integral text (no fraction or exponent) keeps full 64-bit precision
+            if (text.find('.') == std::string::npos &&
+                text.find('e') == std::string::npos &&
+                text.find('E') == std::string::npos)
+            {
+                return std::stoll(text);
+            }
+            return std::stod(text);
+        }
+        catch (const std::invalid_argument&)
+        {
+            throw std::runtime_error("Invalid number literal: '" + text + "'");
+        }
+        catch (const std::out_of_range&)
+        {
+            throw std::runtime_error("Number literal out of range: '" + text + "'");
+        }
+    }
+
+    /**
      * @brief FEEL AST Node structure
      * 
      * Represents a single node in the Abstract Syntax Tree for FEEL expressions.
@@ -161,18 +206,68 @@ namespace orion::bre
         std::vector<FunctionParameter> parameters; ///< Function parameters (only for FUNCTION_CALL nodes)
 
         /**
+         * @brief Pre-computed value for literal nodes.
+         *
+         * Literals are constants, so converting the source text on every
+         * evaluation is pure waste. It is resolved once at construction, which
+         * also moves malformed-number errors to parse time where they belong.
+         * Unused (and null) for non-literal node types.
+         */
+        nlohmann::json literal_value;
+
+        /**
          * @brief Construct a new AST Node
          * @param node_type The type of the node
          * @param node_value The value associated with the node (default: empty string)
          */
         ASTNode(ASTNodeType node_type, std::string node_value = "") : type(node_type), value(std::move(node_value))
         {
+            if (type == ASTNodeType::LITERAL_NUMBER)
+            {
+                literal_value = parse_number_literal(value);
+            }
         }
 
         /**
-         * @brief Virtual destructor for proper cleanup of derived classes
+         * @brief Destructor.
+         *
+         * Tears the tree down iteratively. The default recursive destructor
+         * would blow the stack for deeply nested expressions, which is
+         * precisely the input a depth-limited parser is meant to survive.
          */
-        virtual ~ASTNode() = default;
+        virtual ~ASTNode()
+        {
+            std::vector<std::unique_ptr<ASTNode>> pending;
+            pending.reserve(children.size() + parameters.size());
+            for (auto& child : children)
+            {
+                if (child) pending.push_back(std::move(child));
+            }
+            children.clear();
+            for (auto& param : parameters)
+            {
+                if (param.valueExpr) pending.push_back(std::move(param.valueExpr));
+            }
+            parameters.clear();
+
+            while (!pending.empty())
+            {
+                std::unique_ptr<ASTNode> node = std::move(pending.back());
+                pending.pop_back();
+
+                for (auto& child : node->children)
+                {
+                    if (child) pending.push_back(std::move(child));
+                }
+                node->children.clear();
+
+                for (auto& param : node->parameters)
+                {
+                    if (param.valueExpr) pending.push_back(std::move(param.valueExpr));
+                }
+                node->parameters.clear();
+            }
+        }
         
         // Rule of five for polymorphic base class
         ASTNode(const ASTNode&) = delete;

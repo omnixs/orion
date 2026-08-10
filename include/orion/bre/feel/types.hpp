@@ -39,6 +39,8 @@ namespace orion::bre::feel {
     {
         Date date;
         Time time;
+        int tz_offset_seconds = 0; // timezone offset in seconds (0 = UTC/local)
+        bool has_tz = false; // whether timezone info is present
         auto operator<=>(const DateTime&) const = default;
     };
 

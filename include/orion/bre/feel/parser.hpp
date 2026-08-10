@@ -115,6 +115,41 @@ namespace orion::bre::feel {
     static nlohmann::json eval_expression(std::string_view expression, const nlohmann::json& input, const EvaluationContext& eval_ctx);  private:
         const std::vector<Token>* tokens_ = nullptr;  ///< Current token stream
         size_t position_ = 0;                         ///< Current position in token stream
+
+        /**
+         * @brief Maximum nesting depth for recursive descent.
+         *
+         * The descent chain re-enters itself through parse_primary (via
+         * parenthesized expressions, filters, list elements, ...). Without a
+         * bound, deeply nested input exhausts the call stack, which is an
+         * unrecoverable crash rather than a catchable error. 256 levels is far
+         * beyond any realistic FEEL expression.
+         */
+        static constexpr int MAX_RECURSION_DEPTH = 256;
+
+        int depth_ = 0;                               ///< Current recursive-descent depth
+
+        /**
+         * @brief RAII guard that bounds recursive-descent depth.
+         */
+        class DepthGuard
+        {
+        public:
+            explicit DepthGuard(Parser& parser) : parser_(parser)
+            {
+                if (++parser_.depth_ > MAX_RECURSION_DEPTH)
+                {
+                    --parser_.depth_;
+                    throw std::runtime_error("FEEL expression nesting too deep");
+                }
+            }
+            ~DepthGuard() { --parser_.depth_; }
+            DepthGuard(const DepthGuard&) = delete;
+            DepthGuard& operator=(const DepthGuard&) = delete;
+
+        private:
+            Parser& parser_;
+        };
         
         /**
          * @brief Get current token without advancing
@@ -223,5 +258,13 @@ namespace orion::bre::feel {
     void parse_context_entry(std::unique_ptr<ASTNode>& context_node);
     
     std::unique_ptr<ASTNode> parse_unary_minus();
+
+    // Language construct helpers
+    std::unique_ptr<ASTNode> parse_for_expression();
+    std::unique_ptr<ASTNode> parse_quantified_expression(std::string_view quantifier);
+    std::unique_ptr<ASTNode> parse_in_tests();
+    std::unique_ptr<ASTNode> parse_single_unary_test();
+    std::unique_ptr<ASTNode> parse_postfix(std::unique_ptr<ASTNode> node);
+    std::unique_ptr<ASTNode> parse_range(TokenType open_bracket);
 };
 } // namespace orion::bre
