@@ -18,13 +18,122 @@
 
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/feel/evaluator.hpp>
+#include <algorithm>
+#include <cctype>
 #include <sstream>
 
 namespace orion::bre::feel {
+    namespace {
+        /**
+         * @brief Append a Unicode code point to a string as UTF-8.
+         *
+         * Used when decoding \\uXXXX / \\UXXXXXX escapes in string literals.
+         * Invalid code points are replaced with U+FFFD.
+         */
+        void append_utf8(std::string& out, unsigned long code_point)
+        {
+            if (code_point > 0x10FFFFUL || (code_point >= 0xD800UL && code_point <= 0xDFFFUL))
+            {
+                code_point = 0xFFFDUL; // Replacement character
+            }
+
+            if (code_point < 0x80UL)
+            {
+                out += static_cast<char>(code_point);
+            }
+            else if (code_point < 0x800UL)
+            {
+                out += static_cast<char>(0xC0UL | (code_point >> 6));
+                out += static_cast<char>(0x80UL | (code_point & 0x3FUL));
+            }
+            else if (code_point < 0x10000UL)
+            {
+                out += static_cast<char>(0xE0UL | (code_point >> 12));
+                out += static_cast<char>(0x80UL | ((code_point >> 6) & 0x3FUL));
+                out += static_cast<char>(0x80UL | (code_point & 0x3FUL));
+            }
+            else
+            {
+                out += static_cast<char>(0xF0UL | (code_point >> 18));
+                out += static_cast<char>(0x80UL | ((code_point >> 12) & 0x3FUL));
+                out += static_cast<char>(0x80UL | ((code_point >> 6) & 0x3FUL));
+                out += static_cast<char>(0x80UL | (code_point & 0x3FUL));
+            }
+        }
+
+        /**
+         * @brief Decode FEEL string escape sequences (DMN 1.5 section 10.3.1.2).
+         *
+         * The lexer deliberately preserves raw text including backslashes, so
+         * decoding happens here at parse time and costs nothing at evaluation
+         * time. Unknown escapes are preserved verbatim.
+         */
+        std::string decode_string_escapes(std::string_view text)
+        {
+            if (text.find('\\') == std::string_view::npos)
+            {
+                return std::string(text); // Fast path: nothing to decode
+            }
+
+            std::string decoded;
+            decoded.reserve(text.size());
+            for (size_t i = 0; i < text.size(); ++i)
+            {
+                if (text[i] != '\\' || i + 1 >= text.size())
+                {
+                    decoded += text[i];
+                    continue;
+                }
+
+                const char escape = text[++i];
+                switch (escape)
+                {
+                    case 'n':  decoded += '\n'; break;
+                    case 'r':  decoded += '\r'; break;
+                    case 't':  decoded += '\t'; break;
+                    case '\'': decoded += '\''; break;
+                    case '"':  decoded += '"';  break;
+                    case '\\': decoded += '\\'; break;
+                    case 'u':
+                    case 'U':
+                    {
+                        // \uXXXX (4 hex digits) or \UXXXXXX (6 hex digits) -> UTF-8
+                        const size_t digits = (escape == 'u') ? 4 : 6;
+                        if (i + digits < text.size())
+                        {
+                            const std::string_view hex = text.substr(i + 1, digits);
+                            const bool all_hex = std::all_of(hex.begin(), hex.end(), [](unsigned char ch) {
+                                return std::isxdigit(ch) != 0;
+                            });
+                            if (all_hex)
+                            {
+                                const unsigned long code_point = std::stoul(std::string(hex), nullptr, 16);
+                                append_utf8(decoded, code_point);
+                                i += digits;
+                                break;
+                            }
+                        }
+                        // Not a valid escape: keep it verbatim
+                        decoded += '\\';
+                        decoded += escape;
+                        break;
+                    }
+                    default:
+                        // Unknown escape: preserve both characters
+                        decoded += '\\';
+                        decoded += escape;
+                        break;
+                }
+            }
+            return decoded;
+        }
+    } // namespace
+
     std::unique_ptr<ASTNode> Parser::parse(const std::vector<Token>& tokens)
     {
         tokens_ = &tokens;
         position_ = 0;
+        depth_ = 0;
         
         if (tokens.empty() || is_at_end())
         {
@@ -108,7 +217,7 @@ namespace orion::bre::feel {
             auto node = std::make_unique<ASTNode>(ASTNodeType::CONDITIONAL);
             
             // Parse condition expression
-            auto condition = parse_logical_or();
+            auto condition = parse_conditional();
             node->children.push_back(std::move(condition));
             
             // Expect "then" keyword
@@ -238,11 +347,17 @@ namespace orion::bre::feel {
                     {
                         int depth = 1;
                         advance(); // consume <
-                        while (depth > 0 && position_ < tokens_->size())
+                        // Note: advance() is a no-op at END_OF_INPUT, so the loop
+                        // must terminate on is_at_end() rather than on position_.
+                        while (depth > 0 && !is_at_end())
                         {
                             if (check(TokenType::OPERATOR) && peek().text == "<") depth++;
                             else if (check(TokenType::OPERATOR) && peek().text == ">") depth--;
                             if (depth > 0) advance();
+                        }
+                        if (depth > 0)
+                        {
+                            throw std::runtime_error("Unterminated parameterized type after 'instance of'");
                         }
                         if (check(TokenType::OPERATOR) && peek().text == ">")
                             advance(); // consume final >
@@ -362,18 +477,31 @@ namespace orion::bre::feel {
     std::unique_ptr<ASTNode> Parser::parse_exponentiation()
     {
         auto left = parse_primary();
-        
-        // Check for filter expression: expr[condition] or expr[index]
-        while (check(TokenType::LBRACKET))
+
+        // Postfix chain: filters (expr[...]) and property access (expr.name) may
+        // interleave freely, e.g. Applicants[1].Name.
+        while (check(TokenType::LBRACKET) || check(TokenType::DOT))
         {
-            advance(); // consume '['
-            auto filter = parse_logical_or();
-            expect(TokenType::RBRACKET, "Expected ']' after filter expression");
-            
-            auto node = std::make_unique<ASTNode>(ASTNodeType::FILTER_EXPR, "filter");
-            node->children.push_back(std::move(left));
-            node->children.push_back(std::move(filter));
-            left = std::move(node);
+            if (check(TokenType::LBRACKET))
+            {
+                advance(); // consume '['
+                auto filter = parse_conditional();
+                expect(TokenType::RBRACKET, "Expected ']' after filter expression");
+
+                auto node = std::make_unique<ASTNode>(ASTNodeType::FILTER_EXPR, "filter");
+                node->children.push_back(std::move(left));
+                node->children.push_back(std::move(filter));
+                left = std::move(node);
+            }
+            else
+            {
+                advance(); // consume '.'
+                const Token& property = advance();
+                auto node = std::make_unique<ASTNode>(ASTNodeType::PROPERTY_ACCESS,
+                                                      std::string(property.text));
+                node->children.push_back(std::move(left));
+                left = std::move(node);
+            }
         }
         
         // Right-associative: 2**3**4 = 2**(3**4)
@@ -395,6 +523,10 @@ namespace orion::bre::feel {
     // Precedence level 7 (highest): Primary expressions
     std::unique_ptr<ASTNode> Parser::parse_primary()
 {
+    // parse_primary is the single re-entry point of every recursive-descent
+    // cycle, so bounding depth here bounds the whole parser.
+    DepthGuard guard(*this);
+
     // Dispatch to specialized parsing methods
     if (check(TokenType::NUMBER))
     {
@@ -428,9 +560,7 @@ namespace orion::bre::feel {
     
     if (check(TokenType::LBRACE))
     {
-        // A context literal may be followed by property access or a filter,
-        // e.g. `{a: 1}.a` (DMN 1.5 §10.3.2.5)
-        return parse_postfix(parse_context_literal());
+        return parse_context_literal();
     }
     
     if (check(TokenType::OPERATOR) && check_text("-"))
@@ -459,7 +589,8 @@ std::unique_ptr<ASTNode> Parser::parse_string_literal()
     {
         text = text.substr(1, text.length() - 2);
     }
-    return std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, std::string(text));
+
+    return std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, decode_string_escapes(text));
 }
 
 std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
@@ -492,7 +623,14 @@ std::unique_ptr<ASTNode> Parser::parse_keyword_or_not_function()
     {
         return parse_quantified_expression(token.text);
     }
-    
+
+    // Handle 'if' so conditionals are legal in every expression position
+    // (DMN 1.5 section 10.3.2.1), e.g. 1 + (if x then 2 else 3).
+    if (token.text == "if")
+    {
+        return parse_conditional();
+    }
+
     // Other keywords should not appear as primary expressions
     std::ostringstream oss;
     oss << "Unexpected keyword '" << token.text << "' at position " << token.position;
@@ -714,7 +852,7 @@ void Parser::parse_function_parameters(ASTNode* func_node, std::string_view func
         }
         
         // Parse the value expression
-        auto value_expr = parse_logical_or();
+        auto value_expr = parse_conditional();
         
         // Store parameter in the parameters vector
         FunctionParameter param;
@@ -765,7 +903,7 @@ std::unique_ptr<ASTNode> Parser::parse_variable_with_properties(std::string_view
 std::unique_ptr<ASTNode> Parser::parse_parenthesized_expression()
 {
     advance(); // consume '('
-    auto expr = parse_logical_or(); // Parse inner expression (start from lowest precedence)
+    auto expr = parse_conditional(); // Parse inner expression (start from lowest precedence)
     
     // Check if this is a range: (expr..expr] or (expr..expr)
     if (check(TokenType::DOTDOT)) {
@@ -835,7 +973,7 @@ std::unique_ptr<ASTNode> Parser::parse_postfix(std::unique_ptr<ASTNode> node)
         else if (check(TokenType::LBRACKET))
         {
             advance(); // consume '['
-            auto filter = parse_logical_or();
+            auto filter = parse_conditional();
             if (!check(TokenType::RBRACKET))
                 throw std::runtime_error("Expected ']' in filter expression");
             advance(); // consume ']'
@@ -856,7 +994,7 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
     // Parse first element, then check for ..
     if (!check(TokenType::RBRACKET))
     {
-        auto first = parse_logical_or();
+        auto first = parse_conditional();
         
         // If we see .., this is a range not a list
         if (check(TokenType::DOTDOT)) {
@@ -892,7 +1030,7 @@ std::unique_ptr<ASTNode> Parser::parse_list_literal()
             {
                 break;
             }
-            list_node->children.push_back(parse_logical_or());
+            list_node->children.push_back(parse_conditional());
         }
         
         expect(TokenType::RBRACKET, "Expected ']' after list elements");
@@ -918,42 +1056,38 @@ std::unique_ptr<ASTNode> Parser::parse_unary_minus()
 
 [[nodiscard]] std::string Parser::parse_context_key()
 {
-    // Parse key (must be identifier or string)
-    if (check(TokenType::IDENTIFIER))
-    {
-        std::string key(advance().text);
-
-        // DMN 1.5 §10.3.1.2 (grammar rule 26): a FEEL name may contain "additional
-        // name symbols" (. / - + *) between name parts. The lexer emits those as
-        // separate operator/dot tokens, so re-assemble them here. This is safe
-        // because a context key is always terminated by ':'.
-        auto is_additional_name_symbol = [this]() {
-            if (check(TokenType::DOT)) return true;
-            if (!check(TokenType::OPERATOR)) return false;
-            const std::string_view op = peek().text;
-            return op == "+" || op == "-" || op == "*" || op == "/";
-        };
-
-        while (is_additional_name_symbol())
-        {
-            key += std::string(advance().text);
-            if (check(TokenType::IDENTIFIER) || check(TokenType::NUMBER) || check(TokenType::KEYWORD))
-            {
-                key += std::string(advance().text);
-            }
-        }
-        return key;
-    }
-    
     if (check(TokenType::STRING))
     {
-        std::string key(advance().text);
+        std::string_view key = advance().text;
         // Remove quotes if present
         if (key.size() >= 2 && key.front() == '"' && key.back() == '"')
         {
-            return key.substr(1, key.size() - 2);
+            key = key.substr(1, key.size() - 2);
         }
-        return key;
+        return decode_string_escapes(key);
+    }
+
+    // Unquoted context keys may include FEEL additional-name-symbols.
+    // Consume tokens verbatim until ':' and then trim leading/trailing spaces.
+    std::string key;
+    while (!is_at_end() && !check(TokenType::COLON))
+    {
+        if (check(TokenType::COMMA) || check(TokenType::RBRACE))
+        {
+            break;
+        }
+        key += std::string(advance().text);
+    }
+
+    if (!key.empty())
+    {
+        const auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+        auto begin = std::find_if_not(key.begin(), key.end(), is_space);
+        auto end = std::find_if_not(key.rbegin(), key.rend(), is_space).base();
+        if (begin < end)
+        {
+            return std::string(begin, end);
+        }
     }
     
     std::ostringstream oss;
@@ -970,7 +1104,7 @@ void Parser::parse_context_entry(std::unique_ptr<ASTNode>& context_node)
     // Store key-value pair as child nodes
     auto key_node = std::make_unique<ASTNode>(ASTNodeType::LITERAL_STRING, key);
     context_node->children.push_back(std::move(key_node));
-    context_node->children.push_back(parse_logical_or());
+    context_node->children.push_back(parse_conditional());
 }
 
 std::unique_ptr<ASTNode> Parser::parse_context_literal()
@@ -1057,7 +1191,7 @@ std::unique_ptr<ASTNode> Parser::parse_for_expression()
     advance(); // consume 'return'
     
     // Parse the return expression
-    auto return_expr = parse_logical_or();
+    auto return_expr = parse_conditional();
     node->children.push_back(std::move(return_expr));
     
     return node;
@@ -1103,7 +1237,7 @@ std::unique_ptr<ASTNode> Parser::parse_quantified_expression(std::string_view qu
     advance(); // consume 'satisfies'
     
     // Parse the condition expression
-    auto condition = parse_logical_or();
+    auto condition = parse_conditional();
     node->children.push_back(std::move(condition));
     
     return node;

@@ -352,14 +352,42 @@ namespace orion::bre::feel {
             return json(nullptr);
         }
 
+        // Parse the selector once and reuse the AST for every element. Calling
+        // Evaluator::evaluate per item re-ran the lexer, the parser and the
+        // string pre-passes for each element of the list.
+        Lexer selector_lexer;
+        Parser selector_parser;
+        std::unique_ptr<ASTNode> selector_ast;
+        try
+        {
+            const auto selector_tokens = selector_lexer.tokenize(selector_expr);
+            selector_ast = selector_parser.parse(selector_tokens);
+        }
+        catch (const std::exception&)
+        {
+            return std::nullopt; // Not something we can handle here
+        }
+
         json out = json::array();
+        json local_ctx = input.is_object() ? input : json::object();
+        std::vector<std::string> injected_keys;
+
         for (const auto& item : base_val)
         {
-            json local_ctx = input;
-            if (!local_ctx.is_object())
+            // Undo the previous item's injections so its properties do not leak
+            // into the predicate evaluation of subsequent items.
+            for (const auto& key : injected_keys)
             {
-                local_ctx = json::object();
+                if (auto original = input.find(key); original != input.end())
+                {
+                    local_ctx[key] = *original;
+                }
+                else
+                {
+                    local_ctx.erase(key);
+                }
             }
+            injected_keys.clear();
 
             local_ctx["item"] = item;
             if (item.is_object())
@@ -367,12 +395,13 @@ namespace orion::bre::feel {
                 for (auto it = item.begin(); it != item.end(); ++it)
                 {
                     local_ctx[it.key()] = it.value();
+                    injected_keys.push_back(it.key());
                 }
             }
 
             try
             {
-                json pred = Evaluator::evaluate(selector_expr, local_ctx, eval_ctx);
+                json pred = selector_ast->evaluate(local_ctx, eval_ctx);
                 if (pred.is_boolean() && pred.get<bool>())
                 {
                     out.push_back(item);
@@ -535,35 +564,19 @@ namespace orion::bre::feel {
         }
 
         // AST-based evaluation path (all FEEL features supported)
-        // Phase 1: Function calls (not, all, any, contains)
-        // Phase 2: List operations ([...])
-        bool has_unsupported_features = false;
-        
-        if (has_unsupported_features)
+        try
         {
-            warn("[LEGACY-USED] Expression has unsupported features, using LEGACY path: '{}'", expression);
-        }
-        
-        if (!has_unsupported_features)
-        {
-            try
-            {
-                Lexer lexer;
-                auto tokens = lexer.tokenize(expression);
-                
-                Parser parser;
-                auto ast = parser.parse(tokens);
-                
-                return ast->evaluate(input, eval_ctx);
-            }
-            catch (const std::exception& e)
-            {
-                // AST evaluation failed - unsupported FEEL features
-                throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression) + " - " + e.what());
-            }
-        }
+            Lexer lexer;
+            auto tokens = lexer.tokenize(expression);
 
-        // If we reach here with AST parsing enabled, something went wrong
-        throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression));
+            Parser parser;
+            auto ast = parser.parse(tokens);
+
+            return ast->evaluate(input, eval_ctx);
+        }
+        catch (const std::exception& e)
+        {
+            throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression) + " - " + e.what());
+        }
     }
 }

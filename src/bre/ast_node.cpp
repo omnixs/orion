@@ -60,11 +60,25 @@ namespace orion::bre
             return oss.str();
         }
 
+        // Days since 1970-01-01 for a proleptic Gregorian calendar date.
+        // Howard Hinnant's days_from_civil: correct for negative years and does
+        // not mis-count the current year's leap day (a naive y/4 - y/100 + y/400
+        // term treats 29 February as already elapsed on 1 January).
+        long long days_from_civil(long long year, unsigned month, unsigned day)
+        {
+            year -= month <= 2;
+            const long long era = (year >= 0 ? year : year - 399) / 400;
+            const unsigned long long yoe = static_cast<unsigned long long>(year - era * 400);          // [0, 399]
+            const unsigned long long doy = (153ULL * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // [0, 365]
+            const unsigned long long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;                       // [0, 146096]
+            return era * 146097LL + static_cast<long long>(doe) - 719468LL;
+        }
+
         // Duration arithmetic helpers
         bool is_duration_string(const json& val)
         {
             if (!val.is_string()) return false;
-            auto s = val.get<std::string>();
+            const std::string& s = val.get_ref<const std::string&>();
             if (s.empty()) return false;
             return s[0] == 'P' || (s[0] == '-' && s.size() > 1 && s[1] == 'P');
         }
@@ -348,37 +362,9 @@ namespace orion::bre
         {
             case ASTNodeType::LITERAL_NUMBER:
             {
-                // Handle special keywords
-                if (value == "true") return true;
-                if (value == "false") return false;
-                if (value == "null") return nullptr;
-                
-                // Parse numeric literal
-                try
-                {
-                    // Try integer first
-                    if (value.find('.') == std::string::npos && 
-                        value.find('e') == std::string::npos && 
-                        value.find('E') == std::string::npos)
-                    {
-                        return std::stoll(value);
-                    }
-                    // Parse as double
-                    return std::stod(value);
-                }
-                catch (const std::invalid_argument&)
-                {
-                    std::ostringstream oss;
-                    oss << "Invalid number literal: '" << value << "'";
-                    throw std::runtime_error(oss.str());
-                }
-                catch (const std::out_of_range&)
-                {
-                    std::ostringstream oss;
-                    oss << "Number literal out of range: '" << value << "'";
-                    throw std::runtime_error(oss.str());
+                // Resolved once at construction (see ASTNode::literal_value)
+                return literal_value;
             }
-        }
         
         case ASTNodeType::LITERAL_STRING:
         {
@@ -397,36 +383,34 @@ namespace orion::bre
         
         case ASTNodeType::LITERAL_CONTEXT:
         {
-            // DMN 1.5 §10.3.1.2: context entry names SHALL be unique; a duplicate
-            // name makes the whole context literal invalid (null).
-            // DMN 1.5 clause 10.4: when evaluating an entry value, the scope includes
-            // the previous entries of the same context, so `{a: 1, b: a + 1}` works.
-            json contextObject = json::object();
+            json context_object = json::object();
 
-            // Only a context with more than one entry can reference a previous entry,
-            // so avoid copying the input scope for the common single-entry case.
-            const bool needs_local_scope = children.size() > 2;
-            json local_scope = needs_local_scope ? input : json(nullptr);
-            const json& entry_scope = needs_local_scope ? local_scope : input;
+            // DMN 1.5 context semantics:
+            // - entries are evaluated left-to-right
+            // - each entry can reference previously computed entries
+            // - duplicate keys make the whole context null
+            // Use a local scope that starts from input and is extended per entry.
+            json local_scope = input;
+            if (!local_scope.is_object())
+            {
+                local_scope = json::object();
+            }
 
-            // Children are stored as pairs: [key_node, value_node, key_node, value_node, ...]
             for (size_t i = 0; i + 1 < children.size(); i += 2)
             {
-                // Key is stored in a LITERAL_STRING node
                 const std::string& key = children[i]->value;
-                if (contextObject.contains(key))
+
+                if (context_object.contains(key))
                 {
-                    return nullptr; // Duplicate context entry name
+                    return nullptr;
                 }
-                // Value is any expression
-                json val = children[i + 1]->evaluate(entry_scope, eval_ctx);
-                if (needs_local_scope)
-                {
-                    local_scope[key] = val;
-                }
-                contextObject[key] = std::move(val);
+
+                json entry_value = children[i + 1]->evaluate(local_scope, eval_ctx);
+                context_object[key] = entry_value;
+                local_scope[key] = entry_value;
             }
-            return contextObject;
+
+            return context_object;
         }
         
         case ASTNodeType::VARIABLE:
@@ -492,8 +476,8 @@ namespace orion::bre
                     // String concatenation: both must be strings
                     if (left.is_string() && right.is_string())
                     {
-                        auto ls = left.get<std::string>();
-                        auto rs = right.get<std::string>();
+                        const std::string& ls = left.get_ref<const std::string&>();
+                        const std::string& rs = right.get_ref<const std::string&>();
                         // Duration + Duration
                         if (is_duration_string(left) && is_duration_string(right))
                         {
@@ -593,8 +577,8 @@ namespace orion::bre
                     if (left.is_null() || right.is_null()) return nullptr;
                     if (left.is_string() && right.is_string())
                     {
-                        auto ls = left.get<std::string>();
-                        auto rs = right.get<std::string>();
+                        const std::string& ls = left.get_ref<const std::string&>();
+                        const std::string& rs = right.get_ref<const std::string&>();
                         // Duration - Duration
                         if (is_duration_string(left) && is_duration_string(right))
                         {
@@ -651,15 +635,9 @@ namespace orion::bre
                                 if (dt1->has_tz != dt2->has_tz) return nullptr;
                                 // Convert both to total seconds from epoch-ish (UTC-normalized)
                                 auto to_secs = [](const feel::DateTime& dt) -> long long {
-                                    long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
-                                    for (int mm = 1; mm < dt.date.m; mm++)
-                                    {
-                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                                        days += md[mm];
-                                    }
-                                    if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
-                                        days++;
-                                    days += dt.date.d;
+                                    const long long days = days_from_civil(dt.date.y,
+                                                                           static_cast<unsigned>(dt.date.m),
+                                                                           static_cast<unsigned>(dt.date.d));
                                     return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
                                 };
                                 long long diff = to_secs(*dt1) - to_secs(*dt2);
@@ -675,16 +653,9 @@ namespace orion::bre
                             if (d1 && d2)
                             {
                                 auto to_days = [](const feel::Date& d) -> long long {
-                                    long long days = d.y * 365LL + d.y/4 - d.y/100 + d.y/400;
-                                    for (int mm = 1; mm < d.m; mm++)
-                                    {
-                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                                        days += md[mm];
-                                    }
-                                    if (d.m > 2 && ((d.y%4==0 && d.y%100!=0) || d.y%400==0))
-                                        days++;
-                                    days += d.d;
-                                    return days;
+                                    return days_from_civil(d.y,
+                                                           static_cast<unsigned>(d.m),
+                                                           static_cast<unsigned>(d.d));
                                 };
                                 long long diff = to_days(*d1) - to_days(*d2);
                                 feel::Duration dur;
@@ -708,15 +679,9 @@ namespace orion::bre
                             if (dt1 && dt2)
                             {
                                 auto to_secs = [](const feel::DateTime& dt) -> long long {
-                                    long long days = dt.date.y * 365LL + dt.date.y/4 - dt.date.y/100 + dt.date.y/400;
-                                    for (int mm = 1; mm < dt.date.m; mm++)
-                                    {
-                                        static const int md[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
-                                        days += md[mm];
-                                    }
-                                    if (dt.date.m > 2 && ((dt.date.y%4==0 && dt.date.y%100!=0) || dt.date.y%400==0))
-                                        days++;
-                                    days += dt.date.d;
+                                    const long long days = days_from_civil(dt.date.y,
+                                                                           static_cast<unsigned>(dt.date.m),
+                                                                           static_cast<unsigned>(dt.date.d));
                                     return days * 86400LL + dt.time.h * 3600LL + dt.time.m * 60LL + dt.time.s - dt.tz_offset_seconds;
                                 };
                                 long long diff = to_secs(*dt1) - to_secs(*dt2);
@@ -1092,10 +1057,14 @@ namespace orion::bre
                     }
                     
                     // Right is a range object
-                    if (right.is_object() && right.contains("__range__")) {
-                        std::string type = right["__range__"].get<std::string>();
-                        auto start_val = right["__start__"];
-                        auto end_val = right["__end__"];
+                    if (auto range_it = right.is_object() ? right.find("__range__") : right.end();
+                        right.is_object() && range_it != right.end()) {
+                        const std::string& type = range_it->get_ref<const std::string&>();
+                        const auto start_it = right.find("__start__");
+                        const auto end_it = right.find("__end__");
+                        if (start_it == right.end() || end_it == right.end()) return nullptr;
+                        const json& start_val = *start_it;
+                        const json& end_val = *end_it;
                         bool start_incl = (type[0] == '[');
                         bool end_incl = (type[1] == ']');
                         
@@ -1106,9 +1075,9 @@ namespace orion::bre
                             return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
                         }
                         if (left.is_string() && start_val.is_string() && end_val.is_string()) {
-                            auto v = left.get<std::string>();
-                            auto s = start_val.get<std::string>();
-                            auto e = end_val.get<std::string>();
+                            const std::string& v = left.get_ref<const std::string&>();
+                            const std::string& s = start_val.get_ref<const std::string&>();
+                            const std::string& e = end_val.get_ref<const std::string&>();
                             return (start_incl ? v >= s : v > s) && (end_incl ? v <= e : v < e);
                         }
                         return nullptr;
@@ -1213,6 +1182,32 @@ namespace orion::bre
                     // Not a temporal property - fall through to error
                 }
                 
+                // DMN 1.5 §10.3.2.5: a path expression applied to a list
+                // projects the property over every element, preserving
+                // positions. Missing properties project as null.
+                if (obj.is_array())
+                {
+                    json projected = json::array();
+                    projected.get_ref<json::array_t&>().reserve(obj.size());
+                    for (const auto& element : obj)
+                    {
+                        if (!element.is_object())
+                        {
+                            projected.push_back(nullptr);
+                            continue;
+                        }
+                        if (auto it = element.find(propertyName); it != element.end())
+                        {
+                            projected.push_back(*it);
+                        }
+                        else
+                        {
+                            projected.push_back(nullptr);
+                        }
+                    }
+                    return projected;
+                }
+
                 // Obj must be an object/dict to have properties
                 if (!obj.is_object())
                 {
@@ -1391,313 +1386,24 @@ namespace orion::bre
                 }
             }
             
-            // Dispatch to appropriate function
-            if (funcName == "not")
-            {
-                return feel::evaluate_not_function(args);
-            }
-            else if (funcName == "all")
-            {
-                return feel::evaluate_all_function(args);
-            }
-            else if (funcName == "any")
-            {
-                return feel::evaluate_any_function(args);
-            }
-            else if (funcName == "contains")
-            {
-                return feel::evaluate_contains_function(args);
-            }
-            // Math functions
-            else if (funcName == "abs")
-            {
-                return feel::evaluate_abs_function(args);
-            }
-            else if (funcName == "sqrt")
-            {
-                return feel::evaluate_sqrt_function(args);
-            }
-            else if (funcName == "floor")
-            {
-                return feel::evaluate_floor_function(args);
-            }
-            else if (funcName == "ceiling")
-            {
-                return feel::evaluate_ceiling_function(args);
-            }
-            else if (funcName == "exp")
-            {
-                return feel::evaluate_exp_function(args);
-            }
-            else if (funcName == "log")
-            {
-                return feel::evaluate_log_function(args);
-            }
-            else if (funcName == "modulo")
-            {
-                return feel::evaluate_modulo_function(args);
-            }
-            else if (funcName == "decimal")
-            {
-                return feel::evaluate_decimal_function(args);
-            }
-            else if (funcName == "round")
-            {
-                return feel::evaluate_round_function(args);
-            }
-            else if (funcName == "round up")
-            {
-                return feel::evaluate_round_up_function(args);
-            }
-            else if (funcName == "round down")
-            {
-                return feel::evaluate_round_down_function(args);
-            }
-            else if (funcName == "round half up")
-            {
-                return feel::evaluate_round_half_up_function(args);
-            }
-            else if (funcName == "round half down")
-            {
-                return feel::evaluate_round_half_down_function(args);
-            }
-            // String functions
-            else if (funcName == "substring before")
-            {
-                return feel::evaluate_substring_before_function(args);
-            }
-            else if (funcName == "substring after")
-            {
-                return feel::evaluate_substring_after_function(args);
-            }
-            else if (funcName == "substring")
-            {
-                return feel::evaluate_substring_function(args);
-            }
-            else if (funcName == "string length")
-            {
-                return feel::evaluate_string_length_function(args);
-            }
-            else if (funcName == "upper case")
-            {
-                return feel::evaluate_upper_case_function(args);
-            }
-            else if (funcName == "lower case")
-            {
-                return feel::evaluate_lower_case_function(args);
-            }
-            else if (funcName == "starts with")
-            {
-                return feel::evaluate_starts_with_function(args);
-            }
-            else if (funcName == "ends with")
-            {
-                return feel::evaluate_ends_with_function(args);
-            }
-            else if (funcName == "replace")
-            {
-                return feel::evaluate_replace_function(args);
-            }
-            else if (funcName == "matches")
-            {
-                return feel::evaluate_matches_function(args, eval_ctx);
-            }
-            else if (funcName == "split")
-            {
-                return feel::evaluate_split_function(args);
-            }
-            else if (funcName == "string join")
-            {
-                return feel::evaluate_string_join_function(args);
-            }
-            else if (funcName == "date")
-            {
-                return feel::evaluate_date_function(args);
-            }
-            else if (funcName == "duration")
-            {
-                return feel::evaluate_duration_function(args);
-            }
-            else if (funcName == "time")
-            {
-                return feel::evaluate_time_function(args);
-            }
-            else if (funcName == "date and time")
-            {
-                return feel::evaluate_date_and_time_function(args);
-            }
-            else if (funcName == "years and months duration")
-            {
-                return feel::evaluate_years_and_months_duration_function(args);
-            }
-            else if (funcName == "day of year")
-            {
-                return feel::evaluate_day_of_year_function(args);
-            }
-            else if (funcName == "day of week")
-            {
-                return feel::evaluate_day_of_week_function(args);
-            }
-            else if (funcName == "month of year")
-            {
-                return feel::evaluate_month_of_year_function(args);
-            }
-            else if (funcName == "week of year")
-            {
-                return feel::evaluate_week_of_year_function(args);
-            }
-            else if (funcName == "now")
-            {
-                return feel::evaluate_now_function(args);
-            }
-            else if (funcName == "today")
-            {
-                return feel::evaluate_today_function(args);
-            }
-            // Phase 1: Trivial functions
-            else if (funcName == "odd")
-            {
-                return feel::evaluate_odd_function(args);
-            }
-            else if (funcName == "even")
-            {
-                return feel::evaluate_even_function(args);
-            }
-            else if (funcName == "number")
-            {
-                return feel::evaluate_number_function(args);
-            }
-            else if (funcName == "string")
-            {
-                return feel::evaluate_string_function(args);
-            }
-            else if (funcName == "is")
-            {
-                return feel::evaluate_is_function(args);
-            }
-            // Phase 2A: Aggregation functions
-            else if (funcName == "count")
-            {
-                return feel::evaluate_count_function(args);
-            }
-            else if (funcName == "sum")
-            {
-                return feel::evaluate_sum_function(args);
-            }
-            else if (funcName == "min")
-            {
-                return feel::evaluate_min_function(args);
-            }
-            else if (funcName == "max")
-            {
-                return feel::evaluate_max_function(args);
-            }
-            else if (funcName == "mean")
-            {
-                return feel::evaluate_mean_function(args);
-            }
-            else if (funcName == "product")
-            {
-                return feel::evaluate_product_function(args);
-            }
-            else if (funcName == "median")
-            {
-                return feel::evaluate_median_function(args);
-            }
-            else if (funcName == "stddev")
-            {
-                return feel::evaluate_stddev_function(args);
-            }
-            else if (funcName == "mode")
-            {
-                return feel::evaluate_mode_function(args);
-            }
-            // Phase 2B: List manipulation functions
-            else if (funcName == "list contains")
-            {
-                return feel::evaluate_list_contains_function(args);
-            }
-            else if (funcName == "append")
-            {
-                return feel::evaluate_append_function(args);
-            }
-            else if (funcName == "concatenate")
-            {
-                return feel::evaluate_concatenate_function(args);
-            }
-            else if (funcName == "insert before")
-            {
-                return feel::evaluate_insert_before_function(args);
-            }
-            else if (funcName == "remove")
-            {
-                return feel::evaluate_remove_function(args);
-            }
-            else if (funcName == "reverse")
-            {
-                return feel::evaluate_reverse_function(args);
-            }
-            else if (funcName == "index of")
-            {
-                return feel::evaluate_index_of_function(args);
-            }
-            else if (funcName == "sublist")
-            {
-                return feel::evaluate_sublist_function(args);
-            }
-            else if (funcName == "union")
-            {
-                return feel::evaluate_union_function(args);
-            }
-            else if (funcName == "distinct values")
-            {
-                return feel::evaluate_distinct_values_function(args);
-            }
-            else if (funcName == "flatten")
-            {
-                return feel::evaluate_flatten_function(args);
-            }
-            else if (funcName == "sort")
-            {
-                return feel::evaluate_sort_function(args);
-            }
-            else if (funcName == "list replace")
-            {
-                return feel::evaluate_list_replace_function(args);
-            }
-            // ========== PHASE 3: CONTEXT FUNCTIONS ==========
-            else if (funcName == "get value")
-            {
-                return feel::evaluate_get_value_function(args);
-            }
-            else if (funcName == "get entries")
-            {
-                return feel::evaluate_get_entries_function(args);
-            }
-            else if (funcName == "context")
-            {
-                return feel::evaluate_context_function(args);
-            }
-            else if (funcName == "context put")
-            {
-                return feel::evaluate_context_put_function(args);
-            }
-            else if (funcName == "context merge")
-            {
-                return feel::evaluate_context_merge_function(args);
-            }
-            else if (eval_ctx.bkm_map)
+            // Dispatch to appropriate function via an O(1) lookup table.
+            // A linear if/else-if chain over ~72 names made every call pay for
+            // the position of its name in the chain, and pushed user-defined
+            // BKM invocations (the common case in real DRGs) to the very end.
+            if (const auto* handler = feel::find_builtin_handler(funcName))
+            {
+                return (*handler)(args, input, eval_ctx);
+            }
+
+            if (eval_ctx.bkm_map)
             {
                 auto bkm_it = eval_ctx.bkm_map->find(funcName);
                 if (bkm_it != eval_ctx.bkm_map->end())
                 {
                     return bkm_it->second->invoke(args, input, *eval_ctx.bkm_map, eval_ctx);
                 }
-                std::ostringstream oss;
-                oss << "Unknown function: " << funcName;
-                throw std::runtime_error(oss.str());
             }
-            else
+
             {
                 std::ostringstream oss;
                 oss << "Unknown function: " << funcName;
@@ -1986,18 +1692,41 @@ namespace orion::bre
                 
                 // Filter by condition
                 json result = json::array();
-                json local_ctx = input;
+                json local_ctx = input.is_object() ? input : json::object();
+
+                // Keys injected by the previous item, so they can be undone before
+                // the next iteration. Without this, an item's properties leak into
+                // the predicate evaluation of subsequent items.
+                std::vector<std::string> injected_keys;
+
                 for (size_t i = 0; i < list_val.size(); ++i)
                 {
                     const auto& item = list_val[i];
+
+                    // Undo the previous item's injections: restore the original
+                    // value where the input shadowed one, otherwise remove the key.
+                    for (const auto& key : injected_keys)
+                    {
+                        if (auto original = input.find(key); original != input.end())
+                        {
+                            local_ctx[key] = *original;
+                        }
+                        else
+                        {
+                            local_ctx.erase(key);
+                        }
+                    }
+                    injected_keys.clear();
+
                     local_ctx["item"] = item;
-                    
+
                     // If item is context, merge its keys into local scope
                     if (item.is_object())
                     {
                         for (auto it = item.begin(); it != item.end(); ++it)
                         {
                             local_ctx[it.key()] = it.value();
+                            injected_keys.push_back(it.key());
                         }
                     }
                     

@@ -77,6 +77,20 @@ namespace orion::bre::feel {
          */
         [[nodiscard]] bool matches(std::string_view input) const;
 
+        /**
+         * @brief Replace every match of the compiled pattern in @p input
+         *
+         * Uses PCRE2 substitution so that `replace()` shares the exact regex
+         * flavour, the JIT and the compiled-pattern cache with `matches()`.
+         * Replacement text uses `$1`..`$n` for capture groups, per DMN.
+         *
+         * @param input The subject string
+         * @param replacement The replacement template
+         * @return The substituted string, or nullopt on substitution failure
+         */
+        [[nodiscard]] std::optional<std::string> replace_all(std::string_view input,
+                                                             std::string_view replacement) const;
+
         // Move-only type (owns PCRE2 resources)
         CompiledRegex(CompiledRegex&&) noexcept;
         CompiledRegex& operator=(CompiledRegex&&) noexcept;
