@@ -383,6 +383,11 @@ namespace orion::bre
         
         case ASTNodeType::LITERAL_CONTEXT:
         {
+            if (children.empty())
+            {
+                return json::object();
+            }
+
             json context_object = json::object();
 
             // DMN 1.5 context semantics:
@@ -390,23 +395,18 @@ namespace orion::bre
             // - each entry can reference previously computed entries
             // - duplicate keys make the whole context null
             // Use a local scope that starts from input and is extended per entry.
-            json local_scope = input;
-            if (!local_scope.is_object())
-            {
-                local_scope = json::object();
-            }
+            json local_scope = input.is_object() ? input : json::object();
 
             for (size_t i = 0; i + 1 < children.size(); i += 2)
             {
                 const std::string& key = children[i]->value;
 
-                if (context_object.contains(key))
-                {
-                    return nullptr;
-                }
+                // Insert first to avoid a second key lookup via contains()+operator[].
+                auto [entry_it, inserted] = context_object.emplace(key, nullptr);
+                if (!inserted) return nullptr;
 
                 json entry_value = children[i + 1]->evaluate(local_scope, eval_ctx);
-                context_object[key] = entry_value;
+                entry_it.value() = entry_value;
                 local_scope[key] = entry_value;
             }
 

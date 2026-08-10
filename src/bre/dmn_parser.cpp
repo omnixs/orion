@@ -375,19 +375,16 @@ namespace orion::bre
         return (colon == std::string_view::npos) ? name : name.substr(colon + 1);
     }
 
-    // Helper to render a context entry name as a quoted FEEL string key
-    [[nodiscard]] static std::string quote_feel_key(std::string_view name)
+    // Helper to append a context entry name as a quoted FEEL string key.
+    static void append_quoted_feel_key(std::string& output, std::string_view name)
     {
-        std::string quoted;
-        quoted.reserve(name.size() + 2);
-        quoted.push_back('"');
+        output.push_back('"');
         for (const char character : name)
         {
-            if (character == '"' || character == '\\') quoted.push_back('\\');
-            quoted.push_back(character);
+            if (character == '"' || character == '\\') output.push_back('\\');
+            output.push_back(character);
         }
-        quoted.push_back('"');
-        return quoted;
+        output.push_back('"');
     }
 
     [[nodiscard]] static std::string boxed_context_to_feel(rapidxml::xml_node<>* context_node);
@@ -491,13 +488,25 @@ namespace orion::bre
             while (collides(result_key)) result_key.push_back('_');
         }
 
-        std::string feel_expression = "{";
+        std::string feel_expression;
+        size_t reserved_size = 2; // "{}"
+        for (const auto& [name, expression] : entries)
+        {
+            reserved_size += name.size() + expression.size() + 6; // quotes, colon+space, separator slack
+        }
+        if (has_result)
+        {
+            reserved_size += result_key.size() + result_expression.size() + 10;
+        }
+        feel_expression.reserve(reserved_size);
+
+        feel_expression.push_back('{');
         bool first_entry = true;
         for (const auto& [name, expression] : entries)
         {
             if (!first_entry) feel_expression += ", ";
             first_entry = false;
-            feel_expression += quote_feel_key(name);
+            append_quoted_feel_key(feel_expression, name);
             feel_expression += ": ";
             feel_expression += expression;
         }
