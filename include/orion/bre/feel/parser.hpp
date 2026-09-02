@@ -224,6 +224,14 @@ namespace orion::bre::feel {
         std::unique_ptr<ASTNode> parse_additive();
         
         /**
+         * @brief Parse the upper endpoint of a range after '..'
+         *
+         * Endpoints are full arithmetic expressions (e.g. `[1..n+1]`); none of the range
+         * closing tokens (`]`, `)`, or the `[` alias for an exclusive bound) can continue one.
+         */
+        std::unique_ptr<ASTNode> parse_range_bound();
+        
+        /**
          * @brief Parse multiplicative expression
          * Grammar: multiplicative → exponentiation ( ("*" | "/") exponentiation )*
          */

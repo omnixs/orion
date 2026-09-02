@@ -108,7 +108,8 @@ namespace orion::bre::feel {
                 const TokenType pt = prev_type();
                 const bool prev_allows_open_range =
                     pt == TokenType::END_OF_INPUT || pt == TokenType::LPAREN || pt == TokenType::LBRACE ||
-                    pt == TokenType::COMMA || pt == TokenType::COLON || pt == TokenType::OPERATOR;
+                    pt == TokenType::COMMA || pt == TokenType::COLON || pt == TokenType::OPERATOR ||
+                    pt == TokenType::KEYWORD;
                 const char nn = next_non_space(position_ + 1);
                 const bool next_starts_value =
                     std::isalnum(static_cast<unsigned char>(nn)) || nn == '_' || nn == '"';
@@ -429,6 +430,9 @@ namespace orion::bre::feel {
             const bool is_regular_ident_char =
                 std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == ' ';
 
+            // FEEL names may embed '-' (DMN 1.5 §10.3.1.2 additional name symbols). Only absorb it
+            // when the next character starts a name segment; '-' before a digit stays subtraction
+            // so unspaced arithmetic such as "Age-1" keeps working.
             bool is_hyphenated_segment = false;
             if (ch == '-')
             {
@@ -436,7 +440,7 @@ namespace orion::bre::feel {
                 if (next_pos < input_.length())
                 {
                     const char next = input_[next_pos];
-                    if (std::isalnum(static_cast<unsigned char>(next)) || next == '_')
+                    if (std::isalpha(static_cast<unsigned char>(next)) || next == '_')
                     {
                         is_hyphenated_segment = true;
                     }
