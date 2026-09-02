@@ -347,7 +347,7 @@ namespace orion::bre::detail
             if (pos + 1 < expr.length() && expr.substr(pos, 2) == "**")
             {
                 pos += 2;
-                double right = parse_power(expr, pos); // Right associative
+                double right = parse_factor(expr, pos); // Left associative
                 // DMN null propagation: if either operand is NaN (null), result is NaN
                 if (std::isnan(result) || std::isnan(right))
                 {

@@ -148,12 +148,11 @@ BOOST_AUTO_TEST_CASE(test_eval_exponentiation_with_parentheses_in_exponent) {
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_chained_exponentiation_right_associative) {
-    // 2**3**2 should be 2**(3**2) = 2**9 = 512 (right-associative)
-    // NOT (2**3)**2 = 8**2 = 64 (left-associative)
+    // TCK expects left-associative chaining: (2**3)**2 = 64
     using orion::bre::feel::Evaluator;
     auto result = Evaluator::evaluate("2**3**2", {}, get_test_eval_ctx());
-    
-    BOOST_CHECK_EQUAL(result.get<double>(), 512.0);
+
+    BOOST_CHECK_EQUAL(result.get<double>(), 64.0);
 }
 
 BOOST_AUTO_TEST_CASE(test_eval_exponentiation_with_multiplication) {

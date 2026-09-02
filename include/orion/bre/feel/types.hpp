@@ -62,4 +62,14 @@ namespace orion::bre::feel {
     [[nodiscard]] std::optional<Date> parse_date(std::string_view str);
     [[nodiscard]] std::optional<Time> parse_time(std::string_view str);
     [[nodiscard]] std::optional<DateTime> parse_datetime(std::string_view str);
+
+    /**
+     * @brief Resolve an IANA zone name (e.g. "Europe/Paris") to its UTC offset at a local instant.
+     *
+     * Uses the standard library time zone database. Returns std::nullopt when the name is unknown,
+     * the instant is outside the representable range, or the toolchain ships no time zone database.
+     */
+    [[nodiscard]] std::optional<int> named_timezone_offset_seconds(std::string_view tz_name,
+                                                                   const Date& date,
+                                                                   const Time& time);
 }

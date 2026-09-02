@@ -99,6 +99,23 @@ BOOST_AUTO_TEST_CASE(duration_invalid_malformed)
     BOOST_CHECK(result.is_null());  // P followed by number but no unit
 }
 
+BOOST_AUTO_TEST_CASE(duration_invalid_bare_p)
+{
+    // Bare period designator is invalid
+    json result = Evaluator::evaluate("duration(\"P\")", {}, get_test_eval_ctx());
+    BOOST_CHECK(result.is_null());
+}
+
+BOOST_AUTO_TEST_CASE(duration_invalid_time_units_without_t)
+{
+    // Time units H/S must be in the T section
+    json no_t_hours = Evaluator::evaluate("duration(\"P1H\")", {}, get_test_eval_ctx());
+    BOOST_CHECK(no_t_hours.is_null());
+
+    json no_t_seconds = Evaluator::evaluate("duration(\"P1S\")", {}, get_test_eval_ctx());
+    BOOST_CHECK(no_t_seconds.is_null());
+}
+
 BOOST_AUTO_TEST_CASE(duration_invalid_empty_string)
 {
     // Empty string - invalid

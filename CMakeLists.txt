@@ -223,9 +223,23 @@ file(GLOB ORION_INTERNAL_HDRS CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/bre/feel/*.hpp"
 )
 
+# Detect whether the standard library ships a usable IANA time zone database.
+# libstdc++ advertises __cpp_lib_chrono before implementing tzdb, so probe by compiling.
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX23_STANDARD_COMPILE_OPTION}")
+check_cxx_source_compiles("
+#include <chrono>
+int main() { return std::chrono::locate_zone(\"Etc/UTC\") == nullptr; }
+" ORION_HAS_STD_TZDB)
+unset(CMAKE_REQUIRED_FLAGS)
+
 # Create the main library
 add_library(orion_lib STATIC ${ORION_SRC})
 add_library(orion::orion_lib ALIAS orion_lib)
+
+if(ORION_HAS_STD_TZDB)
+  target_compile_definitions(orion_lib PRIVATE ORION_HAS_STD_TZDB=1)
+endif()
 
 # Attach headers (no compile impact) for IDE view
 target_sources(orion_lib PRIVATE ${ORION_PUBLIC_HDRS} ${ORION_INTERNAL_HDRS})
@@ -287,6 +301,7 @@ if(ORION_BUILD_TESTS)
       # FEEL unit tests
       tst/bre/feel/test_lexer.cpp
       tst/bre/feel/test_lexer_decimal_numbers.cpp
+      tst/bre/feel/test_lexer_names_and_ranges.cpp
       tst/bre/feel/test_parser.cpp
       tst/bre/feel/test_parser_subtraction.cpp
       tst/bre/feel/test_evaluator_exponentiation.cpp
@@ -301,6 +316,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_evaluator_property_access.cpp
       tst/bre/feel/test_evaluator_builtin_math.cpp
       tst/bre/feel/test_evaluator_duration.cpp
+      tst/bre/feel/test_temporal_timezones.cpp
       tst/bre/feel/test_unary_feel_functions.cpp
       tst/bre/feel/test_feel_segfault_debug.cpp
       tst/bre/feel/test_function_registry.cpp

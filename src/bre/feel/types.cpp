@@ -21,6 +21,13 @@
 #include <climits>  // For INT_MAX
 #include <charconv> // For std::from_chars
 
+// ORION_HAS_STD_TZDB is set by CMake after probing for std::chrono::locate_zone. libstdc++
+// advertises __cpp_lib_chrono without shipping a time zone database, so a compile probe is
+// the only reliable detection. Without it, named zones resolve to an unknown offset.
+#ifdef ORION_HAS_STD_TZDB
+#include <chrono>
+#endif
+
 namespace orion::bre::feel {
     // Helper to parse integer from string_view without allocation
     inline int parse_int(std::string_view sv) {
@@ -28,6 +35,50 @@ namespace orion::bre::feel {
         std::from_chars(sv.data(), sv.data() + sv.size(), value);
         return value;
     }
+
+    std::optional<int> named_timezone_offset_seconds(std::string_view tz_name,
+                                                     const Date& date,
+                                                     const Time& time)
+    {
+#ifdef ORION_HAS_STD_TZDB
+        // std::chrono::year only models a limited range; FEEL allows far wider years.
+        if (date.y < static_cast<int>(std::chrono::year::min()) ||
+            date.y > static_cast<int>(std::chrono::year::max()))
+        {
+            return std::nullopt;
+        }
+
+        try
+        {
+            const std::chrono::time_zone* zone = std::chrono::locate_zone(std::string(tz_name));
+            if (zone == nullptr) return std::nullopt;
+
+            const std::chrono::year_month_day ymd{
+                std::chrono::year{date.y},
+                std::chrono::month{static_cast<unsigned>(date.m)},
+                std::chrono::day{static_cast<unsigned>(date.d)}};
+            if (!ymd.ok()) return std::nullopt;
+
+            const std::chrono::local_seconds local_tp =
+                std::chrono::local_days{ymd} + std::chrono::hours{time.h} +
+                std::chrono::minutes{time.m} + std::chrono::seconds{time.s};
+
+            const std::chrono::local_info info = zone->get_info(local_tp);
+            // For ambiguous/nonexistent local times, use the offset in effect before the transition.
+            return static_cast<int>(info.first.offset.count());
+        }
+        catch (const std::exception&)
+        {
+            return std::nullopt; // unknown zone name or no time zone database available
+        }
+#else
+        (void)tz_name;
+        (void)date;
+        (void)time;
+        return std::nullopt;
+#endif
+    }
+
     std::optional<Date> parse_date(std::string_view str)
     {
         // CTRE compile-time regex for date pattern (with optional negative year)
@@ -101,6 +152,7 @@ namespace orion::bre::feel {
         // Parse timezone offset for adjustment
         int tz_offset_seconds = 0;
         bool has_tz = false;
+        std::string_view named_zone;
         if (pos < time_and_tz.size()) {
             if (time_and_tz[pos] == 'Z') {
                 tz_offset_seconds = 0;
@@ -121,11 +173,18 @@ namespace orion::bre::feel {
                 tz_offset_seconds = (tzh * 3600 + tzm * 60) * (neg ? -1 : 1);
             } else if (time_and_tz[pos] == '@') {
                 has_tz = true; // named timezone
+                const auto tz_name = time_and_tz.substr(pos + 1);
+                if (tz_name.empty()) return std::nullopt;
+                named_zone = tz_name;
             }
         }
         
         Date date{date_opt->y, date_opt->m, date_opt->d};
         Time time_val{h, m, s};
+        if (!named_zone.empty())
+        {
+            tz_offset_seconds = named_timezone_offset_seconds(named_zone, date, time_val).value_or(0);
+        }
         DateTime dt{date, time_val};
         dt.tz_offset_seconds = tz_offset_seconds;
         dt.has_tz = has_tz;
