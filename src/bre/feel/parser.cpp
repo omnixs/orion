@@ -739,7 +739,8 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
     // Examples: "list contains", "insert before", "index of", "distinct values",
     // "substring before", "substring after", "starts with", "ends with",
     // "get value", "get entries", "context put", "context merge",
-    // "upper case", "lower case", "round up", "round down"
+    // "upper case", "lower case", "round up", "round down",
+    // and range relation names such as "met by".
     {
         size_t saved = position_;
         std::string multi_name;
@@ -757,6 +758,11 @@ std::unique_ptr<ASTNode> Parser::parse_identifier_or_function()
         else if (token.text == "get" && matches_word("entries")) multi_name = "get entries";
         else if (token.text == "context" && matches_word("put")) multi_name = "context put";
         else if (token.text == "context" && matches_word("merge")) multi_name = "context merge";
+        else if (token.text == "met" && matches_word("by")) multi_name = "met by";
+        else if (token.text == "overlaps" && matches_word("before")) multi_name = "overlaps before";
+        else if (token.text == "overlaps" && matches_word("after")) multi_name = "overlaps after";
+        else if (token.text == "finished" && matches_word("by")) multi_name = "finished by";
+        else if (token.text == "started" && matches_word("by")) multi_name = "started by";
         else if (token.text == "upper" && matches_word("case")) multi_name = "upper case";
         else if (token.text == "lower" && matches_word("case")) multi_name = "lower case";
         else if (token.text == "round" && matches_word("up")) multi_name = "round up";

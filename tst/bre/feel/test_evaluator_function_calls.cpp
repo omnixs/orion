@@ -273,4 +273,86 @@ BOOST_AUTO_TEST_CASE(test_unknown_function)
     auto funcNode = std::make_unique<ASTNode>(ASTNodeType::FUNCTION_CALL, "unknownFunc");    BOOST_CHECK_THROW((void)funcNode->evaluate({}, get_test_eval_ctx()), std::runtime_error);
 }
 
+BOOST_AUTO_TEST_CASE(test_range_function_before_and_meets)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("before(1, 10)", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("before(1, [5..10])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("includes([1..10], 5)", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("meets([1..5], [5..10])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("during(5, [1..10])", {}, get_test_eval_ctx()) == true);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_after_and_met_by)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("after(10, 1)", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("after(1, 10)", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("met by([5..10], [1..5])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("met by([1..5], [6..10])", {}, get_test_eval_ctx()) == false);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_overlaps)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps([1..5], [4..10])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps([1..5], [6..10])", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps before([1..5], [4..10])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps before([4..10], [1..5])", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps after([4..10], [1..5])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps after([1..5], [4..10])", {}, get_test_eval_ctx()) == false);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_finishes_and_finished_by)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("finishes([5..10], [1..10])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("finishes([1..10], [5..10])", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("finished by([1..10], 10)", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("finished by([1..10], 9)", {}, get_test_eval_ctx()) == false);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_starts_and_started_by)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("starts([1..5], [1..10])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("starts([2..5], [1..10])", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("started by([1..10], [1..5])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("started by([2..10], [1..5])", {}, get_test_eval_ctx()) == false);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_coincides)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("coincides([1..5], [1..5])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("coincides([1..5], [1..6])", {}, get_test_eval_ctx()) == false);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_exclusive_boundaries)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps([1..5], (5..8])", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps([1..5), [5..8] )", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps before([1..5), (1..5])", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("overlaps before([1..5], [1..5])", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("finished by([1..10), 10)", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("started by((1..10], 1)", {}, get_test_eval_ctx()) == false);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("coincides((1..5), [1..5])", {}, get_test_eval_ctx()) == false);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_temporal_bounds)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate(
+        "before(\"2020-01-01\", \"2020-01-02\")", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate(
+        "includes([\"00:00:00\"..\"23:59:59\"], \"12:00:00\")", {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate(
+        "coincides([\"2020-01-01T00:00:00\"..\"2020-01-02T00:00:00\"], [\"2020-01-01T00:00:00\"..\"2020-01-02T00:00:00\"])",
+        {}, get_test_eval_ctx()) == true);
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate(
+        "before(\"P1D\", \"P2D\")", {}, get_test_eval_ctx()) == true);
+}
+
+BOOST_AUTO_TEST_CASE(test_range_function_invalid_operands)
+{
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("before(1, \"not-a-number\")", {}, get_test_eval_ctx()).is_null());
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("before([1, 2], [3, 4])", {}, get_test_eval_ctx()).is_null());
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("meets(1, 2)", {}, get_test_eval_ctx()).is_null());
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("includes(5, [1..10])", {}, get_test_eval_ctx()).is_null());
+    BOOST_TEST(orion::bre::feel::Evaluator::evaluate("before(null, 1)", {}, get_test_eval_ctx()).is_null());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

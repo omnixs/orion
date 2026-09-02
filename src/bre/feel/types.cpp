@@ -191,6 +191,39 @@ namespace orion::bre::feel {
         return dt;
     }
 
+    std::optional<int> compare_temporal_values(std::string_view lhs, std::string_view rhs)
+    {
+        if (auto date_lhs = parse_date(lhs), date_rhs = parse_date(rhs); date_lhs && date_rhs)
+        {
+            if (*date_lhs < *date_rhs) return -1;
+            if (*date_lhs > *date_rhs) return 1;
+            return 0;
+        }
+        if (auto time_lhs = parse_time(lhs), time_rhs = parse_time(rhs); time_lhs && time_rhs)
+        {
+            if (*time_lhs < *time_rhs) return -1;
+            if (*time_lhs > *time_rhs) return 1;
+            return 0;
+        }
+        if (auto datetime_lhs = parse_datetime(lhs), datetime_rhs = parse_datetime(rhs);
+            datetime_lhs && datetime_rhs)
+        {
+            if (*datetime_lhs < *datetime_rhs) return -1;
+            if (*datetime_lhs > *datetime_rhs) return 1;
+            return 0;
+        }
+        if (auto duration_lhs = parse_duration(lhs), duration_rhs = parse_duration(rhs);
+            duration_lhs && duration_rhs)
+        {
+            if (duration_lhs->total_months != duration_rhs->total_months)
+                return duration_lhs->total_months < duration_rhs->total_months ? -1 : 1;
+            if (duration_lhs->total_seconds != duration_rhs->total_seconds)
+                return duration_lhs->total_seconds < duration_rhs->total_seconds ? -1 : 1;
+            return 0;
+        }
+        return std::nullopt;
+    }
+
     std::optional<Duration> parse_duration(std::string_view str)
     {
         if (str.empty())

@@ -117,85 +117,7 @@ namespace orion::bre::feel {
         return 0;
     }
 
-    // Helper: Three-way comparison for dates
-    static std::optional<int> try_compare_dates(std::string_view lhs, std::string_view rhs)
-    {
-        auto date_lhs = parse_date(lhs);
-        if (!date_lhs) { return std::nullopt;
-}
-        
-        auto date_rhs = parse_date(rhs);
-        if (!date_rhs) { return std::nullopt;
-}
-        
-        if (*date_lhs < *date_rhs) { return -1;
-}
-        if (*date_lhs > *date_rhs) { return 1;
-}
-        return 0;
-    }
-
-    // Helper: Three-way comparison for times
-    static std::optional<int> try_compare_times(std::string_view lhs, std::string_view rhs)
-    {
-        auto time_lhs = parse_time(lhs);
-        if (!time_lhs) { return std::nullopt;
-}
-        
-        auto time_rhs = parse_time(rhs);
-        if (!time_rhs) { return std::nullopt;
-}
-        
-        if (*time_lhs < *time_rhs) { return -1;
-}
-        if (*time_lhs > *time_rhs) { return 1;
-}
-        return 0;
-    }
-
-    // Helper: Three-way comparison for datetimes
-    static std::optional<int> try_compare_datetimes(std::string_view lhs, std::string_view rhs)
-    {
-        auto datetime_lhs = parse_datetime(lhs);
-        if (!datetime_lhs) { return std::nullopt;
-}
-        
-        auto datetime_rhs = parse_datetime(rhs);
-        if (!datetime_rhs) { return std::nullopt;
-}
-        
-        if (*datetime_lhs < *datetime_rhs) { return -1;
-}
-        if (*datetime_lhs > *datetime_rhs) { return 1;
-}
-        return 0;
-    }
-
-    // Helper: Three-way comparison for durations
-    static std::optional<int> try_compare_durations(std::string_view lhs, std::string_view rhs)
-    {
-        auto duration_lhs = parse_duration(lhs);
-        if (!duration_lhs) {
-            return std::nullopt;
-        }
-        
-        auto duration_rhs = parse_duration(rhs);
-        if (!duration_rhs) {
-            return std::nullopt;
-        }
-        
-        if (duration_lhs->total_months != duration_rhs->total_months)
-        {
-            return (duration_lhs->total_months < duration_rhs->total_months) ? -1 : 1;
-        }
-        if (duration_lhs->total_seconds != duration_rhs->total_seconds)
-        {
-            return (duration_lhs->total_seconds < duration_rhs->total_seconds) ? -1 : 1;
-        }
-        return 0;
-    }
-
-    // Main dispatcher: Try each type comparison in order
+    // Main dispatcher for numeric and temporal values, with lexical fallback.
     static int cmp_values(std::string_view lhs, std::string_view rhs)
     {
         // Evaluate any FEEL function calls first (e.g., duration("PT31H"))
@@ -214,26 +136,7 @@ namespace orion::bre::feel {
             return compare_numbers(num_lhs, num_rhs);
         }
         
-        // Try date comparison
-        if (auto result = try_compare_dates(lhs_unquoted, rhs_unquoted))
-        {
-            return *result;
-        }
-        
-        // Try time comparison
-        if (auto result = try_compare_times(lhs_unquoted, rhs_unquoted))
-        {
-            return *result;
-        }
-        
-        // Try datetime comparison
-        if (auto result = try_compare_datetimes(lhs_unquoted, rhs_unquoted))
-        {
-            return *result;
-        }
-        
-        // Try duration comparison
-        if (auto result = try_compare_durations(lhs_unquoted, rhs_unquoted))
+        if (auto result = compare_temporal_values(lhs_unquoted, rhs_unquoted))
         {
             return *result;
         }

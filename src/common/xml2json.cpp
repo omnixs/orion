@@ -279,7 +279,9 @@ namespace orion::common
     {
         nlohmann::json componentObj = nlohmann::json::object();
         
-        for (auto* comp = expNode->first_node("component"); comp != nullptr; comp = comp->next_sibling("component"))
+        auto* firstComponent = expNode->first_node("component");
+        if (firstComponent == nullptr) firstComponent = expNode->first_node("tc:component");
+        for (auto* comp = firstComponent; comp != nullptr; comp = comp->next_sibling(comp->name()))
         {
             const char* compName = (comp->first_attribute("name") != nullptr)
                                        ? comp->first_attribute("name")->value()
@@ -287,6 +289,7 @@ namespace orion::common
             if (compName != nullptr)
             {
                 auto* valNode = comp->first_node("value");
+                if (valNode == nullptr) valNode = comp->first_node("tc:value");
                 if (valNode != nullptr)
                 {
                     componentObj[compName] = parse_value_with_nil(valNode);
@@ -371,7 +374,7 @@ namespace orion::common
         }
 
         // Check for component structure
-        if (expNode->first_node("component") != nullptr)
+        if (expNode->first_node("component") != nullptr || expNode->first_node("tc:component") != nullptr)
         {
             return parse_expected_components(expNode);
         }
