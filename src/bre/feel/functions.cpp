@@ -255,6 +255,484 @@ json evaluate_contains_function(const std::vector<json>& args)
     return string_val.find(substring_val) != std::string::npos;
 }
 
+namespace {
+    struct RangeInfo
+    {
+        bool start_included = true;
+        bool end_included = true;
+        const json* start = nullptr;
+        const json* end = nullptr;
+    };
+
+    bool is_comparable_value(const json& value)
+    {
+        return !value.is_null() && (value.is_boolean() || value.is_number() || value.is_string());
+    }
+
+    bool are_compatible_values(const json& lhs, const json& rhs)
+    {
+        return (lhs.is_number() && rhs.is_number()) || (lhs.is_string() && rhs.is_string()) ||
+               (lhs.is_boolean() && rhs.is_boolean());
+    }
+
+    bool are_compatible_ranges(const RangeInfo& lhs, const RangeInfo& rhs)
+    {
+         return lhs.start != nullptr && lhs.end != nullptr && rhs.start != nullptr && rhs.end != nullptr &&
+             are_compatible_values(*lhs.start, *rhs.start) && are_compatible_values(*lhs.end, *rhs.end);
+    }
+
+    bool is_range_value(const json& value)
+    {
+        return value.is_object() && value.contains("__range__") && value.contains("__start__") &&
+               value.contains("__end__") && is_comparable_value(value["__start__"]) &&
+               is_comparable_value(value["__end__"]);
+    }
+
+    RangeInfo extract_range_info(const json& value)
+    {
+        RangeInfo info;
+        if (!is_range_value(value)) return info;
+
+        const auto& range_type = value["__range__"];
+        info.start = &value["__start__"];
+        info.end = &value["__end__"];
+        if (range_type.is_string())
+        {
+            const std::string_view type = range_type.get_ref<const std::string&>();
+            info.start_included = !type.empty() && type.front() == '[';
+            info.end_included = type.size() > 1 && type.back() == ']';
+        }
+        return info;
+    }
+
+    bool are_compatible_relation_operands(const json& lhs, const json& rhs)
+    {
+        if (is_range_value(lhs) && is_range_value(rhs))
+            return are_compatible_ranges(extract_range_info(lhs), extract_range_info(rhs));
+        if (is_range_value(lhs))
+        {
+            const auto range = extract_range_info(lhs);
+                 return is_comparable_value(rhs) && range.start != nullptr && range.end != nullptr &&
+                     are_compatible_values(*range.start, rhs) && are_compatible_values(*range.end, rhs);
+        }
+        if (is_range_value(rhs))
+        {
+            const auto range = extract_range_info(rhs);
+                 return is_comparable_value(lhs) && range.start != nullptr && range.end != nullptr &&
+                     are_compatible_values(lhs, *range.start) && are_compatible_values(lhs, *range.end);
+        }
+        return is_comparable_value(lhs) && is_comparable_value(rhs) && are_compatible_values(lhs, rhs);
+    }
+
+    int compare_scalar_values(const json& lhs, const json& rhs)
+    {
+        if (lhs == rhs) return 0;
+
+        if (lhs.is_number() && rhs.is_number())
+        {
+            const double a = lhs.get<double>();
+            const double b = rhs.get<double>();
+            if (a < b) return -1;
+            if (a > b) return 1;
+            return 0;
+        }
+
+        if (lhs.is_string() && rhs.is_string())
+        {
+            const std::string_view a = lhs.get_ref<const std::string&>();
+            const std::string_view b = rhs.get_ref<const std::string&>();
+            if (const auto temporal_cmp = compare_temporal_values(a, b)) return *temporal_cmp;
+
+            if (a < b) return -1;
+            if (a > b) return 1;
+            return 0;
+        }
+
+        if (lhs.is_boolean() && rhs.is_boolean())
+        {
+            if (lhs.get<bool>() < rhs.get<bool>()) return -1;
+            if (lhs.get<bool>() > rhs.get<bool>()) return 1;
+            return 0;
+        }
+
+        return 0;
+    }
+
+    int compare_scalar_values(const json* lhs, const json& rhs)
+    {
+        return compare_scalar_values(*lhs, rhs);
+    }
+
+    int compare_scalar_values(const json& lhs, const json* rhs)
+    {
+        return compare_scalar_values(lhs, *rhs);
+    }
+
+    int compare_scalar_values(const json* lhs, const json* rhs)
+    {
+        return compare_scalar_values(*lhs, *rhs);
+    }
+
+    bool is_point_value(const json& value)
+    {
+        return is_comparable_value(value);
+    }
+
+    bool before_point_and_range(const json& point, const RangeInfo& range)
+    {
+        if (!is_comparable_value(point) || range.start == nullptr || !are_compatible_values(point, *range.start))
+            return false;
+        const int cmp = compare_scalar_values(point, range.start);
+        return cmp < 0 || (cmp == 0 && !range.start_included);
+    }
+
+    bool after_point_and_range(const json& point, const RangeInfo& range)
+    {
+        if (!is_comparable_value(point) || range.end == nullptr || !are_compatible_values(point, *range.end))
+            return false;
+        const int cmp = compare_scalar_values(point, range.end);
+        return cmp > 0 || (cmp == 0 && !range.end_included);
+    }
+
+    bool before_range_and_point(const RangeInfo& range, const json& point)
+    {
+        if (!is_comparable_value(point) || range.end == nullptr || !are_compatible_values(*range.end, point))
+            return false;
+        const int cmp = compare_scalar_values(range.end, point);
+        return cmp < 0 || (cmp == 0 && !range.end_included);
+    }
+
+    bool after_range_and_point(const RangeInfo& range, const json& point)
+    {
+        if (!is_comparable_value(point) || range.start == nullptr || !are_compatible_values(*range.start, point))
+            return false;
+        const int cmp = compare_scalar_values(range.start, point);
+        return cmp > 0 || (cmp == 0 && !range.start_included);
+    }
+}
+
+json evaluate_before_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        if (!are_compatible_ranges(r1, r2)) return nullptr;
+        const int cmp = compare_scalar_values(r1.end, r2.start);
+        return cmp < 0 || (cmp == 0 && (!r1.end_included || !r2.start_included));
+    }
+    if (is_range_value(rhs))
+    {
+        return before_point_and_range(lhs, extract_range_info(rhs));
+    }
+    if (is_range_value(lhs))
+    {
+        return before_range_and_point(extract_range_info(lhs), rhs);
+    }
+    if (!is_comparable_value(lhs) || !is_comparable_value(rhs) || !are_compatible_values(lhs, rhs)) return nullptr;
+    return compare_scalar_values(lhs, rhs) < 0;
+}
+
+json evaluate_after_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        if (!are_compatible_ranges(r1, r2)) return nullptr;
+        const int cmp = compare_scalar_values(r1.start, r2.end);
+        return cmp > 0 || (cmp == 0 && (!r1.start_included || !r2.end_included));
+    }
+    if (is_range_value(rhs))
+    {
+        return after_point_and_range(lhs, extract_range_info(rhs));
+    }
+    if (is_range_value(lhs))
+    {
+        return after_range_and_point(extract_range_info(lhs), rhs);
+    }
+    if (!is_comparable_value(lhs) || !is_comparable_value(rhs) || !are_compatible_values(lhs, rhs)) return nullptr;
+    return compare_scalar_values(lhs, rhs) > 0;
+}
+
+json evaluate_meets_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+    if (!is_range_value(args[0]) || !is_range_value(args[1])) return nullptr;
+
+    const auto r1 = extract_range_info(args[0]);
+    const auto r2 = extract_range_info(args[1]);
+    return r1.end_included && r2.start_included && compare_scalar_values(r1.end, r2.start) == 0;
+}
+
+json evaluate_met_by_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+    if (!is_range_value(args[0]) || !is_range_value(args[1])) return nullptr;
+
+    const auto r1 = extract_range_info(args[0]);
+    const auto r2 = extract_range_info(args[1]);
+    return r1.start_included && r2.end_included && compare_scalar_values(r1.start, r2.end) == 0;
+}
+
+json evaluate_overlaps_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+    if (!is_range_value(args[0]) || !is_range_value(args[1])) return nullptr;
+
+    const auto r1 = extract_range_info(args[0]);
+    const auto r2 = extract_range_info(args[1]);
+
+    const int end_cmp = compare_scalar_values(r1.end, r2.start);
+    const int start_cmp = compare_scalar_values(r1.start, r2.end);
+
+    const bool first = end_cmp > 0 || (end_cmp == 0 && r1.end_included && r2.start_included);
+    const bool second = start_cmp < 0 || (start_cmp == 0 && r1.start_included && r2.end_included);
+    return first && second;
+}
+
+json evaluate_overlaps_before_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+    if (!is_range_value(args[0]) || !is_range_value(args[1])) return nullptr;
+
+    const auto r1 = extract_range_info(args[0]);
+    const auto r2 = extract_range_info(args[1]);
+
+    const int s_cmp = compare_scalar_values(r1.start, r2.start);
+    const int e_cmp_1 = compare_scalar_values(r1.end, r2.start);
+    const int e_cmp_2 = compare_scalar_values(r1.end, r2.end);
+
+    const bool first = s_cmp < 0 || (s_cmp == 0 && r1.start_included && !r2.start_included);
+    const bool second = e_cmp_1 > 0 || (e_cmp_1 == 0 && r1.end_included && r2.start_included);
+    const bool third = e_cmp_2 < 0 || (e_cmp_2 == 0 && (!r1.end_included || r2.end_included));
+    return first && second && third;
+}
+
+json evaluate_overlaps_after_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+    if (!is_range_value(args[0]) || !is_range_value(args[1])) return nullptr;
+
+    const auto r1 = extract_range_info(args[0]);
+    const auto r2 = extract_range_info(args[1]);
+
+    const int s_cmp = compare_scalar_values(r2.start, r1.start);
+    const int e_cmp_1 = compare_scalar_values(r2.end, r1.start);
+    const int e_cmp_2 = compare_scalar_values(r2.end, r1.end);
+
+    const bool first = s_cmp < 0 || (s_cmp == 0 && r2.start_included && !r1.start_included);
+    const bool second = e_cmp_1 > 0 || (e_cmp_1 == 0 && r2.end_included && r1.start_included);
+    const bool third = e_cmp_2 < 0 || (e_cmp_2 == 0 && (!r2.end_included || r1.end_included));
+    return first && second && third;
+}
+
+json evaluate_finishes_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_point_value(lhs) && is_range_value(rhs))
+    {
+        const auto range = extract_range_info(rhs);
+        return range.end_included && compare_scalar_values(lhs, range.end) == 0;
+    }
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int cmp = compare_scalar_values(r1.start, r2.start);
+        return (r1.end_included == r2.end_included) && compare_scalar_values(r1.end, r2.end) == 0 &&
+               (cmp > 0 || (cmp == 0 && (!r1.start_included || r2.start_included)));
+    }
+    return nullptr;
+}
+
+json evaluate_finished_by_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_range_value(lhs) && is_point_value(rhs))
+    {
+        const auto range = extract_range_info(lhs);
+        return range.end_included && compare_scalar_values(range.end, rhs) == 0;
+    }
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int cmp = compare_scalar_values(r1.start, r2.start);
+        return (r1.end_included == r2.end_included) && compare_scalar_values(r1.end, r2.end) == 0 &&
+               (cmp < 0 || (cmp == 0 && (r1.start_included || !r2.start_included)));
+    }
+    return nullptr;
+}
+
+json evaluate_includes_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_range_value(lhs) && is_point_value(rhs))
+    {
+        const auto range = extract_range_info(lhs);
+        const int cmp_start = compare_scalar_values(range.start, rhs);
+        const int cmp_end = compare_scalar_values(range.end, rhs);
+        return (cmp_start < 0 && cmp_end > 0) ||
+               (cmp_start == 0 && range.start_included) ||
+               (cmp_end == 0 && range.end_included);
+    }
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int s_cmp = compare_scalar_values(r1.start, r2.start);
+        const int e_cmp = compare_scalar_values(r1.end, r2.end);
+        return (s_cmp < 0 || (s_cmp == 0 && (r1.start_included || !r2.start_included))) &&
+               (e_cmp > 0 || (e_cmp == 0 && (r1.end_included || !r2.end_included)));
+    }
+    return nullptr;
+}
+
+json evaluate_during_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_point_value(lhs) && is_range_value(rhs))
+    {
+        const auto range = extract_range_info(rhs);
+        const int cmp_start = compare_scalar_values(range.start, lhs);
+        const int cmp_end = compare_scalar_values(range.end, lhs);
+        return (cmp_start < 0 && cmp_end > 0) ||
+               (cmp_start == 0 && range.start_included) ||
+               (cmp_end == 0 && range.end_included);
+    }
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int s_cmp = compare_scalar_values(r2.start, r1.start);
+        const int e_cmp = compare_scalar_values(r2.end, r1.end);
+        return (s_cmp < 0 || (s_cmp == 0 && (r2.start_included || !r1.start_included))) &&
+               (e_cmp > 0 || (e_cmp == 0 && (r2.end_included || !r1.end_included)));
+    }
+    return nullptr;
+}
+
+json evaluate_starts_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_point_value(lhs) && is_range_value(rhs))
+    {
+        const auto range = extract_range_info(rhs);
+        return compare_scalar_values(lhs, range.start) == 0 && range.start_included;
+    }
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int cmp = compare_scalar_values(r1.start, r2.start);
+        const int end_cmp = compare_scalar_values(r1.end, r2.end);
+        return cmp == 0 && r1.start_included == r2.start_included &&
+               (end_cmp < 0 || (end_cmp == 0 && (!r1.end_included || r2.end_included)));
+    }
+    return nullptr;
+}
+
+json evaluate_started_by_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+    if (!are_compatible_relation_operands(args[0], args[1])) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_range_value(lhs) && is_point_value(rhs))
+    {
+        const auto range = extract_range_info(lhs);
+        return compare_scalar_values(range.start, rhs) == 0 && range.start_included;
+    }
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int cmp = compare_scalar_values(r1.start, r2.start);
+        const int end_cmp = compare_scalar_values(r2.end, r1.end);
+        return cmp == 0 && r1.start_included == r2.start_included &&
+               (end_cmp < 0 || (end_cmp == 0 && (!r2.end_included || r1.end_included)));
+    }
+    return nullptr;
+}
+
+json evaluate_coincides_function(const std::vector<json>& args)
+{
+    if (args.size() != 2) return nullptr;
+    if (args[0].is_null() || args[1].is_null()) return nullptr;
+
+    const auto& lhs = args[0];
+    const auto& rhs = args[1];
+
+    if (is_range_value(lhs) && is_range_value(rhs))
+    {
+        const auto r1 = extract_range_info(lhs);
+        const auto r2 = extract_range_info(rhs);
+        const int start_cmp = compare_scalar_values(r1.start, r2.start);
+        const int end_cmp = compare_scalar_values(r1.end, r2.end);
+        return start_cmp == 0 && r1.start_included == r2.start_included &&
+               end_cmp == 0 && r1.end_included == r2.end_included;
+    }
+    return compare_scalar_values(lhs, rhs) == 0;
+}
+
 // ========== MATH FUNCTIONS IMPLEMENTATION ==========
 
 json evaluate_abs_function(const std::vector<json>& args)
@@ -3631,6 +4109,22 @@ namespace {
             {"context",                   adapt_args_only<&evaluate_context_function>},
             {"context put",               adapt_args_only<&evaluate_context_put_function>},
             {"context merge",             adapt_args_only<&evaluate_context_merge_function>},
+
+            // Phase 6: range and interval functions
+            {"before",                    adapt_args_only<&evaluate_before_function>},
+            {"after",                     adapt_args_only<&evaluate_after_function>},
+            {"meets",                     adapt_args_only<&evaluate_meets_function>},
+            {"met by",                    adapt_args_only<&evaluate_met_by_function>},
+            {"overlaps",                  adapt_args_only<&evaluate_overlaps_function>},
+            {"overlaps before",           adapt_args_only<&evaluate_overlaps_before_function>},
+            {"overlaps after",            adapt_args_only<&evaluate_overlaps_after_function>},
+            {"finishes",                  adapt_args_only<&evaluate_finishes_function>},
+            {"finished by",               adapt_args_only<&evaluate_finished_by_function>},
+            {"includes",                  adapt_args_only<&evaluate_includes_function>},
+            {"during",                    adapt_args_only<&evaluate_during_function>},
+            {"starts",                    adapt_args_only<&evaluate_starts_function>},
+            {"started by",                adapt_args_only<&evaluate_started_by_function>},
+            {"coincides",                 adapt_args_only<&evaluate_coincides_function>},
         };
         return table;
     }

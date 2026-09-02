@@ -575,6 +575,22 @@ namespace orion::bre::feel {
     /// context merge(contexts) → contexts merged left to right; later entries win
     [[nodiscard]] json evaluate_context_merge_function(const std::vector<json>& args);
 
+    // ========== RANGE / INTERVAL FUNCTIONS (DMN 1.5 §10.3.4.7) ==========
+    [[nodiscard]] json evaluate_before_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_after_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_meets_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_met_by_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_overlaps_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_overlaps_before_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_overlaps_after_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_finishes_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_finished_by_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_includes_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_during_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_starts_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_started_by_function(const std::vector<json>& args);
+    [[nodiscard]] json evaluate_coincides_function(const std::vector<json>& args);
+
     // ========== BUILT-IN FUNCTION DISPATCH ==========
 
     /**
