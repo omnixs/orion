@@ -428,16 +428,9 @@ struct DirInfo {
 
 // Load baseline CSV file for regression detection
 // CSV format: "test_dir","test_case_id","result_node_id","result","detail"
-//
-// A single TCK file can contain several <testCase> elements that all assert the same
-// decision output (e.g. 0020-vacation-days-test-01.xml has 7 cases, all checking
-// "Total Vacation Days"), so (test_dir, test_case_id, result_node_id) is not always unique.
-// Results for a shared key are kept in file order and matched positionally against the
-// current run's rows for that same key (see detect_regressions), rather than collapsing
-// them into one another and comparing the wrong test case.
-static std::map<std::string, std::vector<BaselineResult>> load_baseline(const fs::path& baselinePath)
+static std::map<std::string, BaselineResult> load_baseline(const fs::path& baselinePath)
 {
-    std::map<std::string, std::vector<BaselineResult>> baseline;
+    std::map<std::string, BaselineResult> baseline;
     
     if (baselinePath.empty() || !fs::exists(baselinePath)) {
         return baseline;
@@ -494,14 +487,12 @@ static std::map<std::string, std::vector<BaselineResult>> load_baseline(const fs
             br.level = level;
             br.passed = (result == "SUCCESS");
             
-            baseline[testId].push_back(br);
+            baseline[testId] = br;
         }
     }
     
-    std::size_t total_results = 0;
-    for (const auto& [key, results] : baseline) total_results += results.size();
     spdlog::info("Loaded baseline with {} test results from {}", 
-                 total_results, baselinePath.string());
+                 baseline.size(), baselinePath.string());
     
     return baseline;
 }
@@ -1134,7 +1125,7 @@ static void print_summary(const TestStats& main_stats, const TestStats& extra_st
 // CSV format: "test_dir","test_case_id","result_node_id","result","detail"
 static RegressionInfo detect_regressions(
     const fs::path& currentCsvPath,
-    const std::map<std::string, std::vector<BaselineResult>>& baseline,
+    const std::map<std::string, BaselineResult>& baseline,
     bool checkLevel2)
 {
     RegressionInfo info;
@@ -1148,9 +1139,6 @@ static RegressionInfo detect_regressions(
     }
     
     std::string line;
-    // Tracks how many current rows have been seen for each key, so duplicate keys within a
-    // file (see load_baseline) are matched to the same-position baseline row, not the last one.
-    std::map<std::string, std::size_t> occurrence;
     
     while (std::getline(file, line)) {
         if (line.empty()) continue;
@@ -1197,15 +1185,10 @@ static RegressionInfo detect_regressions(
                 info.level2Failures++;
             }
             
-            // Check for regressions (baseline passed but current failed), matching
-            // same-key rows positionally so duplicate keys don't compare against the
-            // wrong test case's baseline result.
+            // Check for regressions (baseline passed but current failed)
             auto it = baseline.find(testId);
-            if (it != baseline.end()) {
-                const std::size_t idx = occurrence[testId]++;
-                if (idx < it->second.size() && it->second[idx].passed && !currentPassed) {
-                    info.regressions.push_back(testId);
-                }
+            if (it != baseline.end() && it->second.passed && !currentPassed) {
+                info.regressions.push_back(testId);
             }
         }
     }
@@ -1347,16 +1330,14 @@ int main(int argc, char** argv)
         }
         
         // Load baseline if regression check is enabled
-        std::map<std::string, std::vector<BaselineResult>> baseline;
+        std::map<std::string, BaselineResult> baseline;
         if (config.regressionCheck && !config.baselinePath.empty()) {
             spdlog::info("Loading baseline from: {}", config.baselinePath.string());
             baseline = load_baseline(config.baselinePath);
             if (baseline.empty()) {
                 spdlog::warn("Regression check enabled but baseline is empty or could not be loaded");
             } else {
-                std::size_t total_results = 0;
-                for (const auto& [key, results] : baseline) total_results += results.size();
-                spdlog::info("Baseline loaded: {} test results", total_results);
+                spdlog::info("Baseline loaded: {} test results", baseline.size());
             }
         }
         
