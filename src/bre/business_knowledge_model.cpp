@@ -73,6 +73,8 @@ namespace orion::bre
             }
         }
 
-        return feel::Evaluator::evaluate(expression_text, bkm_context, eval_ctx);
+        EvaluationContext bkm_eval_ctx(eval_ctx.regex_cache);
+        bkm_eval_ctx.bkm_map = &available_bkms;
+        return feel::Evaluator::evaluate(expression_text, bkm_context, bkm_eval_ctx);
     }
 } // namespace orion::bre
