@@ -129,8 +129,8 @@ void register_date_time_functions(FunctionRegistry& reg) {
     
     reg.register_function({"number", {
         {"from"},
-        {"grouping separator"},
-        {"decimal separator"}
+        {"grouping separator", true},
+        {"decimal separator", true}
     }});
     
     reg.register_function({"string", {{"from"}}});

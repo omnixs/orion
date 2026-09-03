@@ -140,6 +140,10 @@ namespace orion::bre
         std::string_view bkm_name,
         std::string& error_message);
 
+    std::vector<std::unique_ptr<BusinessKnowledgeModel>> parse_all_business_knowledge_models(
+        std::string_view dmn_xml,
+        std::string& error_message);
+
     /**
      * @brief Parse specific BKM invocation pattern from FEEL expression
      * @param expression FEEL expression that may contain BKM calls

@@ -19,6 +19,7 @@
 #include <orion/bre/business_knowledge_model.hpp>
 #include <orion/api/logger.hpp>
 #include <orion/bre/bkm_manager.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include "orion/bre/contract_violation.hpp"
 
 
@@ -72,7 +73,6 @@ namespace orion::bre
             }
         }
 
-        // Evaluate the BKM expression with the enhanced context
-        return evaluate_bkm_expression(expression_text, bkm_context, available_bkms, eval_ctx);
+        return feel::Evaluator::evaluate(expression_text, bkm_context, eval_ctx);
     }
 } // namespace orion::bre

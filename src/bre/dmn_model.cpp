@@ -146,10 +146,15 @@ namespace orion::bre
                     // Use pre-parsed AST for complex FEEL expressions
                     try
                     {
-                        json ast_result = rule.inputEntries_ast[i]->evaluate(input, eval_ctx);
-                        
-                        // Compare AST result with input value
-                        entry_matches_result = (ast_result == input_value);
+                        json ast_input = input;
+                        if (entry.find('?') != std::string::npos)
+                        {
+                            ast_input["__feel_implicit_value"] = input_value;
+                        }
+                        json ast_result = rule.inputEntries_ast[i]->evaluate(ast_input, eval_ctx);
+                        entry_matches_result = entry.find('?') != std::string::npos
+                            ? ast_result.is_boolean() && ast_result.get<bool>()
+                            : (ast_result == input_value);
                     }
                     catch (const std::runtime_error&)
                     {

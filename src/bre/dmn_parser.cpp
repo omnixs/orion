@@ -57,6 +57,21 @@ namespace orion::bre
 }
             
         // Skip if it looks like a simple comparison or range (unary_test_matches handles these)
+        if (expression.find('?') != string::npos)
+        {
+            string generalized_expression = expression;
+            size_t position = 0;
+            while ((position = generalized_expression.find('?', position)) != string::npos)
+            {
+                generalized_expression.replace(position, 1, "__feel_implicit_value");
+                position += 21;
+            }
+            feel::Lexer lexer;
+            auto tokens = lexer.tokenize(generalized_expression);
+            feel::Parser parser;
+            return parser.parse(tokens);
+        }
+
         if (expression.find(">=") != string::npos ||
             expression.find("<=") != string::npos ||
             expression.find("..") != string::npos ||
@@ -1137,6 +1152,47 @@ namespace orion::bre
         {
             error_message = e.what();
             return nullptr;
+        }
+    }
+
+    vector<unique_ptr<BusinessKnowledgeModel>> parse_all_business_knowledge_models(
+        std::string_view dmn_xml, string& error_message)
+    {
+        vector<unique_ptr<BusinessKnowledgeModel>> result;
+        if (dmn_xml.empty())
+        {
+            error_message = "DMN XML cannot be empty";
+            return result;
+        }
+
+        rapidxml::xml_document<> doc;
+        string buffer(dmn_xml);
+        try
+        {
+            doc.parse<0>(&buffer[0]);
+            auto* root = doc.first_node();
+            if (root == nullptr) throw std::runtime_error("DMN: empty document");
+
+            for (auto* node = root->first_node("businessKnowledgeModel"); node != nullptr;
+                 node = node->next_sibling("businessKnowledgeModel"))
+            {
+                auto* name = node->first_attribute("name");
+                if (name == nullptr) continue;
+                string parse_error;
+                auto bkm = parse_business_knowledge_model(dmn_xml, name->value(), parse_error);
+                if (!bkm)
+                {
+                    error_message = parse_error;
+                    return {};
+                }
+                result.push_back(std::move(bkm));
+            }
+            return result;
+        }
+        catch (const exception& e)
+        {
+            error_message = e.what();
+            return {};
         }
     }
 
