@@ -370,6 +370,46 @@ namespace orion::bre
         throw std::runtime_error(std::string("DMN: businessKnowledgeModel '").append(bkm_name) + "' not found");
     }
 
+    static std::tuple<std::string, std::string, bool> parse_bkm_result_metadata(
+        std::string_view xml, std::string_view bkm_name)
+    {
+        rapidxml::xml_document<> doc;
+        std::string buffer(xml);
+        doc.parse<0>(&buffer[0]);
+        auto* root = doc.first_node();
+        if (root == nullptr) return {};
+
+        std::string result_type_ref;
+        for (auto* bkm = root->first_node("businessKnowledgeModel"); bkm != nullptr;
+             bkm = bkm->next_sibling("businessKnowledgeModel"))
+        {
+            auto* name = bkm->first_attribute("name");
+            if (name == nullptr || name->value() != bkm_name) continue;
+            auto* logic = bkm->first_node("encapsulatedLogic");
+            auto* expression = logic == nullptr ? nullptr : logic->first_node("literalExpression");
+            if (expression != nullptr && expression->first_attribute("typeRef") != nullptr)
+            {
+                result_type_ref = expression->first_attribute("typeRef")->value();
+            }
+            break;
+        }
+
+        std::string element_type_ref;
+        bool is_collection = false;
+        for (auto* item = root->first_node("itemDefinition"); item != nullptr;
+             item = item->next_sibling("itemDefinition"))
+        {
+            auto* name = item->first_attribute("name");
+            if (name == nullptr || name->value() != result_type_ref) continue;
+            auto* collection = item->first_attribute("isCollection");
+            is_collection = collection != nullptr && std::string(collection->value()) == "true";
+            auto* type = item->first_node("typeRef");
+            if (type != nullptr) element_type_ref = type->value();
+            break;
+        }
+        return {result_type_ref, element_type_ref, is_collection};
+    }
+
     // Helper to find XML node with or without namespace prefix
     static rapidxml::xml_node<>* find_node(rapidxml::xml_node<>* parent, const char* name_with_prefix, const char* name_without_prefix)
     {
@@ -1127,6 +1167,8 @@ namespace orion::bre
         try
         {
             auto [name, parameters, expression] = parse_dmn_business_knowledge_model(dmn_xml, bkm_name);
+            auto [result_type_ref, result_element_type_ref, result_is_collection] =
+                parse_bkm_result_metadata(dmn_xml, bkm_name);
 
             // Validate parsed data
             if (name.empty()) [[unlikely]]
@@ -1145,6 +1187,9 @@ namespace orion::bre
             bkm->name = name;
             bkm->parameters = parameters;
             bkm->expression_text = expression;
+            bkm->result_type_ref = result_type_ref;
+            bkm->result_element_type_ref = result_element_type_ref;
+            bkm->result_is_collection = result_is_collection;
 
             return bkm;
         }
