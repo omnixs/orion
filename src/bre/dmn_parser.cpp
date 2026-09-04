@@ -57,6 +57,21 @@ namespace orion::bre
 }
             
         // Skip if it looks like a simple comparison or range (unary_test_matches handles these)
+        if (expression.find('?') != string::npos)
+        {
+            string generalized_expression = expression;
+            size_t position = 0;
+            while ((position = generalized_expression.find('?', position)) != string::npos)
+            {
+                generalized_expression.replace(position, 1, "__feel_implicit_value");
+                position += 21;
+            }
+            feel::Lexer lexer;
+            auto tokens = lexer.tokenize(generalized_expression);
+            feel::Parser parser;
+            return parser.parse(tokens);
+        }
+
         if (expression.find(">=") != string::npos ||
             expression.find("<=") != string::npos ||
             expression.find("..") != string::npos ||
@@ -353,6 +368,46 @@ namespace orion::bre
         }
 
         throw std::runtime_error(std::string("DMN: businessKnowledgeModel '").append(bkm_name) + "' not found");
+    }
+
+    static std::tuple<std::string, std::string, bool> parse_bkm_result_metadata(
+        std::string_view xml, std::string_view bkm_name)
+    {
+        rapidxml::xml_document<> doc;
+        std::string buffer(xml);
+        doc.parse<0>(&buffer[0]);
+        auto* root = doc.first_node();
+        if (root == nullptr) return {};
+
+        std::string result_type_ref;
+        for (auto* bkm = root->first_node("businessKnowledgeModel"); bkm != nullptr;
+             bkm = bkm->next_sibling("businessKnowledgeModel"))
+        {
+            auto* name = bkm->first_attribute("name");
+            if (name == nullptr || name->value() != bkm_name) continue;
+            auto* logic = bkm->first_node("encapsulatedLogic");
+            auto* expression = logic == nullptr ? nullptr : logic->first_node("literalExpression");
+            if (expression != nullptr && expression->first_attribute("typeRef") != nullptr)
+            {
+                result_type_ref = expression->first_attribute("typeRef")->value();
+            }
+            break;
+        }
+
+        std::string element_type_ref;
+        bool is_collection = false;
+        for (auto* item = root->first_node("itemDefinition"); item != nullptr;
+             item = item->next_sibling("itemDefinition"))
+        {
+            auto* name = item->first_attribute("name");
+            if (name == nullptr || name->value() != result_type_ref) continue;
+            auto* collection = item->first_attribute("isCollection");
+            is_collection = collection != nullptr && std::string(collection->value()) == "true";
+            auto* type = item->first_node("typeRef");
+            if (type != nullptr) element_type_ref = type->value();
+            break;
+        }
+        return {result_type_ref, element_type_ref, is_collection};
     }
 
     // Helper to find XML node with or without namespace prefix
@@ -1112,6 +1167,8 @@ namespace orion::bre
         try
         {
             auto [name, parameters, expression] = parse_dmn_business_knowledge_model(dmn_xml, bkm_name);
+            auto [result_type_ref, result_element_type_ref, result_is_collection] =
+                parse_bkm_result_metadata(dmn_xml, bkm_name);
 
             // Validate parsed data
             if (name.empty()) [[unlikely]]
@@ -1130,6 +1187,9 @@ namespace orion::bre
             bkm->name = name;
             bkm->parameters = parameters;
             bkm->expression_text = expression;
+            bkm->result_type_ref = result_type_ref;
+            bkm->result_element_type_ref = result_element_type_ref;
+            bkm->result_is_collection = result_is_collection;
 
             return bkm;
         }
@@ -1137,6 +1197,47 @@ namespace orion::bre
         {
             error_message = e.what();
             return nullptr;
+        }
+    }
+
+    vector<unique_ptr<BusinessKnowledgeModel>> parse_all_business_knowledge_models(
+        std::string_view dmn_xml, string& error_message)
+    {
+        vector<unique_ptr<BusinessKnowledgeModel>> result;
+        if (dmn_xml.empty())
+        {
+            error_message = "DMN XML cannot be empty";
+            return result;
+        }
+
+        rapidxml::xml_document<> doc;
+        string buffer(dmn_xml);
+        try
+        {
+            doc.parse<0>(&buffer[0]);
+            auto* root = doc.first_node();
+            if (root == nullptr) throw std::runtime_error("DMN: empty document");
+
+            for (auto* node = root->first_node("businessKnowledgeModel"); node != nullptr;
+                 node = node->next_sibling("businessKnowledgeModel"))
+            {
+                auto* name = node->first_attribute("name");
+                if (name == nullptr) continue;
+                string parse_error;
+                auto bkm = parse_business_knowledge_model(dmn_xml, name->value(), parse_error);
+                if (!bkm)
+                {
+                    error_message = parse_error;
+                    return {};
+                }
+                result.push_back(std::move(bkm));
+            }
+            return result;
+        }
+        catch (const exception& e)
+        {
+            error_message = e.what();
+            return {};
         }
     }
 

@@ -34,6 +34,9 @@ namespace orion::bre
         std::string name;
         std::vector<std::string> parameters;
         std::string expression_text;
+        std::string result_type_ref;
+        std::string result_element_type_ref;
+        bool result_is_collection = false;
 
         /**
          * @brief Invoke the BKM with given arguments

@@ -51,7 +51,16 @@ namespace orion::bre
 
         try
         {
-            // If bkm_name is empty, just try to parse the first available BKM
+            if (bkm_name.empty())
+            {
+                auto bkms = parse_all_business_knowledge_models(dmn_xml, error_message);
+                for (auto& bkm : bkms)
+                {
+                    add_bkm(std::move(bkm));
+                }
+                return !bkms.empty();
+            }
+
             auto bkm = parse_business_knowledge_model(dmn_xml, bkm_name, error_message);
             if (bkm) [[likely]]
             {

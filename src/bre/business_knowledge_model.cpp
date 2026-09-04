@@ -19,6 +19,7 @@
 #include <orion/bre/business_knowledge_model.hpp>
 #include <orion/api/logger.hpp>
 #include <orion/bre/bkm_manager.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include "orion/bre/contract_violation.hpp"
 
 
@@ -31,6 +32,42 @@ namespace orion::bre
 {
     // Import logger functions
     using orion::api::debug;
+
+    static bool matches_builtin_type(const json& value, std::string type_ref)
+    {
+        const auto separator = type_ref.rfind(':');
+        if (separator != std::string::npos) type_ref = type_ref.substr(separator + 1);
+        if (type_ref == "number") return value.is_number();
+        if (type_ref == "string") return value.is_string();
+        if (type_ref == "boolean") return value.is_boolean();
+        if (type_ref == "date" || type_ref == "time" || type_ref == "date and time" ||
+            type_ref == "duration") return value.is_string();
+        return value.is_object();
+    }
+
+    static json coerce_bkm_result(json result, const BusinessKnowledgeModel& bkm)
+    {
+        if (bkm.result_type_ref.empty() || result.is_null()) return result;
+        if (bkm.result_is_collection)
+        {
+            if (!result.is_array()) return nullptr;
+            if (!bkm.result_element_type_ref.empty())
+            {
+                for (const auto& element : result)
+                {
+                    if (!matches_builtin_type(element, bkm.result_element_type_ref)) return nullptr;
+                }
+            }
+            return result;
+        }
+        if (matches_builtin_type(result, bkm.result_type_ref)) return result;
+        if (result.is_array() && result.size() == 1 &&
+            matches_builtin_type(result.front(), bkm.result_type_ref))
+        {
+            return result.front();
+        }
+        return nullptr;
+    }
 
     nlohmann::json BusinessKnowledgeModel::invoke(const std::vector<nlohmann::json>& args,
                                                   const nlohmann::json& input,
@@ -72,7 +109,9 @@ namespace orion::bre
             }
         }
 
-        // Evaluate the BKM expression with the enhanced context
-        return evaluate_bkm_expression(expression_text, bkm_context, available_bkms, eval_ctx);
+        EvaluationContext bkm_eval_ctx(eval_ctx.regex_cache);
+        bkm_eval_ctx.bkm_map = &available_bkms;
+        return coerce_bkm_result(
+            feel::Evaluator::evaluate(expression_text, bkm_context, bkm_eval_ctx), *this);
     }
 } // namespace orion::bre

@@ -94,17 +94,7 @@ namespace orion::bre::feel {
             out = value;
             return true;
         }
-        try
-        {
-            out = std::stod(std::string(str));
-            return true;
-        }
-        catch (const std::invalid_argument&) {
-            return false; // Not a valid number
-        }
-        catch (const std::out_of_range&) {
-            return false; // Number out of range
-        }
+        return false;
     }
 
     // Helper: Three-way comparison for numeric types
