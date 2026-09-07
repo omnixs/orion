@@ -149,6 +149,43 @@ BOOST_AUTO_TEST_CASE(test_engine_loads_collection_type)
     BOOST_TEST(result.has_value(), "Engine should load collection type");
 }
 
+BOOST_AUTO_TEST_CASE(test_bkm_custom_scalar_result_type_is_coerced)
+{
+    std::string_view dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" namespace="test">
+    <itemDefinition id="tFareBrand" name="tFareBrand">
+        <typeRef>string</typeRef>
+    </itemDefinition>
+    <businessKnowledgeModel name="fareBrandDecoding" id="bkm1">
+        <variable name="fareBrandDecoding" id="bkmv1" typeRef="tFareBrand" />
+        <encapsulatedLogic kind="FEEL">
+            <formalParameter name="farebasis" typeRef="string" />
+            <literalExpression typeRef="tFareBrand">
+                <text>substring(farebasis, 7, 1)</text>
+            </literalExpression>
+        </encapsulatedLogic>
+    </businessKnowledgeModel>
+    <inputData name="farebasis" id="input1">
+        <variable name="farebasis" id="inputv1" typeRef="string" />
+    </inputData>
+    <decision name="result" id="decision1">
+        <variable name="result" id="decisionv1" typeRef="string" />
+        <informationRequirement id="requirement1">
+            <requiredInput href="#input1" />
+        </informationRequirement>
+        <literalExpression typeRef="string">
+            <text>fareBrandDecoding(farebasis)</text>
+        </literalExpression>
+    </decision>
+</definitions>)";
+
+    orion::api::BusinessRulesEngine engine;
+    BOOST_TEST(engine.load_dmn_model(dmn_xml).has_value());
+
+    const auto result = engine.evaluate({{"farebasis", "XYQ02ALA"}});
+    BOOST_TEST(result.at("result") == "L");
+}
+
 // ============================================================================
 // Type Validation Tests
 // ============================================================================
