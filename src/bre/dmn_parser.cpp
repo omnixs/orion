@@ -405,6 +405,7 @@ namespace orion::bre
             is_collection = collection != nullptr && std::string(collection->value()) == "true";
             auto* type = item->first_node("typeRef");
             if (type != nullptr) element_type_ref = type->value();
+            if (!is_collection && !element_type_ref.empty()) result_type_ref = element_type_ref;
             break;
         }
         return {result_type_ref, element_type_ref, is_collection};
