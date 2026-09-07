@@ -1178,12 +1178,6 @@ namespace orion::bre
                 return nullptr;
             }
 
-            if (expression.empty()) [[unlikely]]
-            {
-                error_message = "BKM expression cannot be empty in DMN XML for BKM: " + name;
-                return nullptr;
-            }
-
             auto bkm = make_unique<BusinessKnowledgeModel>();
             bkm->name = name;
             bkm->parameters = parameters;
@@ -1191,6 +1185,36 @@ namespace orion::bre
             bkm->result_type_ref = result_type_ref;
             bkm->result_element_type_ref = result_element_type_ref;
             bkm->result_is_collection = result_is_collection;
+
+            if (expression.empty())
+            {
+                rapidxml::xml_document<> document;
+                std::string buffer(dmn_xml);
+                document.parse<0>(&buffer[0]);
+                auto* root = document.first_node();
+                for (auto* node = root->first_node("businessKnowledgeModel"); node != nullptr;
+                     node = node->next_sibling("businessKnowledgeModel"))
+                {
+                    const auto* name_attribute = node->first_attribute("name");
+                    if (name_attribute == nullptr || name != name_attribute->value()) continue;
+
+                    auto* logic = node->first_node("encapsulatedLogic");
+                    auto* table = logic == nullptr ? nullptr : logic->first_node("decisionTable");
+                    if (table != nullptr)
+                    {
+                        DmnParser parser;
+                        bkm->decision_table = make_unique<DecisionTable>(
+                            parser.parse_decision_table_from_node(table, node));
+                    }
+                    break;
+                }
+            }
+
+            if (!bkm->is_valid())
+            {
+                error_message = "BKM logic cannot be empty in DMN XML for BKM: " + name;
+                return nullptr;
+            }
 
             return bkm;
         }
@@ -1229,7 +1253,7 @@ namespace orion::bre
                 if (!bkm)
                 {
                     error_message = parse_error;
-                    return {};
+                    continue;
                 }
                 result.push_back(std::move(bkm));
             }

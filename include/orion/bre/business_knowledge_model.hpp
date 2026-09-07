@@ -19,7 +19,9 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+#include <orion/bre/dmn_model.hpp>
 #include <orion/bre/evaluation_context.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 #include <map>
@@ -34,6 +36,7 @@ namespace orion::bre
         std::string name;
         std::vector<std::string> parameters;
         std::string expression_text;
+        std::unique_ptr<DecisionTable> decision_table;
         std::string result_type_ref;
         std::string result_element_type_ref;
         bool result_is_collection = false;
@@ -58,7 +61,7 @@ namespace orion::bre
          */
         [[nodiscard]] bool is_valid() const noexcept
         {
-            return !name.empty() && !expression_text.empty();
+            return !name.empty() && (!expression_text.empty() || decision_table != nullptr);
         }
     };
 } // namespace orion::bre

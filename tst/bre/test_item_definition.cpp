@@ -186,6 +186,41 @@ BOOST_AUTO_TEST_CASE(test_bkm_custom_scalar_result_type_is_coerced)
     BOOST_TEST(result.at("result") == "L");
 }
 
+BOOST_AUTO_TEST_CASE(test_bkm_decision_table_preserves_collect_result)
+{
+    std::string_view dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" namespace="test">
+    <businessKnowledgeModel name="airportZone" id="bkm1">
+        <variable name="airportZone" id="bkmv1" typeRef="string" />
+        <encapsulatedLogic kind="FEEL">
+            <formalParameter name="airport" typeRef="string" />
+            <decisionTable id="dt1" hitPolicy="COLLECT">
+                <input id="i1"><inputExpression typeRef="string"><text>airport</text></inputExpression></input>
+                <output id="o1" />
+                <rule id="r1"><inputEntry><text>"CDG"</text></inputEntry><outputEntry><text>"FR_MAINLAND"</text></outputEntry></rule>
+            </decisionTable>
+        </encapsulatedLogic>
+    </businessKnowledgeModel>
+    <businessKnowledgeModel name="unsupportedContextBkm" id="bkm2">
+        <variable name="unsupportedContextBkm" id="bkmv2" typeRef="context" />
+        <encapsulatedLogic kind="FEEL">
+            <context><contextEntry><literalExpression><text>"unused"</text></literalExpression></contextEntry></context>
+        </encapsulatedLogic>
+    </businessKnowledgeModel>
+    <inputData name="airport" id="input1"><variable name="airport" id="inputv1" typeRef="string" /></inputData>
+    <decision name="result" id="decision1">
+        <variable name="result" id="decisionv1" typeRef="boolean" />
+        <literalExpression typeRef="boolean"><text>list contains(airportZone(airport), "FR_MAINLAND")</text></literalExpression>
+    </decision>
+</definitions>)";
+
+    orion::api::BusinessRulesEngine engine;
+    BOOST_TEST(engine.load_dmn_model(dmn_xml).has_value());
+
+    const auto result = engine.evaluate({{"airport", "CDG"}});
+    BOOST_TEST(result.at("result") == true);
+}
+
 // ============================================================================
 // Type Validation Tests
 // ============================================================================

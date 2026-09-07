@@ -81,10 +81,10 @@ namespace orion::bre
             THROW_CONTRACT_VIOLATION("BKM name cannot be empty during invocation");
         }
 
-        // Contract: Expression must be non-empty
-        if (expression_text.empty()) [[unlikely]]
+        // Contract: BKM must contain either a FEEL literal expression or decision table.
+        if (expression_text.empty() && !decision_table) [[unlikely]]
         {
-            THROW_CONTRACT_VIOLATION("BKM expression cannot be empty");
+            THROW_CONTRACT_VIOLATION("BKM logic cannot be empty");
         }
 
         // DMN 1.5 flexible parameter handling: BKMs can accept variable arguments
@@ -111,6 +111,10 @@ namespace orion::bre
 
         EvaluationContext bkm_eval_ctx(eval_ctx.regex_cache);
         bkm_eval_ctx.bkm_map = &available_bkms;
+        if (decision_table)
+        {
+            return coerce_bkm_result(decision_table->evaluate(bkm_context, bkm_eval_ctx), *this);
+        }
         return coerce_bkm_result(
             feel::Evaluator::evaluate(expression_text, bkm_context, bkm_eval_ctx), *this);
     }
