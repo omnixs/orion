@@ -1206,6 +1206,11 @@ namespace orion::bre
                         bkm->decision_table = make_unique<DecisionTable>(
                             parser.parse_decision_table_from_node(table, node));
                     }
+                    else
+                    {
+                        auto* context = logic == nullptr ? nullptr : logic->first_node("context");
+                        bkm->expression_text = boxed_context_to_feel(context);
+                    }
                     break;
                 }
             }

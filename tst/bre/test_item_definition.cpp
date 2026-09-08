@@ -153,20 +153,20 @@ BOOST_AUTO_TEST_CASE(test_bkm_custom_scalar_result_type_is_coerced)
 {
     std::string_view dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" namespace="test">
-    <itemDefinition id="tFareBrand" name="tFareBrand">
+    <itemDefinition id="tCodeFragment" name="tCodeFragment">
         <typeRef>string</typeRef>
     </itemDefinition>
-    <businessKnowledgeModel name="fareBrandDecoding" id="bkm1">
-        <variable name="fareBrandDecoding" id="bkmv1" typeRef="tFareBrand" />
+    <businessKnowledgeModel name="extractCodeFragment" id="bkm1">
+        <variable name="extractCodeFragment" id="bkmv1" typeRef="tCodeFragment" />
         <encapsulatedLogic kind="FEEL">
-            <formalParameter name="farebasis" typeRef="string" />
-            <literalExpression typeRef="tFareBrand">
-                <text>substring(farebasis, 7, 1)</text>
+            <formalParameter name="encodedValue" typeRef="string" />
+            <literalExpression typeRef="tCodeFragment">
+                <text>substring(encodedValue, 7, 1)</text>
             </literalExpression>
         </encapsulatedLogic>
     </businessKnowledgeModel>
-    <inputData name="farebasis" id="input1">
-        <variable name="farebasis" id="inputv1" typeRef="string" />
+    <inputData name="encodedValue" id="input1">
+        <variable name="encodedValue" id="inputv1" typeRef="string" />
     </inputData>
     <decision name="result" id="decision1">
         <variable name="result" id="decisionv1" typeRef="string" />
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE(test_bkm_custom_scalar_result_type_is_coerced)
             <requiredInput href="#input1" />
         </informationRequirement>
         <literalExpression typeRef="string">
-            <text>fareBrandDecoding(farebasis)</text>
+            <text>extractCodeFragment(encodedValue)</text>
         </literalExpression>
     </decision>
 </definitions>)";
@@ -182,42 +182,46 @@ BOOST_AUTO_TEST_CASE(test_bkm_custom_scalar_result_type_is_coerced)
     orion::api::BusinessRulesEngine engine;
     BOOST_TEST(engine.load_dmn_model(dmn_xml).has_value());
 
-    const auto result = engine.evaluate({{"farebasis", "XYQ02ALA"}});
-    BOOST_TEST(result.at("result") == "L");
+    const auto result = engine.evaluate({{"encodedValue", "ABCDEFZH"}});
+    BOOST_TEST(result.at("result") == "Z");
 }
 
 BOOST_AUTO_TEST_CASE(test_bkm_decision_table_preserves_collect_result)
 {
     std::string_view dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" namespace="test">
-    <businessKnowledgeModel name="airportZone" id="bkm1">
-        <variable name="airportZone" id="bkmv1" typeRef="string" />
+    <businessKnowledgeModel name="categoryLookup" id="bkm1">
+        <variable name="categoryLookup" id="bkmv1" typeRef="string" />
         <encapsulatedLogic kind="FEEL">
-            <formalParameter name="airport" typeRef="string" />
+            <formalParameter name="sourceValue" typeRef="string" />
             <decisionTable id="dt1" hitPolicy="COLLECT">
-                <input id="i1"><inputExpression typeRef="string"><text>airport</text></inputExpression></input>
+                <input id="i1"><inputExpression typeRef="string"><text>sourceValue</text></inputExpression></input>
                 <output id="o1" />
-                <rule id="r1"><inputEntry><text>"CDG"</text></inputEntry><outputEntry><text>"FR_MAINLAND"</text></outputEntry></rule>
+                <rule id="r1"><inputEntry><text>"ITEM_A"</text></inputEntry><outputEntry><text>"GROUP_ALPHA"</text></outputEntry></rule>
             </decisionTable>
         </encapsulatedLogic>
     </businessKnowledgeModel>
-    <businessKnowledgeModel name="unsupportedContextBkm" id="bkm2">
-        <variable name="unsupportedContextBkm" id="bkmv2" typeRef="context" />
+    <businessKnowledgeModel name="scaledValue" id="bkm2">
+        <variable name="scaledValue" id="bkmv2" typeRef="context" />
         <encapsulatedLogic kind="FEEL">
-            <context><contextEntry><literalExpression><text>"unused"</text></literalExpression></contextEntry></context>
+            <formalParameter name="factor" typeRef="number" />
+            <context>
+                <contextEntry><variable name="scaled" /><literalExpression><text>factor * 100</text></literalExpression></contextEntry>
+                <contextEntry><literalExpression><text>{ value: scaled }</text></literalExpression></contextEntry>
+            </context>
         </encapsulatedLogic>
     </businessKnowledgeModel>
-    <inputData name="airport" id="input1"><variable name="airport" id="inputv1" typeRef="string" /></inputData>
+    <inputData name="sourceValue" id="input1"><variable name="sourceValue" id="inputv1" typeRef="string" /></inputData>
     <decision name="result" id="decision1">
         <variable name="result" id="decisionv1" typeRef="boolean" />
-        <literalExpression typeRef="boolean"><text>list contains(airportZone(airport), "FR_MAINLAND")</text></literalExpression>
+        <literalExpression typeRef="boolean"><text>list contains(categoryLookup(sourceValue), "GROUP_ALPHA") and scaledValue(0.1).value = 10</text></literalExpression>
     </decision>
 </definitions>)";
 
     orion::api::BusinessRulesEngine engine;
     BOOST_TEST(engine.load_dmn_model(dmn_xml).has_value());
 
-    const auto result = engine.evaluate({{"airport", "CDG"}});
+    const auto result = engine.evaluate({{"sourceValue", "ITEM_A"}});
     BOOST_TEST(result.at("result") == true);
 }
 

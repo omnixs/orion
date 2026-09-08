@@ -86,10 +86,10 @@ BOOST_AUTO_TEST_CASE(test_engine_namespace_api)
     BOOST_CHECK(engine.get_namespace().empty());
 }
 
-BOOST_AUTO_TEST_CASE(test_airline_namespace_integration)
+BOOST_AUTO_TEST_CASE(test_prefixed_namespace_integration)
 {
     // Test with minimal DMN that has namespace - just enough to test functionality
-    const std::string airline_dmn = R"(<?xml version="1.0" encoding="UTF-8"?>
+  const std::string prefixed_dmn = R"(<?xml version="1.0" encoding="UTF-8"?>
 <dmn:definitions xmlns:dmn="http://www.omg.org/spec/DMN/20180521/MODEL/" namespace="http://example.com/dmn">
   <dmn:decision id="test_decision" name="TestDecision">
     <dmn:decisionTable hitPolicy="FIRST">
@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(test_airline_namespace_integration)
     orion::api::BusinessRulesEngine engine;
     
     // Load the DMN with namespace
-    auto result = engine.load_dmn_model(airline_dmn);
+    auto result = engine.load_dmn_model(prefixed_dmn);
     if (!result.has_value()) {
         BOOST_TEST_MESSAGE("Load failed with error: " << result.error());
     }

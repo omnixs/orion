@@ -47,17 +47,17 @@ BOOST_AUTO_TEST_SUITE(FeelLexerNamesAndRangesSuite)
 BOOST_AUTO_TEST_CASE(hyphenated_name_is_single_identifier)
 {
     Lexer lexer;
-    auto tokens = lexer.tokenize("pre-tax-income");
+    auto tokens = lexer.tokenize("source-value-name");
 
     BOOST_REQUIRE_EQUAL(tokens.size(), 2); // identifier + EOF
     BOOST_CHECK_EQUAL(tokens[0].type, TokenType::IDENTIFIER);
-    BOOST_CHECK_EQUAL(tokens[0].text, "pre-tax-income");
+    BOOST_CHECK_EQUAL(tokens[0].text, "source-value-name");
 }
 
 BOOST_AUTO_TEST_CASE(hyphenated_name_resolves_from_input)
 {
-    json input = {{"pre-tax-income", 1000}};
-    BOOST_CHECK_EQUAL(parse_and_evaluate("pre-tax-income", input).get<double>(), 1000.0);
+    json input = {{"source-value-name", 1000}};
+    BOOST_CHECK_EQUAL(parse_and_evaluate("source-value-name", input).get<double>(), 1000.0);
 }
 
 BOOST_AUTO_TEST_CASE(unspaced_subtraction_of_number_is_not_a_name)
