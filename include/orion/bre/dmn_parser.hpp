@@ -51,11 +51,10 @@ namespace orion::bre
     {
     public:
         DmnModel parse(std::string_view xml);
-
-    private:
         DecisionTable parse_decision_table_from_node(rapidxml::xml_node<char>* table,
                                                      rapidxml::xml_node<char>* decision_node);
-        
+
+    private:
         // Helper methods for parse_decision_table_from_node (refactored from 120-line function)
         void parse_input_clauses(rapidxml::xml_node<char>* table, DecisionTable& decision_table);
         void parse_output_clauses(rapidxml::xml_node<char>* table, DecisionTable& decision_table);
