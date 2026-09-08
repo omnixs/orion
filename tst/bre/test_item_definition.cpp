@@ -211,6 +211,15 @@ BOOST_AUTO_TEST_CASE(test_bkm_decision_table_preserves_collect_result)
             </context>
         </encapsulatedLogic>
     </businessKnowledgeModel>
+    <businessKnowledgeModel name="unsupportedFunction" id="bkm3">
+        <variable name="unsupportedFunction" id="bkmv3" />
+        <encapsulatedLogic kind="FEEL">
+            <functionDefinition>
+                <formalParameter name="input" typeRef="number" />
+                <literalExpression><text>input + 1</text></literalExpression>
+            </functionDefinition>
+        </encapsulatedLogic>
+    </businessKnowledgeModel>
     <inputData name="sourceValue" id="input1"><variable name="sourceValue" id="inputv1" typeRef="string" /></inputData>
     <decision name="result" id="decision1">
         <variable name="result" id="decisionv1" typeRef="boolean" />

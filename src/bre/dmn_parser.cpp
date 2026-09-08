@@ -1209,7 +1209,10 @@ namespace orion::bre
                     else
                     {
                         auto* context = logic == nullptr ? nullptr : logic->first_node("context");
-                        bkm->expression_text = boxed_context_to_feel(context);
+                        if (context != nullptr)
+                        {
+                            bkm->expression_text = boxed_context_to_feel(context);
+                        }
                     }
                     break;
                 }

@@ -569,6 +569,13 @@ namespace orion::bre::feel {
             Lexer lexer;
             auto tokens = lexer.tokenize(expression);
 
+            if (std::ranges::any_of(tokens, [](const Token& token) {
+                return token.type == TokenType::IDENTIFIER && token.text == "function";
+            }))
+            {
+                return nullptr;
+            }
+
             Parser parser;
             auto ast = parser.parse(tokens);
 
