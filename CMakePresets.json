@@ -7,7 +7,7 @@
       "displayName": "Windows Base Configuration",
       "description": "Base configuration for Windows with vcpkg",
       "hidden": true,
-      "generator": "Visual Studio 17 2022",
+      "generator": "Visual Studio 18 2026",
       "architecture": { "value": "x64", "strategy": "external" },
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "23",
@@ -19,14 +19,14 @@
     {
       "name": "windows-static",
       "displayName": "Windows (Static)",
-      "description": "Visual Studio 2022 with static linking",
+      "description": "Visual Studio 2026 with static linking",
       "inherits": "windows-base",
       "binaryDir": "${sourceDir}/build"
     },
     {
       "name": "windows-dynamic",
       "displayName": "Windows (Dynamic)",
-      "description": "Visual Studio 2022 with dynamic linking",
+      "description": "Visual Studio 2026 with dynamic linking",
       "inherits": "windows-base",
       "binaryDir": "${sourceDir}/build-dynamic",
       "cacheVariables": {

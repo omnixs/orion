@@ -388,6 +388,15 @@ if(ORION_BUILD_TESTS)
     set_property(TARGET orion-bench-allocs PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
     source_group(TREE ${CMAKE_SOURCE_DIR} FILES src/bench/orion_bench_allocs.cpp)
 
+    # Direct FEEL expression benchmarks: measure lexer / parser / evaluate
+    # without decision-table overhead.
+    add_executable(orion-bench-feel src/bench/orion_bench_feel.cpp)
+    target_link_libraries(orion-bench-feel PRIVATE orion_lib benchmark::benchmark
+        $<TARGET_NAME_IF_EXISTS:spdlog::spdlog>)
+    target_include_directories(orion-bench-feel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_property(TARGET orion-bench-feel PROPERTY VS_GLOBAL_IntDir "$(Configuration)\\$(ProjectName)\\")
+    source_group(TREE ${CMAKE_SOURCE_DIR} FILES src/bench/orion_bench_feel.cpp)
+
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/bench/orion_bench_bundle.cpp")
       add_executable(orion-bench-bundle src/bench/orion_bench_bundle.cpp src/api/spdlog_logger.cpp src/common/log.cpp)
       target_link_libraries(orion-bench-bundle PRIVATE orion_lib benchmark::benchmark spdlog::spdlog)

@@ -47,6 +47,12 @@
 #include <benchmark/benchmark.h>
 #include <orion/api/engine.hpp>
 #include <orion/api/logger.hpp>
+#include <orion/bre/ast_node.hpp>
+#include <orion/bre/evaluation_context.hpp>
+#include <orion/bre/feel/evaluator.hpp>
+#include <orion/bre/feel/lexer.hpp>
+#include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/regex_cache.hpp>
 #include <nlohmann/json.hpp>
 #include <new>
 #include <cstddef>
@@ -377,6 +383,67 @@ static void BM_Medium_Load(benchmark::State& state)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Direct FEEL path — isolates lexer / parser / evaluate allocation counts.
+// ---------------------------------------------------------------------------
+
+namespace
+{
+
+orion::bre::EvaluationContext& feel_ctx()
+{
+    static orion::bre::feel::RegexCache cache;
+    static orion::bre::EvaluationContext ctx(cache);
+    return ctx;
+}
+
+const std::string k_feel_arith   = "1 + 7 * 2 - 3";
+const std::string k_feel_compare = "age >= 21 and priority > 5";
+const nlohmann::json k_feel_person = nlohmann::json{{"age", 30}, {"priority", 7}};
+
+} // namespace
+
+static void BM_Feel_Tokenize_Allocs(benchmark::State& state)
+{
+    orion::bre::feel::Lexer lexer;
+    for (auto _ : state)
+    {
+        auto tokens = lexer.tokenize(k_feel_arith);
+        benchmark::DoNotOptimize(tokens);
+    }
+}
+
+static void BM_Feel_Parse_Allocs(benchmark::State& state)
+{
+    orion::bre::feel::Lexer lexer;
+    for (auto _ : state)
+    {
+        auto tokens = lexer.tokenize(k_feel_arith);
+        orion::bre::feel::Parser parser;
+        auto ast = parser.parse(tokens);
+        benchmark::DoNotOptimize(ast);
+    }
+}
+
+static void BM_Feel_Eval_Arith_Allocs(benchmark::State& state)
+{
+    const nlohmann::json empty = nlohmann::json::object();
+    for (auto _ : state)
+    {
+        auto result = orion::bre::feel::Evaluator::evaluate(k_feel_arith, empty, feel_ctx());
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+static void BM_Feel_Eval_Compare_Allocs(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        auto result = orion::bre::feel::Evaluator::evaluate(k_feel_compare, k_feel_person, feel_ctx());
+        benchmark::DoNotOptimize(result);
+    }
+}
+
 // =============================================================================
 // Registration
 // =============================================================================
@@ -392,6 +459,12 @@ BENCHMARK(BM_Medium_Allocs);
 // Load cost
 BENCHMARK(BM_Simple_Load);
 BENCHMARK(BM_Medium_Load);
+
+// Direct FEEL path
+BENCHMARK(BM_Feel_Tokenize_Allocs);
+BENCHMARK(BM_Feel_Parse_Allocs);
+BENCHMARK(BM_Feel_Eval_Arith_Allocs);
+BENCHMARK(BM_Feel_Eval_Compare_Allocs);
 
 // =============================================================================
 // main
