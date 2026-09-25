@@ -215,6 +215,7 @@ namespace orion::bre::feel {
             advance(); // consume "if"
             
             auto node = std::make_unique<ASTNode>(ASTNodeType::CONDITIONAL);
+            node->children.reserve(3);
             
             // Parse condition expression
             auto condition = parse_conditional();
@@ -265,6 +266,7 @@ namespace orion::bre::feel {
             
             // Create binary OR node
             auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "or");
+            node->children.reserve(2);
             node->children.push_back(std::move(left));
             node->children.push_back(std::move(right));
             left = std::move(node);
@@ -285,6 +287,7 @@ namespace orion::bre::feel {
             
             // Create binary AND node
             auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "and");
+            node->children.reserve(2);
             node->children.push_back(std::move(left));
             node->children.push_back(std::move(right));
             left = std::move(node);
@@ -313,6 +316,7 @@ namespace orion::bre::feel {
                 auto upper = parse_additive();
                 
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BETWEEN, "between");
+                node->children.reserve(3);
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(lower));
                 node->children.push_back(std::move(upper));
@@ -380,6 +384,7 @@ namespace orion::bre::feel {
                 auto right = parse_in_tests();
                 
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "in");
+                node->children.reserve(2);
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(right));
                 return node;
@@ -402,6 +407,7 @@ namespace orion::bre::feel {
                 
                 // Create binary comparison node
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, normalized_op);
+                node->children.reserve(2);
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(right));
                 left = std::move(node);
@@ -431,6 +437,7 @@ namespace orion::bre::feel {
                 
                 // Create binary operator node
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, std::string(oper));
+                node->children.reserve(2);
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(right));
                 left = std::move(node);
@@ -465,6 +472,7 @@ namespace orion::bre::feel {
                 
                 // Create binary operator node
                 auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, std::string(oper));
+                node->children.reserve(2);
                 node->children.push_back(std::move(left));
                 node->children.push_back(std::move(right));
                 left = std::move(node);
@@ -542,6 +550,7 @@ namespace orion::bre::feel {
             
             // Create binary exponentiation node
             auto node = std::make_unique<ASTNode>(ASTNodeType::BINARY_OP, "**");
+            node->children.reserve(2);
             node->children.push_back(std::move(left));
             node->children.push_back(std::move(right));
             left = std::move(node);

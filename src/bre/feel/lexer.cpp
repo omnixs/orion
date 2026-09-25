@@ -145,7 +145,10 @@ namespace orion::bre::feel {
         input_ = expression;
         position_ = 0;
         std::vector<Token> tokens;
-        tokens.reserve(expression.size() / 4 + 1);  // Heuristic: ~4 chars per token on average
+        // Operator-dense expressions such as "1 + 7 * 2 - 3" average under
+        // three characters per token, so a 4-chars-per-token guess regrows the
+        // vector repeatedly on exactly the short expressions that are common.
+        tokens.reserve(expression.size() / 3 + 3);
 
         while (position_ < input_.length())
         {

@@ -42,7 +42,7 @@ namespace orion::bre::feel {
 
     namespace {
 
-    std::string trim_copy(std::string_view sv)
+    std::string_view trim_view(std::string_view sv)
     {
         size_t start = 0;
         while (start < sv.size() && std::isspace(static_cast<unsigned char>(sv[start])))
@@ -54,7 +54,12 @@ namespace orion::bre::feel {
         {
             --end;
         }
-        return std::string(sv.substr(start, end - start));
+        return sv.substr(start, end - start);
+    }
+
+    std::string trim_copy(std::string_view sv)
+    {
+        return std::string(trim_view(sv));
     }
 
     bool starts_with_ci(std::string_view text, std::string_view prefix)
@@ -161,12 +166,15 @@ namespace orion::bre::feel {
         const json& input,
         const EvaluationContext& eval_ctx)
     {
-        std::string expr = trim_copy(expression);
-        if (!starts_with_ci(expr, "sort"))
+        // Reject on a view first: the overwhelming majority of expressions are
+        // not sort(), and copying the expression just to discard it is waste.
+        const std::string_view trimmed = trim_view(expression);
+        if (!starts_with_ci(trimmed, "sort"))
         {
             return std::nullopt;
         }
 
+        const std::string expr(trimmed);
         size_t lparen = expr.find('(');
         size_t rparen = expr.rfind(')');
         if (lparen == std::string::npos || rparen == std::string::npos || rparen <= lparen)
@@ -272,7 +280,7 @@ namespace orion::bre::feel {
         const json& input,
         const EvaluationContext& eval_ctx)
     {
-        std::string expr = trim_copy(expression);
+        const std::string_view expr = trim_view(expression);
 
         // Projection: <listExpr>.<property>
         if (auto dot_pos = find_last_top_level_char(expr, '.'); dot_pos.has_value())
@@ -280,8 +288,8 @@ namespace orion::bre::feel {
             const size_t pos = dot_pos.value();
             if (pos > 0 && pos + 1 < expr.size())
             {
-                std::string base_expr = trim_copy(std::string_view(expr).substr(0, pos));
-                std::string prop_name = trim_copy(std::string_view(expr).substr(pos + 1));
+                std::string base_expr = trim_copy(expr.substr(0, pos));
+                std::string prop_name = trim_copy(expr.substr(pos + 1));
 
                 if (!base_expr.empty() && !prop_name.empty())
                 {
@@ -339,8 +347,8 @@ namespace orion::bre::feel {
             return std::nullopt;
         }
 
-        std::string base_expr = trim_copy(std::string_view(expr).substr(0, lbracket));
-        std::string selector_expr = trim_copy(std::string_view(expr).substr(lbracket + 1, rbracket - lbracket - 1));
+        std::string base_expr = trim_copy(expr.substr(0, lbracket));
+        std::string selector_expr = trim_copy(expr.substr(lbracket + 1, rbracket - lbracket - 1));
         if (base_expr.empty() || selector_expr.empty())
         {
             return std::nullopt;
@@ -421,12 +429,14 @@ namespace orion::bre::feel {
         const json& input,
         const EvaluationContext& eval_ctx)
     {
-        std::string expr = trim_copy(expression);
-        if (!starts_with_ci(expr, "list replace") && !starts_with_ci(expr, "replace"))
+        // Reject on a view first; see try_evaluate_sort_with_lambda_precedes.
+        const std::string_view trimmed = trim_view(expression);
+        if (!starts_with_ci(trimmed, "list replace") && !starts_with_ci(trimmed, "replace"))
         {
             return std::nullopt;
         }
 
+        const std::string expr(trimmed);
         size_t lparen = expr.find('(');
         size_t rparen = expr.rfind(')');
         if (lparen == std::string::npos || rparen == std::string::npos || rparen <= lparen)
