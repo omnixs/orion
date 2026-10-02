@@ -69,6 +69,10 @@ namespace orion::bre::feel {
      *
      * Uses the standard library time zone database. Returns std::nullopt when the name is unknown,
      * the instant is outside the representable range, or the toolchain ships no time zone database.
+     *
+     * The standard library loads that database on first use and keeps it for the process lifetime
+     * (MSVC never frees it). Hosts that fence per-command allocations should call
+     * std::chrono::get_tzdb() once at startup.
      */
     [[nodiscard]] std::optional<int> named_timezone_offset_seconds(std::string_view tz_name,
                                                                    const Date& date,

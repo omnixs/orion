@@ -35,9 +35,6 @@
 
 namespace orion::bre::detail
 {
-    // Thread-local context pointer for variable resolution in math expressions
-    inline thread_local const nlohmann::json* current_eval_context = nullptr;
-
     /**
      * @brief Split function arguments respecting parentheses nesting
      * @param args_str The argument string (e.g., "a, b, c(x, y), d")
@@ -113,9 +110,7 @@ namespace orion::bre::detail
     double parse_number_literal_impl(std::string_view expr, size_t& pos);
     double parse_identifier_or_variable(std::string_view expr, size_t& pos);
     std::string extract_variable_name(std::string_view expr, size_t start_pos, size_t& pos);
-    std::string try_extend_variable_name(std::string_view expr, std::string_view var_name, size_t start_pos, size_t& pos);
     double resolve_feel_constant(std::string_view var_name);
-    double resolve_variable_from_context(std::string_view var_name, bool& found);
 
     /**
      * @brief Skip whitespace characters

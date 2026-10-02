@@ -111,7 +111,7 @@ namespace orion::bre::feel {
          * @param token_text Token text (must reference storage that outlives this token)
          * @param pos Position in source string
          */
-        Token(TokenType token_type, std::string_view token_text, size_t pos = 0)
+        constexpr Token(TokenType token_type, std::string_view token_text, size_t pos = 0)
             : type(token_type), text(token_text), position(pos)
         {
         }

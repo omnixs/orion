@@ -3,6 +3,7 @@
 ## Table of Contents
 - [General Principles](#general-principles)
 - [C++ Language Standards](#cpp-language-standards)
+- [Static and Global State](#static-and-global-state)
 - [DMN 1.5 Compliance](#dmn-15-compliance)
 - [Error Handling](#error-handling)
 - [Memory Management](#memory-management)
@@ -263,6 +264,77 @@ class BadEvaluator {
 - **`errno` for error handling**: Use `std::expected` or exceptions
 - **Exception specifications**: Don't use deprecated `throw(X,Y)` syntax (use `noexcept` where appropriate)
 - **Non-specific exceptions**: Don't `throw 7;` or `throw "error";` - use proper error types
+
+## Static and Global State
+
+ORION is embedded in host processes that run many engines on many threads and that fence or
+profile heap usage per command. State the library creates lazily on first use is allocated inside
+whichever host command happens to trigger it and is kept for the process lifetime, so the host
+reports it as a memory leak (v2.2.4 fixed exactly this for the FEEL built-in function table).
+
+### Rule: every static or thread-local variable must be `constexpr` or `constinit`
+
+This applies to all library code (sources in `ORION_SRC`, `include/orion/`, internal headers) and
+covers:
+- function-local `static` variables (including inside lambdas)
+- namespace-scope variables, with or without `static`/`inline`, including anonymous namespaces
+- `static` data members
+- `thread_local` variables
+
+```cpp
+// ❌ BAD: built on first call, allocates inside the host's call stack, never freed before exit
+const std::unordered_map<std::string_view, Handler>& builtin_table() {
+    static const std::unordered_map<std::string_view, Handler> table = {{"abs", &abs_fn}};
+    return table;
+}
+
+// ❌ BAD: Meyers singleton whose constructor allocates
+Registry& Registry::instance() { static Registry registry; return registry; }
+
+// ❌ BAD: lazily allocated lookup containers, once_flag, thread_local caches
+static const std::set<std::string> keywords = {"if", "then"};
+thread_local std::string scratch;
+
+// ✅ GOOD: compile-time table, sorted at compile time, binary search, no heap, no init guard
+struct Entry { std::string_view name; Handler handler; };
+constexpr auto make_table() {
+    auto table = std::to_array<Entry>({{"abs", &abs_fn}, {"floor", &floor_fn}});
+    std::ranges::sort(table, {}, &Entry::name);
+    return table;
+}
+constexpr auto builtin_table = make_table();
+static_assert(std::ranges::adjacent_find(builtin_table, {}, &Entry::name) == builtin_table.end());
+
+// ✅ GOOD: small fixed lists
+static constexpr std::array<std::string_view, 3> UNITS = {"days", "hours", "minutes"};
+
+// ✅ GOOD: unavoidable global object: constexpr, non-allocating constructor + constinit in a .cpp
+namespace { constinit Logger global_logger; }
+```
+
+**Consequences:**
+- **Lookup tables** use `constexpr std::array` of `std::string_view`/function pointers/aggregates;
+  sort at compile time and use `std::ranges::lower_bound`, or `std::ranges::find` for small lists.
+  Never `std::map`, `std::unordered_map`, `std::set`, `std::vector`, `std::string`, `std::regex` or
+  `nlohmann::json` with static storage.
+- **Caches** (compiled regexes, parsed expressions) are owned by an engine or `EvaluationContext`
+  instance, so their lifetime follows the host's object, not the process.
+- **No lazy initialization**: no `std::call_once`/`std::once_flag`, no "build on first use"
+  singletons, no `thread_local` caches.
+- **Mutable global state** (only where an API requires it, e.g. the logger sink) must be
+  thread-safe (`std::atomic`, `std::atomic<std::shared_ptr<T>>`) and must not allocate until the
+  host explicitly configures it.
+- **Standard library process-lifetime caches**: code that triggers lazily initialized standard
+  library state must be documented here. Known case: named time zones use
+  `std::chrono::locate_zone()`; MSVC's STL loads the IANA time zone database on first use and
+  never frees it. Hosts that profile per-command allocations should call
+  `std::chrono::get_tzdb()` once at startup. Do not add new uses of such facilities (e.g.
+  `std::regex`, `std::locale` construction) without documenting them here.
+- **Exceptions** need reviewer approval and a `// static-init-ok: <reason>` comment on the
+  declaration line or the line directly above it.
+
+**Enforcement:** `tools/scripts/check_static_init.ps1` scans the library and fails on any
+violation; it runs in CI (`ci-fast.yml`, job *Static Initialization Guard*).
 
 ## DMN 1.5 Compliance
 
@@ -727,12 +799,14 @@ bool debug_output = (expression.find("PMT") != string::npos &&
 2. **All tests pass** including DMN TCK compliance tests
 3. **clang-tidy passes** with no warnings (naming conventions, code quality)
 4. **No hardcoded values** detected by scanner
-5. **Documentation updated** for API changes
-6. **Performance benchmarks** pass (if applicable)
+5. **No runtime-initialized statics**: `tools/scripts/check_static_init.ps1` passes
+6. **Documentation updated** for API changes
+7. **Performance benchmarks** pass (if applicable)
 
 ### Review Checklist
 - [ ] DMN 1.5 specification compliance
 - [ ] No hardcoded test values or domain assumptions
+- [ ] No static/thread-local variables unless `constexpr` or `constinit` (see [Static and Global State](#static-and-global-state))
 - [ ] Proper error handling and contract validation
 - [ ] Modern C++ best practices followed
 - [ ] clang-tidy warnings addressed (naming, code quality)
@@ -745,6 +819,7 @@ bool debug_output = (expression.find("PMT") != string::npos &&
 # Run before committing
 clang-tidy -p build src/**/*.cpp     # Check code quality and naming
 .\scripts\scan-hardcoded-values.ps1  # Check for hardcoded values
+.\tools\scripts\check_static_init.ps1  # Check for runtime-initialized statics
 cmake --build build --target test    # Run all tests
 cmake --build build --target tst_bre # Run BRE-specific tests
 ```
@@ -768,6 +843,8 @@ clang-tidy -p build --fix-errors src/bre/bkm_manager.cpp
 
 - **clang-tidy**: Enforces naming conventions (CamelCase classes, snake_case functions/variables)
 - **Automated scanning**: `.\scripts\scan-hardcoded-values.ps1` catches hardcoded values
+- **Static initialization guard**: `tools/scripts/check_static_init.ps1` (CI) rejects static or
+  thread-local variables that are not `constexpr`/`constinit`
 - **CI/CD pipeline**: All checks must pass before merge (build, tests, clang-tidy, code quality)
 - **Code review**: Mandatory review by BRE team member
 - **Documentation**: API changes require documentation updates

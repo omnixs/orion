@@ -25,6 +25,7 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <array>
 #include <iomanip>
 
 namespace orion::bre
@@ -147,7 +148,7 @@ namespace orion::bre
         
         int days_in_month(int y, int m)
         {
-            static const int days[] = {0,31,28,31,30,31,30,31,31,30,31,30,31};
+            static constexpr std::array<int, 13> days = {0,31,28,31,30,31,30,31,31,30,31,30,31};
             if (m == 2 && ((y%4==0 && y%100!=0) || y%400==0)) return 29;
             return days[m];
         }

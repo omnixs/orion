@@ -17,10 +17,8 @@
  */
 
 #pragma once
-#include <string>
-#include <vector>
-#include <map>
-#include <optional>
+#include <span>
+#include <string_view>
 
 namespace orion::bre::feel {
 
@@ -28,59 +26,42 @@ namespace orion::bre::feel {
  * @brief Represents a formal parameter in a function signature
  */
 struct FormalParameter {
-    std::string name;
-    bool optional;  // For functions with optional parameters
-    
-    FormalParameter(std::string param_name, bool opt = false)
-        : name(std::move(param_name)), optional(opt) {}
+    std::string_view name;
+    bool optional = false;  // For functions with optional parameters
 };
 
 /**
  * @brief Represents a complete function signature with parameter metadata
+ *
+ * All members reference static, compile-time data.
  */
 struct FunctionSignature {
-    std::string name;
-    std::vector<FormalParameter> parameters;
-    bool variadic;  // For functions accepting variable number of arguments
-    
-    FunctionSignature() : variadic(false) {}
-    
-    FunctionSignature(std::string func_name, 
-                     std::vector<FormalParameter> params,
-                     bool var = false)
-        : name(std::move(func_name)), parameters(std::move(params)), variadic(var) {}
+    std::string_view name;
+    std::span<const FormalParameter> parameters;
+    bool variadic = false;  // For functions accepting variable number of arguments
 };
 
 /**
  * @brief Registry of all built-in FEEL functions with their formal parameter names
  * 
- * This singleton class maintains metadata about all built-in functions to enable
- * named parameter support as required by DMN 1.5 Section 10.3.2.13.5.
+ * Maintains metadata about all built-in functions to enable named parameter
+ * support as required by DMN 1.5 Section 10.3.2.13.5. The metadata is a
+ * compile-time constant table: it never allocates and needs no runtime
+ * initialization, so it is safe to use concurrently from any thread.
  */
 class FunctionRegistry {
 public:
     /**
      * @brief Get the singleton instance
      */
-    static FunctionRegistry& instance();
-    
-    /**
-     * @brief Register a function signature
-     * @param sig The function signature to register
-     */
-    void register_function(const FunctionSignature& sig);
+    static const FunctionRegistry& instance() noexcept;
     
     /**
      * @brief Get the signature for a function by name
      *
-     * Returns an observer pointer rather than a copy: signatures are immutable
-     * process-lifetime metadata, and this is called on every function
-     * invocation, where copying the name plus a vector of parameter names cost
-     * several heap allocations per call.
-     *
      * @param name The function name (case-sensitive)
      * @return Pointer to the signature if found, otherwise nullptr. The pointee
-     *         remains valid for the lifetime of the registry singleton.
+     *         has static storage duration.
      */
     [[nodiscard]] const FunctionSignature* get_signature(std::string_view name) const noexcept;
     
@@ -91,10 +72,8 @@ public:
     FunctionRegistry& operator=(FunctionRegistry&&) = delete;
     
 private:
-    FunctionRegistry();
+    constexpr FunctionRegistry() = default;
     ~FunctionRegistry() = default;
-    
-    std::map<std::string, FunctionSignature, std::less<>> functions_;
 };
 
 } // namespace orion::bre::feel

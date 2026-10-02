@@ -33,6 +33,7 @@ You perform thorough code reviews with focus on correctness, performance, securi
 - [ ] Proper lifetime management (RAII)
 - [ ] Const-correctness maintained
 - [ ] No undefined behavior
+- [ ] No static/thread-local variables unless `constexpr` or `constinit` (no lazily built tables, allocating singletons, `once_flag`, `thread_local` caches) - see CODING_STANDARDS.md "Static and Global State"
 
 ### 2. CODING_STANDARDS.md Compliance
 
@@ -78,6 +79,11 @@ double value = resolve_from_context(property_name, context);
 **Run forbidden value scan:**
 ```powershell
 .\scripts\scan-hardcoded-values.ps1
+```
+
+**Run static initialization guard:**
+```powershell
+.\tools\scripts\check_static_init.ps1
 ```
 
 ### 4. Performance Considerations
@@ -213,6 +219,7 @@ Refer to [Code Review Checklist](../instructions/code_review_checklist.instructi
 - **String_view Changes** → Lifetime safety (critical)
 - **FEEL Evaluator** → DMN compliance, TCK validation
 - **Performance-Critical Code** → Hot path allocations, profiling
+- **Lookup Tables, Caches and Singletons** → Must be `constexpr`/`constinit` or instance-owned (critical)
 - **Parser Changes** → Error handling, robustness
 
 ## Review Examples
@@ -278,5 +285,6 @@ nlohmann::json evaluate(const nlohmann::json& context) {
 - ✅ Specific examples provided for each issue
 - ✅ References to CODING_STANDARDS.md included
 - ✅ No hardcoded values detected
+- ✅ No runtime-initialized statics introduced (`check_static_init.ps1` passes)
 - ✅ Performance impact assessed
 - ✅ Clear next steps provided

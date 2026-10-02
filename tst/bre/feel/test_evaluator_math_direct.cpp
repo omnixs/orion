@@ -15,7 +15,6 @@ using orion::bre::feel::test::get_test_eval_ctx;
 
 namespace orion::bre::detail {
     nlohmann::json eval_math_expression(std::string_view expr);
-    extern thread_local const nlohmann::json* current_eval_context;
 }
 
 BOOST_AUTO_TEST_SUITE(test_math_evaluator_direct)
@@ -74,25 +73,8 @@ BOOST_AUTO_TEST_CASE(test_feel_evaluator_vs_direct_math) {
         // Test through direct math evaluator (no context)
         auto math_result = orion::bre::detail::eval_math_expression(expr);
         
-        // Test through direct math evaluator WITH context setup (like orion::bre::feel::Evaluator does)
-        orion::bre::detail::current_eval_context = &input;
-        auto math_result_with_context = orion::bre::detail::eval_math_expression(expr);
-        orion::bre::detail::current_eval_context = nullptr;
-        
         BOOST_TEST_MESSAGE("  orion::bre::feel::Evaluator result: " << feel_result);
         BOOST_TEST_MESSAGE("  Math evaluator (no context): " << math_result);
-        BOOST_TEST_MESSAGE("  Math evaluator (with context): " << math_result_with_context);
-        
-        // Check if context setup makes a difference
-        if (math_result.is_null() && math_result_with_context.is_null()) {
-            BOOST_TEST_MESSAGE("  Both math evaluator calls return null - fundamental parsing issue");
-        } else if (math_result.is_number() && math_result_with_context.is_null()) {
-            BOOST_TEST_MESSAGE("  Context setup causes math evaluator to fail");
-        } else if (math_result.is_null() && math_result_with_context.is_number()) {
-            BOOST_TEST_MESSAGE("  Context setup fixes math evaluator");
-        } else {
-            BOOST_TEST_MESSAGE("  Math evaluator results are consistent");
-        }
         
         // Both should return the same result for pure math expressions
         if (feel_result.is_null() && math_result.is_null()) {

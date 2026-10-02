@@ -611,8 +611,8 @@ namespace orion::bre::feel {
     /**
      * @brief Look up a built-in FEEL function by name.
      *
-     * Backed by a static hash table built once on first use, so dispatch is
-     * O(1) regardless of how many built-ins exist. Returns nullptr when the
+     * Backed by a compile-time sorted table (binary search), so lookup never
+     * allocates and needs no runtime initialization. Returns nullptr when the
      * name is not a built-in, letting the caller fall through to user-defined
      * business knowledge models.
      *

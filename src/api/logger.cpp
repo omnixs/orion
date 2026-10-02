@@ -35,57 +35,75 @@ namespace orion::api {
     void flush() override {}
   };
 
-  class Logger::Impl {
-  public:
-    Impl() : logger_impl(std::make_shared<NullLogger>()) {}
+  namespace {
+    constinit NullLogger null_logger;
+    constinit Logger global_logger;
+  } // namespace
 
-    std::shared_ptr<ILogger> logger_impl;
-  };
-
-  Logger::Logger() : pimpl(std::make_unique<Impl>()) {}
-
-  Logger::~Logger() = default;
+  auto Logger::instance() noexcept -> Logger& {
+    return global_logger;
+  }
 
   void Logger::set_logger(std::shared_ptr<ILogger> logger_impl) {
     if (logger_impl) {
-      pimpl->logger_impl = logger_impl;
+      logger_impl_.store(std::move(logger_impl), std::memory_order_release);
     }
   }
 
   auto Logger::get_logger() const -> std::shared_ptr<ILogger> {
-    return pimpl->logger_impl;
+    if (auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      return impl;
+    }
+    // Non-owning alias: no allocation.
+    return {std::shared_ptr<ILogger>{}, &null_logger};
   }
 
   void Logger::log(LogLevel level, std::string_view message) const {
-    pimpl->logger_impl->log(level, message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->log(level, message);
+    }
   }
 
   void Logger::critical(std::string_view message) const {
-    pimpl->logger_impl->critical(message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->critical(message);
+    }
   }
 
   void Logger::error(std::string_view message) const {
-    pimpl->logger_impl->error(message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->error(message);
+    }
   }
 
   void Logger::warn(std::string_view message) const {
-    pimpl->logger_impl->warn(message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->warn(message);
+    }
   }
 
   void Logger::info(std::string_view message) const {
-    pimpl->logger_impl->info(message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->info(message);
+    }
   }
 
   void Logger::debug(std::string_view message) const {
-    pimpl->logger_impl->debug(message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->debug(message);
+    }
   }
 
   void Logger::trace(std::string_view message) const {
-    pimpl->logger_impl->trace(message);
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->trace(message);
+    }
   }
 
   void Logger::flush() const {
-    pimpl->logger_impl->flush();
+    if (const auto impl = logger_impl_.load(std::memory_order_acquire)) {
+      impl->flush();
+    }
   }
 
 } // namespace orion::api

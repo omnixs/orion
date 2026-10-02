@@ -23,5 +23,6 @@ Fixes # [Issue Number]
 - [ ] I have commented my code, particularly in hard-to-understand areas.
 - [ ] I have made corresponding changes to the documentation.
 - [ ] My changes generate no new warnings.
+- [ ] No new static/thread-local variables unless `constexpr`/`constinit` (`tools/scripts/check_static_init.ps1` passes).
 - [ ] I have added tests that prove my fix is effective or that my feature works.
 - [ ] New and existing unit tests pass locally with my changes.

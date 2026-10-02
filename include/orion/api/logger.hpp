@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <format>
 #include <memory>
 #include <string>
@@ -55,20 +56,21 @@ namespace orion::api {
   };
 
   /**
-   * @brief Logger singleton with Pimpl pattern
+   * @brief Global logger singleton
    * 
    * This class provides a global logger instance that can be configured by the application.
    * The library uses this logger, and applications inject their specific implementation.
+   *
+   * The singleton is constant-initialized: it performs no heap allocation and
+   * no lazy first-use initialization. set_logger() may be called concurrently
+   * with logging from other threads.
    */
   class Logger {
   public:
-    static auto instance() -> Logger& {
-      static Logger logger;
-      return logger;
-    }
+    static auto instance() noexcept -> Logger&;
 
-    Logger();
-    ~Logger();
+    constexpr Logger() noexcept = default;
+    ~Logger() = default;
 
     // Non-copyable, non-moveable (singleton)
     Logger(const Logger&) = delete;
@@ -97,8 +99,8 @@ namespace orion::api {
     void flush() const;
 
   private:
-    class Impl;
-    std::unique_ptr<Impl> pimpl;
+    // Empty means no logger configured: messages are discarded.
+    std::atomic<std::shared_ptr<ILogger>> logger_impl_;
   };
 
   // Convenience functions for formatted logging
