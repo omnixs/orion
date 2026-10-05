@@ -318,6 +318,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_evaluator_duration.cpp
       tst/bre/feel/test_temporal_timezones.cpp
       tst/bre/feel/test_unary_feel_functions.cpp
+      tst/bre/feel/test_compiled_unary_tests.cpp
       tst/bre/feel/test_feel_segfault_debug.cpp
       tst/bre/feel/test_function_registry.cpp
       tst/bre/feel/test_named_parameters.cpp

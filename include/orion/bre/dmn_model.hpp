@@ -67,6 +67,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include "ast_node.hpp"
@@ -299,6 +300,7 @@ namespace orion::bre
         std::string id; // Unique rule identifier
         std::vector<std::string> inputEntries; // Original expressions (for debugging/fallback)
         std::vector<std::unique_ptr<ASTNode>> inputEntries_ast; // Pre-parsed AST (nullptr if simple unary test)
+        std::vector<std::optional<feel::CompiledUnaryTests>> inputEntries_compiled; // Pre-parsed unary test lists
         std::vector<std::string> outputEntries; // Support multiple outputs (original FEEL expressions)
         std::vector<std::unique_ptr<ASTNode>> outputEntries_ast; // Pre-parsed output FEEL expressions
         std::string description; // Optional rule description
@@ -542,6 +544,32 @@ namespace orion::bre
         }
 
         /**
+         * @brief Text form of a value as matched by feel::unary_test_matches()
+         */
+        inline std::string unary_candidate_text(const nlohmann::json& val)
+        {
+            if (val.is_string()) {
+                return val.get<std::string>();
+            }
+            if (val.is_number_float())
+            {
+                std::ostringstream oss;
+                oss << val.get<double>();
+                return oss.str();
+            }
+            if (val.is_number_integer()) {
+                return std::to_string(val.get<long long>());
+            }
+            if (val.is_number_unsigned()) {
+                return std::to_string(val.get<unsigned long long>());
+            }
+            if (val.is_boolean()) {
+                return val.get<bool>() ? "true" : "false";
+            }
+            return val.dump();
+        }
+
+        /**
          * @brief Check if a decision table entry token matches a given value
          * 
          * Supports DMN unary tests including dash ("-") for any match.
@@ -557,37 +585,14 @@ namespace orion::bre
                 return true;
             }
 
-            auto to_string_sv = [](const nlohmann::json& val) -> std::string
-            {
-                if (val.is_string()) {
-                    return val.get<std::string>();
-                }
-                if (val.is_number_float())
-                {
-                    std::ostringstream oss;
-                    oss << val.get<double>();
-                    return oss.str();
-                }
-                if (val.is_number_integer()) {
-                    return std::to_string(val.get<long long>());
-                }
-                if (val.is_number_unsigned()) {
-                    return std::to_string(val.get<unsigned long long>());
-                }
-                if (val.is_boolean()) {
-                    return val.get<bool>() ? "true" : "false";
-                }
-                return val.dump();
-            };
-
             if (value.is_array())
             {
                 return std::ranges::any_of(value, [&](const auto& element) {
-                    return feel::unary_test_matches(token, to_string_sv(element));
+                    return feel::unary_test_matches(token, unary_candidate_text(element));
                 });
             }
 
-            return feel::unary_test_matches(token, to_string_sv(value));
+            return feel::unary_test_matches(token, unary_candidate_text(value));
         }
     } // namespace detail
 

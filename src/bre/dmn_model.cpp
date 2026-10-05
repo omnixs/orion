@@ -34,6 +34,153 @@ namespace orion::bre
     // Import logger functions
     using orion::api::debug;
 
+    namespace
+    {
+        // Per-evaluation state of one input column; each part is computed at most once per table evaluation.
+        struct InputColumn
+        {
+            bool evaluated = false;
+            json owned_value;
+            const json* value = nullptr;
+            std::optional<std::vector<std::string>> texts;
+            std::optional<std::vector<feel::UnaryCandidate>> candidates;
+            std::optional<json> implicit_context;
+        };
+
+        const json& column_value(InputColumn& col, const InputClause& clause, const json& input, EvaluationContext& eval_ctx)
+        {
+            if (col.evaluated)
+            {
+                return *col.value;
+            }
+            col.evaluated = true;
+            col.value = &col.owned_value;
+            if (clause.inputExpression.empty())
+            {
+                if (const json* found = detail::get_value_from_label(input, clause.label))
+                {
+                    col.value = found;
+                }
+                return *col.value;
+            }
+            try
+            {
+                if (clause.inputExpression_ast)
+                {
+                    col.owned_value = clause.inputExpression_ast->evaluate(input, eval_ctx);
+                }
+                else
+                {
+                    feel::Lexer lexer;
+                    auto tokens = lexer.tokenize(clause.inputExpression);
+                    feel::Parser parser;
+                    auto ast = parser.parse(tokens);
+                    col.owned_value = ast->evaluate(input, eval_ctx);
+                }
+            }
+            catch (...)
+            {
+                col.owned_value = nullptr;
+            }
+            return *col.value;
+        }
+
+        // Same per-element text forms detail::entry_matches() passes to unary_test_matches().
+        const std::vector<std::string>& column_texts(InputColumn& col)
+        {
+            if (!col.texts)
+            {
+                std::vector<std::string> texts;
+                if (col.value->is_array())
+                {
+                    texts.reserve(col.value->size());
+                    for (const auto& element : *col.value)
+                    {
+                        texts.push_back(detail::unary_candidate_text(element));
+                    }
+                }
+                else
+                {
+                    texts.push_back(detail::unary_candidate_text(*col.value));
+                }
+                col.texts = std::move(texts);
+            }
+            return *col.texts;
+        }
+
+        const std::vector<feel::UnaryCandidate>& column_candidates(InputColumn& col)
+        {
+            if (!col.candidates)
+            {
+                std::vector<feel::UnaryCandidate> candidates;
+                candidates.reserve(column_texts(col).size());
+                for (const auto& text : column_texts(col))
+                {
+                    candidates.emplace_back(text);
+                }
+                col.candidates = std::move(candidates);
+            }
+            return *col.candidates;
+        }
+
+        bool text_entry_matches(std::string_view entry, InputColumn& col)
+        {
+            return std::ranges::any_of(column_texts(col), [&](const std::string& text) {
+                return feel::unary_test_matches(entry, text);
+            });
+        }
+
+        bool rule_entry_matches(const Rule& rule, size_t index, const InputClause& clause, InputColumn& col,
+                                const json& input, EvaluationContext& eval_ctx)
+        {
+            const auto& entry = rule.inputEntries[index];
+            if (entry == "-" || entry.empty())
+            {
+                return true;
+            }
+            const json& input_value = column_value(col, clause, input, eval_ctx);
+
+            if (index < rule.inputEntries_ast.size() && rule.inputEntries_ast[index])
+            {
+                try
+                {
+                    if (entry.find('?') != std::string::npos)
+                    {
+                        if (!col.implicit_context)
+                        {
+                            json context = input;
+                            context["__feel_implicit_value"] = input_value;
+                            col.implicit_context = std::move(context);
+                        }
+                        json ast_result = rule.inputEntries_ast[index]->evaluate(*col.implicit_context, eval_ctx);
+                        return ast_result.is_boolean() && ast_result.get<bool>();
+                    }
+                    return rule.inputEntries_ast[index]->evaluate(input, eval_ctx) == input_value;
+                }
+                catch (const std::runtime_error&)
+                {
+                    // AST evaluation failed (FEEL error), fall back to unary_test_matches
+                    return text_entry_matches(entry, col);
+                }
+                catch (const nlohmann::json::exception&)
+                {
+                    // JSON operation failed, fall back to unary_test_matches
+                    return text_entry_matches(entry, col);
+                }
+            }
+
+            if (index < rule.inputEntries_compiled.size() && rule.inputEntries_compiled[index])
+            {
+                const auto& compiled = *rule.inputEntries_compiled[index];
+                return std::ranges::any_of(column_candidates(col), [&](const feel::UnaryCandidate& candidate) {
+                    return compiled.matches(candidate);
+                });
+            }
+
+            return text_entry_matches(entry, col);
+        }
+    } // namespace
+
     // Helper: Validate input data against allowed values (DMN 1.5 Section 8.2.2)
     void DecisionTable::validate_input_values(const json& context) const
     {
@@ -92,6 +239,7 @@ namespace orion::bre
     std::vector<json> DecisionTable::find_matching_rules(const json& input, EvaluationContext& eval_ctx) const
     {
         vector<json> matching_outputs;
+        std::vector<InputColumn> columns(inputs.size());
 
         for (const auto& rule : rules)
         {
@@ -100,80 +248,7 @@ namespace orion::bre
             // Check if all input conditions match
             for (size_t i = 0; i < inputs.size() && i < rule.inputEntries.size(); i++)
             {
-                const auto& input_clause = inputs[i];
-                const auto& entry = rule.inputEntries[i];
-
-                // Evaluate input expression if present, otherwise use label lookup
-                json input_value;
-                if (!input_clause.inputExpression.empty())
-                {
-                    // Input has an expression - evaluate it as FEEL
-                    try
-                    {
-                        if (input_clause.inputExpression_ast)
-                        {
-                            // Use pre-parsed AST (fast path)
-                            input_value = input_clause.inputExpression_ast->evaluate(input, eval_ctx);
-                        }
-                        else
-                        {
-                            // Fallback: parse at runtime
-                            feel::Lexer lexer;
-                            auto tokens = lexer.tokenize(input_clause.inputExpression);
-                            feel::Parser parser;
-                            auto ast = parser.parse(tokens);
-                            input_value = ast->evaluate(input, eval_ctx);
-                        }
-                    }
-                    catch (...)
-                    {
-                        // Expression evaluation failed - use null
-                        input_value = nullptr;
-                    }
-                }
-                else
-                {
-                    // No expression - use label lookup (legacy behavior)
-                    const json* val_ptr = detail::get_value_from_label(input, input_clause.label);
-                    input_value = val_ptr ? *val_ptr : json{};
-                }
-
-                // Phase 3: Use cached AST if available, otherwise fall back to unary_test_matches
-                bool entry_matches_result = false;
-                
-                if (i < rule.inputEntries_ast.size() && rule.inputEntries_ast[i])
-                {
-                    // Use pre-parsed AST for complex FEEL expressions
-                    try
-                    {
-                        json ast_input = input;
-                        if (entry.find('?') != std::string::npos)
-                        {
-                            ast_input["__feel_implicit_value"] = input_value;
-                        }
-                        json ast_result = rule.inputEntries_ast[i]->evaluate(ast_input, eval_ctx);
-                        entry_matches_result = entry.find('?') != std::string::npos
-                            ? ast_result.is_boolean() && ast_result.get<bool>()
-                            : (ast_result == input_value);
-                    }
-                    catch (const std::runtime_error&)
-                    {
-                        // AST evaluation failed (FEEL error), fall back to unary_test_matches
-                        entry_matches_result = detail::entry_matches(entry, input_value);
-                    }
-                    catch (const nlohmann::json::exception&)
-                    {
-                        // JSON operation failed, fall back to unary_test_matches
-                        entry_matches_result = detail::entry_matches(entry, input_value);
-                    }
-                }
-                else
-                {
-                    // Use legacy unary_test_matches for simple comparisons/ranges
-                    entry_matches_result = detail::entry_matches(entry, input_value);
-                }
-
-                if (!entry_matches_result)
+                if (!rule_entry_matches(rule, i, inputs[i], columns[i], input, eval_ctx))
                 {
                     match = false;
                     break;

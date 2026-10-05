@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <nlohmann/json.hpp>
+#include <orion/bre/ast_node.hpp>
 #include <orion/bre/evaluation_context.hpp>
 
 namespace orion::bre::feel {
@@ -46,5 +48,15 @@ namespace orion::bre::feel {
          * @throws std::runtime_error if evaluation fails
          */
         [[nodiscard]] static json evaluate(std::string_view expression, const json& input, const EvaluationContext& eval_ctx);
+
+        /**
+         * @brief Parse an expression once so it can be evaluated repeatedly
+         *
+         * Evaluating the returned AST gives the same result as evaluate(). Returns nullptr when
+         * evaluate() may handle the expression on its text (sort/replace with a function argument,
+         * list filters and projections, function literals) or when it does not parse; callers then
+         * keep using evaluate().
+         */
+        [[nodiscard]] static std::unique_ptr<ASTNode> compile(std::string_view expression);
     };
 }
