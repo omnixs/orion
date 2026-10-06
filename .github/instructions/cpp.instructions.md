@@ -56,6 +56,14 @@ They combine C++23-specific guidance with repository expectations relevant to C+
 
 ---
 
+## Static and Global State (library code)
+- Every function-local `static`, namespace-scope variable, `static` data member and `thread_local` must be `constexpr` or `constinit`.
+- Lookup tables: `constexpr std::array` (sorted at compile time) + `std::ranges::lower_bound`/`find`; never `std::map`/`unordered_map`/`set`/`vector`/`string`/`json` in statics.
+- No allocating singletons, `std::call_once`, or `thread_local` caches; caches belong to an engine/`EvaluationContext` instance.
+- Rationale and examples: `CODING_STANDARDS.md` section "Static and Global State". Verify with `tools/scripts/check_static_init.ps1`.
+
+---
+
 ## Performance Guidance
 - Avoid allocations on hot paths; use zero-copy parsing where possible.
 - Reserve container capacity if the size is known in advance.

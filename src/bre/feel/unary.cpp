@@ -23,6 +23,7 @@
 #include <orion/bre/feel/regex_cache.hpp>
 #include <orion/bre/evaluation_context.hpp>
 #include <ctre.hpp>
+#include <algorithm>
 #include <charconv>
 #include <iostream>
 #include "common/util.hpp" // added for orion::common::trim, split
@@ -234,10 +235,14 @@ namespace orion::bre::feel {
     }
 
     // Helper: Handle comparison operators (<, <=, >, >=, ==)
+    static auto match_comparison_pattern(std::string_view test)
+    {
+        return ctre::match<R"(^\s*([<>]=?|==)\s*(.+)\s*$)">(test);
+    }
+
     static bool match_comparison(std::string_view test, std::string_view candidate)
     {
-        // CTRE compile-time regex for comparison pattern
-        if (auto match = ctre::match<R"(^\s*([<>]=?|==)\s*(.+)\s*$)">(test))
+        if (auto match = match_comparison_pattern(test))
         {
             std::string oper = match.get<1>().to_string();
             std::string rhs = orion::common::trim(match.get<2>().to_string());
@@ -260,10 +265,14 @@ namespace orion::bre::feel {
     }
 
     // Helper: Handle range test [a..b], (a..b), [a..b), (a..b]
+    static auto match_range_pattern(std::string_view test)
+    {
+        return ctre::match<R"(^\s*([\[(])\s*(.+)\s*\.\.\s*(.+)\s*([\])])\s*$)">(test);
+    }
+
     static bool match_range(std::string_view test, std::string_view candidate)
     {
-        // CTRE compile-time regex for range pattern
-        if (auto match = ctre::match<R"(^\s*([\[(])\s*(.+)\s*\.\.\s*(.+)\s*([\])])\s*$)">(test))
+        if (auto match = match_range_pattern(test))
         {
             bool inc_l = match.get<1>().to_view() == "[";
             bool inc_r = match.get<4>().to_view() == "]";
@@ -317,5 +326,79 @@ namespace orion::bre::feel {
 
         // Fallback: literal match
         return match_single_literal(test, candidate);
+    }
+
+    namespace
+    {
+        template <typename T>
+        void classify(T& value)
+        {
+            double num = 0.0;
+            if (parse_number(value.text, num)) { value.number = num; }
+            bool flag = false;
+            if (parse_bool(value.text, flag)) { value.boolean = flag; }
+            value.date = parse_date(value.text);
+            value.time = parse_time(value.text);
+            value.datetime = parse_datetime(value.text);
+            value.duration = parse_duration(value.text);
+        }
+
+        // Same decision order as match_single_literal(), on pre-classified values.
+        template <typename Lit, typename Cand>
+        bool literal_matches(const Lit& lit, const Cand& cand)
+        {
+            if (lit.number && cand.number) { return *lit.number == *cand.number; }
+            if (lit.boolean && cand.boolean) { return *lit.boolean == *cand.boolean; }
+            if (lit.date) { return cand.date && *lit.date == *cand.date; }
+            if (lit.time) { return cand.time && *lit.time == *cand.time; }
+            if (lit.datetime) { return cand.datetime && *lit.datetime == *cand.datetime; }
+            if (lit.duration) { return cand.duration && *lit.duration == *cand.duration; }
+            return lit.text == cand.text;
+        }
+    } // namespace
+
+    UnaryCandidate::UnaryCandidate(std::string candidate)
+        : raw(std::move(candidate)), text(orion::common::trim(raw))
+    {
+        classify(*this);
+    }
+
+    std::optional<CompiledUnaryTests> CompiledUnaryTests::compile(std::string_view test)
+    {
+        // Only lists take the match_list() route in unary_test_matches()
+        std::string trimmed = orion::common::trim(test);
+        if (trimmed.starts_with("not(") || trimmed.find(',') == std::string::npos)
+        {
+            return std::nullopt;
+        }
+
+        CompiledUnaryTests compiled;
+        for (const auto& part : orion::common::split(trimmed, ','))
+        {
+            std::string item = orion::common::trim(part);
+            const bool literal = !item.empty() && item != "-" && !item.starts_with("not(") &&
+                                 !match_comparison_pattern(item) && !match_range_pattern(item);
+            if (!literal)
+            {
+                compiled.items_.emplace_back(std::move(item));
+                continue;
+            }
+            Literal lit;
+            lit.text = unquote(std::move(item));
+            classify(lit);
+            compiled.items_.emplace_back(std::move(lit));
+        }
+        return compiled;
+    }
+
+    bool CompiledUnaryTests::matches(const UnaryCandidate& candidate) const
+    {
+        return std::ranges::any_of(items_, [&](const auto& item) {
+            if (const auto* lit = std::get_if<Literal>(&item))
+            {
+                return literal_matches(*lit, candidate);
+            }
+            return unary_test_matches(std::get<std::string>(item), candidate.raw);
+        });
     }
 }

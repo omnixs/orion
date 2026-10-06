@@ -52,9 +52,6 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
     
     // Test direct math expression evaluation
     BOOST_TEST_MESSAGE("\nTesting through detail::eval_math_expression():");
-    json input;
-    input["testNull"] = nullptr;
-    orion::bre::detail::current_eval_context = &input;
     
     std::vector<std::string> direct_math_tests = {
         "10 - testNull",
@@ -75,8 +72,6 @@ BOOST_AUTO_TEST_CASE(test_null_arithmetic_evaluation_path) {
         }
         BOOST_TEST_MESSAGE("---");
     }
-    
-    orion::bre::detail::current_eval_context = nullptr;
 }
 
 BOOST_AUTO_TEST_SUITE_END()

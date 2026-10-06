@@ -160,7 +160,7 @@ namespace orion::bre::feel {
         if ((tokens_ == nullptr) || tokens_->empty())
         {
             // Create a static END_OF_INPUT token to return when there are no tokens
-            static const Token end_token(TokenType::END_OF_INPUT, "", 0);
+            static constexpr Token end_token(TokenType::END_OF_INPUT, "", 0);
             return end_token; // Return static END_OF_INPUT when empty or null
         }
         if (position_ >= tokens_->size())

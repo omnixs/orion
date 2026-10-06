@@ -17,192 +17,173 @@
  */
 
 #include <orion/bre/feel/function_registry.hpp>
+#include <algorithm>
+#include <array>
 
 namespace orion::bre::feel {
 
-FunctionRegistry& FunctionRegistry::instance() {
-    static FunctionRegistry registry;
+namespace {
+
+// Formal parameter lists, based on DMN 1.5 specification (formal-24-01-01.txt)
+constexpr std::array<FormalParameter, 1> kN{{{"n"}}};
+constexpr std::array<FormalParameter, 1> kNumber{{{"number"}}};
+constexpr std::array<FormalParameter, 2> kDividendDivisor{{{"dividend"}, {"divisor"}}};
+constexpr std::array<FormalParameter, 2> kNScale{{{"n"}, {"scale"}}};
+constexpr std::array<FormalParameter, 1> kString{{{"string"}}};
+constexpr std::array<FormalParameter, 2> kStringMatch{{{"string"}, {"match"}}};
+constexpr std::array<FormalParameter, 3> kSubstring{{{"string"}, {"start position"}, {"length", true}}};
+constexpr std::array<FormalParameter, 4> kReplace{{{"input"}, {"pattern"}, {"replacement"}, {"flags", true}}};
+constexpr std::array<FormalParameter, 3> kMatches{{{"input"}, {"pattern"}, {"flags", true}}};
+constexpr std::array<FormalParameter, 2> kSplit{{{"string"}, {"delimiter"}}};
+constexpr std::array<FormalParameter, 2> kStringJoin{{{"list"}, {"delimiter", true}}};
+constexpr std::array<FormalParameter, 1> kList{{{"list"}}};
+constexpr std::array<FormalParameter, 2> kListElement{{{"list"}, {"element"}}};
+constexpr std::array<FormalParameter, 2> kListMatch{{{"list"}, {"match"}}};
+constexpr std::array<FormalParameter, 2> kListPosition{{{"list"}, {"position"}}};
+constexpr std::array<FormalParameter, 3> kListPositionNewItem{{{"list"}, {"position"}, {"newItem"}}};
+constexpr std::array<FormalParameter, 3> kSublist{{{"list"}, {"start position"}, {"length", true}}};
+constexpr std::array<FormalParameter, 2> kSort{{{"list"}, {"precedes"}}};
+constexpr std::array<FormalParameter, 1> kFrom{{{"from"}}};
+constexpr std::array<FormalParameter, 2> kFromTo{{{"from"}, {"to"}}};
+constexpr std::array<FormalParameter, 3> kNumberFrom{
+    {{"from"}, {"grouping separator", true}, {"decimal separator", true}}};
+constexpr std::array<FormalParameter, 1> kDate{{{"date"}}};
+constexpr std::array<FormalParameter, 1> kNegand{{{"negand"}}};
+constexpr std::array<FormalParameter, 2> kMKey{{{"m"}, {"key"}}};
+constexpr std::array<FormalParameter, 1> kM{{{"m"}}};
+constexpr std::array<FormalParameter, 1> kEntries{{{"entries"}}};
+constexpr std::array<FormalParameter, 3> kContextPut{{{"context"}, {"key"}, {"value"}}};
+constexpr std::array<FormalParameter, 1> kContexts{{{"contexts"}}};
+constexpr std::array<FormalParameter, 2> kValue1Value2{{{"value1"}, {"value2"}}};
+constexpr std::array<FormalParameter, 2> kPoint1Point2{{{"point1"}, {"point2"}}};
+constexpr std::array<FormalParameter, 2> kRange1Range2{{{"range1"}, {"range2"}}};
+constexpr std::array<FormalParameter, 2> kPointRange{{{"point"}, {"range"}}};
+constexpr std::array<FormalParameter, 2> kRangePoint{{{"range"}, {"point"}}};
+
+// Built at compile time: no heap allocation and no lazy (first-call) initialization.
+constexpr auto make_signature_table()
+{
+    auto table = std::to_array<FunctionSignature>({
+        // Numeric functions
+        {"abs", kN},
+        {"floor", kN},
+        {"ceiling", kN},
+        {"sqrt", kNumber},
+        {"exp", kNumber},
+        {"log", kNumber},
+        {"odd", kNumber},
+        {"even", kNumber},
+        {"modulo", kDividendDivisor},
+        {"decimal", kNScale},
+        {"round", kNScale},
+        {"round up", kNScale},
+        {"round down", kNScale},
+        {"round half up", kNScale},
+        {"round half down", kNScale},
+
+        // String functions
+        {"substring", kSubstring},
+        {"string length", kString},
+        {"upper case", kString},
+        {"lower case", kString},
+        {"substring before", kStringMatch},
+        {"substring after", kStringMatch},
+        {"contains", kStringMatch},
+        {"starts with", kStringMatch},
+        {"ends with", kStringMatch},
+        {"replace", kReplace},
+        {"matches", kMatches},
+        {"split", kSplit},
+        {"string join", kStringJoin},
+
+        // List functions
+        {"list contains", kListElement},
+        {"count", kList},
+        {"min", kList, true},
+        {"max", kList, true},
+        {"sum", kList, true},
+        {"mean", kList, true},
+        {"all", kList, true},
+        {"any", kList, true},
+        {"sublist", kSublist},
+        {"append", kList, true},
+        {"concatenate", kList, true},
+        {"insert before", kListPositionNewItem},
+        {"remove", kListPosition},
+        {"reverse", kList},
+        {"index of", kListMatch},
+        {"union", kList, true},
+        {"distinct values", kList},
+        {"flatten", kList},
+        {"product", kList, true},
+        {"median", kList, true},
+        {"stddev", kList, true},
+        {"mode", kList, true},
+        {"list replace", kListPositionNewItem},
+
+        // Date/time conversion functions. The date/time constructors are NOT
+        // registered - they use fallback positional binding because they have
+        // multiple overloaded signatures with different parameter names.
+        {"duration", kFrom},
+        {"number", kNumberFrom},
+        {"string", kFrom},
+        {"years and months duration", kFromTo},
+
+        // Temporal functions
+        {"day of year", kDate},
+        {"day of week", kDate},
+        {"month of year", kDate},
+        {"week of year", kDate},
+        {"now", {}},
+        {"today", {}},
+
+        // Boolean, context and miscellaneous functions
+        {"not", kNegand},
+        {"get value", kMKey},
+        {"get entries", kM},
+        {"context", kEntries},
+        {"context put", kContextPut},
+        {"context merge", kContexts},
+        {"sort", kSort},
+        {"is", kValue1Value2},
+
+        // Range functions
+        {"before", kPoint1Point2},
+        {"after", kPoint1Point2},
+        {"meets", kRange1Range2},
+        {"met by", kRange1Range2},
+        {"overlaps", kRange1Range2},
+        {"overlaps before", kRange1Range2},
+        {"overlaps after", kRange1Range2},
+        {"finishes", kPointRange},
+        {"finished by", kRangePoint},
+        {"includes", kRangePoint},
+        {"during", kPointRange},
+        {"starts", kPointRange},
+        {"started by", kRangePoint},
+        {"coincides", kPoint1Point2},
+    });
+    std::ranges::sort(table, {}, &FunctionSignature::name);
+    return table;
+}
+
+constexpr auto signature_table = make_signature_table();
+static_assert(std::ranges::adjacent_find(signature_table, {}, &FunctionSignature::name) == signature_table.end(),
+              "duplicate function signature name");
+
+} // namespace
+
+const FunctionRegistry& FunctionRegistry::instance() noexcept {
+    static constexpr FunctionRegistry registry{};
     return registry;
-}
-
-// Helper: Register numeric functions
-void register_numeric_functions(FunctionRegistry& reg) {
-    // Single parameter 'n'
-    reg.register_function({"abs", {{"n"}}});
-    reg.register_function({"floor", {{"n"}}});
-    reg.register_function({"ceiling", {{"n"}}});
-    
-    // Single parameter 'number'
-    reg.register_function({"sqrt", {{"number"}}});
-    reg.register_function({"exp", {{"number"}}});
-    reg.register_function({"log", {{"number"}}});
-    reg.register_function({"odd", {{"number"}}});
-    reg.register_function({"even", {{"number"}}});
-    
-    // Two parameters
-    reg.register_function({"modulo", {{"dividend"}, {"divisor"}}});
-    reg.register_function({"decimal", {{"n"}, {"scale"}}});
-    
-    // Rounding functions with two parameters
-    reg.register_function({"round", {{"n"}, {"scale"}}});
-    reg.register_function({"round up", {{"n"}, {"scale"}}});
-    reg.register_function({"round down", {{"n"}, {"scale"}}});
-    reg.register_function({"round half up", {{"n"}, {"scale"}}});
-    reg.register_function({"round half down", {{"n"}, {"scale"}}});
-}
-
-// Helper: Register string functions
-void register_string_functions(FunctionRegistry& reg) {
-    reg.register_function({"substring", {
-        {"string"},
-        {"start position"},
-        {"length", true}  // optional parameter
-    }});
-    reg.register_function({"string length", {{"string"}}});
-    reg.register_function({"upper case", {{"string"}}});
-    reg.register_function({"lower case", {{"string"}}});
-    reg.register_function({"substring before", {{"string"}, {"match"}}});
-    reg.register_function({"substring after", {{"string"}, {"match"}}});
-    reg.register_function({"contains", {{"string"}, {"match"}}});
-    reg.register_function({"starts with", {{"string"}, {"match"}}});
-    reg.register_function({"ends with", {{"string"}, {"match"}}});
-    reg.register_function({"replace", {
-        {"input"},
-        {"pattern"},
-        {"replacement"},
-        {"flags", true}  // optional parameter
-    }});
-    reg.register_function({"matches", {
-        {"input"},
-        {"pattern"},
-        {"flags", true}  // optional parameter
-    }});
-    reg.register_function({"split", {{"string"}, {"delimiter"}}});
-    reg.register_function({"string join", {
-        {"list"},
-        {"delimiter", true}  // optional parameter
-    }});
-}
-
-// Helper: Register list functions
-void register_list_functions(FunctionRegistry& reg) {
-    reg.register_function({"list contains", {{"list"}, {"element"}}});
-    reg.register_function({"count", {{"list"}}});
-    reg.register_function({"min", {{"list"}}, true});
-    reg.register_function({"max", {{"list"}}, true});
-    reg.register_function({"sum", {{"list"}}, true});
-    reg.register_function({"mean", {{"list"}}, true});
-    reg.register_function({"all", {{"list"}}, true});
-    reg.register_function({"any", {{"list"}}, true});
-    
-    reg.register_function({"sublist", {
-        {"list"},
-        {"start position"},
-        {"length", true}  // optional parameter
-    }});
-    
-    // Variadic functions
-    reg.register_function({"append", {{"list"}}, true});
-    reg.register_function({"concatenate", {{"list"}}, true});
-    
-    reg.register_function({"insert before", {{"list"}, {"position"}, {"newItem"}}});
-    reg.register_function({"remove", {{"list"}, {"position"}}});
-    reg.register_function({"reverse", {{"list"}}});
-    reg.register_function({"index of", {{"list"}, {"match"}}});
-    reg.register_function({"union", {{"list"}}, true});
-    reg.register_function({"distinct values", {{"list"}}});
-    reg.register_function({"flatten", {{"list"}}});
-    reg.register_function({"product", {{"list"}}, true});
-    reg.register_function({"median", {{"list"}}, true});
-    reg.register_function({"stddev", {{"list"}}, true});
-    reg.register_function({"mode", {{"list"}}, true});
-    reg.register_function({"list replace", {{"list"}, {"position"}, {"newItem"}}});
-}
-
-// Helper: Register date/time and temporal functions
-void register_date_time_functions(FunctionRegistry& reg) {
-    // Date/time constructor functions NOT registered - they use fallback positional binding
-    // because they have multiple overloaded signatures with different param names
-    // (date: "from" OR "year,month,day"; time: "from" OR "hour,minute,second,offset")
-    // The evaluate_*_function() implementations handle all overloads internally.
-    reg.register_function({"duration", {{"from"}}});
-    
-    reg.register_function({"number", {
-        {"from"},
-        {"grouping separator", true},
-        {"decimal separator", true}
-    }});
-    
-    reg.register_function({"string", {{"from"}}});
-    reg.register_function({"years and months duration", {{"from"}, {"to"}}});
-    
-    // Temporal functions
-    reg.register_function({"day of year", {{"date"}}});
-    reg.register_function({"day of week", {{"date"}}});
-    reg.register_function({"month of year", {{"date"}}});
-    reg.register_function({"week of year", {{"date"}}});
-    reg.register_function({"now", {}});
-    reg.register_function({"today", {}});
-}
-
-// Helper: Register context and miscellaneous functions
-void register_context_and_misc_functions(FunctionRegistry& reg) {
-    // Boolean functions
-    reg.register_function({"not", {{"negand"}}});
-    
-    // Context functions
-    reg.register_function({"get value", {{"m"}, {"key"}}});
-    reg.register_function({"get entries", {{"m"}}});
-    reg.register_function({"context", {{"entries"}}});
-    reg.register_function({"context put", {{"context"}, {"key"}, {"value"}}});
-    reg.register_function({"context merge", {{"contexts"}}});
-    
-    // Miscellaneous functions
-    reg.register_function({"sort", {{"list"}, {"precedes"}}});
-    reg.register_function({"is", {{"value1"}, {"value2"}}});
-    reg.register_function({"now", {}});
-    reg.register_function({"today", {}});
-}
-
-// Helper: Register range functions
-void register_range_functions(FunctionRegistry& reg) {
-    reg.register_function({"before", {{"point1"}, {"point2"}}});
-    reg.register_function({"after", {{"point1"}, {"point2"}}});
-    reg.register_function({"meets", {{"range1"}, {"range2"}}});
-    reg.register_function({"met by", {{"range1"}, {"range2"}}});
-    reg.register_function({"overlaps", {{"range1"}, {"range2"}}});
-    reg.register_function({"overlaps before", {{"range1"}, {"range2"}}});
-    reg.register_function({"overlaps after", {{"range1"}, {"range2"}}});
-    reg.register_function({"finishes", {{"point"}, {"range"}}});
-    reg.register_function({"finished by", {{"range"}, {"point"}}});
-    reg.register_function({"includes", {{"range"}, {"point"}}});
-    reg.register_function({"during", {{"point"}, {"range"}}});
-    reg.register_function({"starts", {{"point"}, {"range"}}});
-    reg.register_function({"started by", {{"range"}, {"point"}}});
-    reg.register_function({"coincides", {{"point1"}, {"point2"}}});
-}
-
-FunctionRegistry::FunctionRegistry() {
-    // Register all built-in functions with their formal parameter names
-    // Based on DMN 1.5 specification (formal-24-01-01.txt)
-    
-    register_numeric_functions(*this);
-    register_string_functions(*this);
-    register_list_functions(*this);
-    register_date_time_functions(*this);
-    register_context_and_misc_functions(*this);
-    register_range_functions(*this);
-}
-
-void FunctionRegistry::register_function(const FunctionSignature& sig) {
-    functions_[sig.name] = sig;
 }
 
 const FunctionSignature* FunctionRegistry::get_signature(
     std::string_view name) const noexcept
 {
-    auto iter = functions_.find(name);
-    return iter != functions_.end() ? &iter->second : nullptr;
+    const auto iter = std::ranges::lower_bound(signature_table, name, {}, &FunctionSignature::name);
+    return (iter != signature_table.end() && iter->name == name) ? &*iter : nullptr;
 }
 
 } // namespace orion::bre::feel
+

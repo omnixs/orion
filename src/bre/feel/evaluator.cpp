@@ -596,4 +596,41 @@ namespace orion::bre::feel {
             throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression) + " - " + e.what());
         }
     }
+
+    std::unique_ptr<ASTNode> Evaluator::compile(std::string_view expression)
+    {
+        // Conservative superset of the text forms intercepted by evaluate() before parsing
+        const std::string_view expr = trim_view(expression);
+        if (starts_with_ci(expr, "sort") || starts_with_ci(expr, "list replace") || starts_with_ci(expr, "replace"))
+        {
+            return nullptr;
+        }
+        if (!expr.empty() && expr.back() == ']')
+        {
+            return nullptr;
+        }
+        if (auto dot_pos = find_last_top_level_char(expr, '.');
+            dot_pos.has_value() && trim_view(expr.substr(0, dot_pos.value())).ends_with(']'))
+        {
+            return nullptr;
+        }
+
+        try
+        {
+            Lexer lexer;
+            auto tokens = lexer.tokenize(expression);
+            if (std::ranges::any_of(tokens, [](const Token& token) {
+                return token.type == TokenType::IDENTIFIER && token.text == "function";
+            }))
+            {
+                return nullptr;
+            }
+            Parser parser;
+            return parser.parse(tokens);
+        }
+        catch (const std::exception&)
+        {
+            return nullptr;
+        }
+    }
 }

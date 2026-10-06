@@ -62,6 +62,15 @@ This checklist defines the quality gates for all code changes in the ORION proje
 - [ ] No raw `new`/`delete`
 - [ ] RAII for all resources
 
+**Static and Global State (CRITICAL - see CODING_STANDARDS.md "Static and Global State"):**
+- [ ] Every new function-local `static`, namespace-scope variable, `static` data member and `thread_local` is `constexpr` or `constinit`
+- [ ] No lazily built lookup tables (`std::map`/`unordered_map`/`set`/`vector`/`string`/`json` in statics) - use `constexpr std::array` + `std::ranges::lower_bound`/`find`
+- [ ] No allocating singletons (`static Foo instance;`), `std::call_once`/`once_flag`, or `thread_local` caches
+- [ ] Caches are owned by an engine/`EvaluationContext` instance
+- [ ] New uses of standard library facilities with process-lifetime caches (`std::chrono::locate_zone`, `std::regex`, `std::locale`) are documented in CODING_STANDARDS.md
+- [ ] Any `// static-init-ok:` exemption is justified and approved
+- [ ] `tools/scripts/check_static_init.ps1` passes
+
 **No Hardcoded Values (CRITICAL for BRE):**
 - [ ] No test-specific function names (e.g., "PMT", "Payment")
 - [ ] No test-specific property names (e.g., "fee", "amount", "rate")
@@ -173,6 +182,27 @@ std::vector<std::string> tokenize(const std::string& input) {
 }
 ```
 
+### For Lookup Tables, Caches and Singletons
+
+Hosts embed ORION in processes that fence/profile heap usage per command. A static built on first
+use allocates inside the host's command and lives until process exit, so it is reported as a leak.
+
+**Checklist:**
+- [ ] Lookup tables are `constexpr` (compile-time sorted `std::array` + `std::ranges::lower_bound`)
+- [ ] Caches live in an engine/`EvaluationContext` instance, never in a static or `thread_local`
+- [ ] Global objects (if unavoidable) have a non-allocating `constexpr` constructor and are `constinit`
+- [ ] Mutable global state is thread-safe (`std::atomic`, `std::atomic<std::shared_ptr<T>>`)
+
+**Example:**
+```cpp
+// ❌ BAD: lazily allocated on first call, never freed before process exit
+static const std::set<std::string> builtins = {"abs", "floor"};
+
+// ✅ GOOD: no heap, no runtime initialization, no init guard
+static constexpr auto builtins = std::to_array<std::string_view>({"abs", "floor"});
+bool is_builtin = std::ranges::find(builtins, name) != builtins.end();
+```
+
 ### For Parser Changes
 
 **Error Handling:**
@@ -212,6 +242,7 @@ Reference: [CODING_STANDARDS.md section or DMN spec section]
 
 **CRITICAL:** Must fix before merge
 - Memory leaks, dangling references
+- Static/thread-local variables that are not `constexpr`/`constinit` (lazy or dynamic initialization)
 - Hardcoded test values in production code
 - DMN spec violations
 - Security issues
@@ -233,12 +264,14 @@ Reference: [CODING_STANDARDS.md section or DMN spec section]
 - All CRITICAL issues resolved
 - No CODING_STANDARDS.md violations
 - No hardcoded test values
+- `tools/scripts/check_static_init.ps1` passes
 - All tests pass (unit + TCK)
 - No performance regressions
 
 **FAIL if:**
 - Any CRITICAL issue unresolved
 - Hardcoded values detected
+- Runtime-initialized static or thread-local state introduced
 - DMN compliance violations
 - Test failures or regressions
 

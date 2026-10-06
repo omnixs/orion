@@ -11,6 +11,8 @@
 **Duration**: ~3-5 minutes  
 
 **What it does:**
+- Runs the static initialization guard (`tools/scripts/check_static_init.ps1`): fails if library code
+  introduces a static/thread-local variable that is not `constexpr`/`constinit`
 - Builds ORION in Debug mode
 - Runs all unit tests (Boost.Test suite)
 - Validates basic functionality across platforms

@@ -22,6 +22,7 @@
 #include "orion/bre/contract_violation.hpp"
 #include <orion/bre/feel/lexer.hpp>
 #include <orion/bre/feel/parser.hpp>
+#include <orion/bre/feel/evaluator.hpp>
 #include <orion/bre/type_validator.hpp>
 #include <rapidxml/rapidxml.hpp>  // Use RapidXML instead of TinyXML2
 
@@ -247,6 +248,7 @@ namespace orion::bre
                 
                 // Phase 3: Pre-parse as AST for performance (cache during model load)
                 r.inputEntries_ast.push_back(tryParseExpressionToAST(entry_text));
+                r.inputEntries_compiled.push_back(r.inputEntries_ast.back() ? std::nullopt : feel::CompiledUnaryTests::compile(entry_text));
             }
 
             // Handle multiple output entries for multi-output tables
@@ -1064,6 +1066,7 @@ namespace orion::bre
                 
                 // Phase 3: Pre-parse as AST for performance (cache during model load)
                 r.inputEntries_ast.push_back(tryParseExpressionToAST(entry_text));
+                r.inputEntries_compiled.push_back(r.inputEntries_ast.back() ? std::nullopt : feel::CompiledUnaryTests::compile(entry_text));
                 
                 // Move to next inputEntry sibling
                 auto* next = ien->next_sibling("dmn:inputEntry");
@@ -1222,6 +1225,11 @@ namespace orion::bre
             {
                 error_message = "BKM logic cannot be empty in DMN XML for BKM: " + name;
                 return nullptr;
+            }
+
+            if (!bkm->decision_table)
+            {
+                bkm->expression_ast = feel::Evaluator::compile(bkm->expression_text);
             }
 
             return bkm;

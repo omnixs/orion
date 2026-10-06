@@ -27,6 +27,17 @@ env:
   VCPKG_COMMIT: 3c5d90a305ff00ca841f085a74a7ce74ee777dee
 
 jobs:
+  static-init-guard:
+    name: Static Initialization Guard
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check library for runtime-initialized statics
+      shell: pwsh
+      run: ./tools/scripts/check_static_init.ps1
+
   build-and-test:
     name: ${{ matrix.os }} - Debug - Unit Tests
     runs-on: ${{ matrix.os }}

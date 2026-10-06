@@ -39,9 +39,7 @@ namespace orion::bre::detail
     double parse_number_literal_impl(std::string_view expr, size_t& pos);
     double parse_identifier_or_variable(std::string_view expr, size_t& pos);
     std::string extract_variable_name(std::string_view expr, size_t start_pos, size_t& pos);
-    std::string try_extend_variable_name(std::string_view expr, std::string_view var_name, size_t start_pos, size_t& pos);
     double resolve_feel_constant(std::string_view var_name);
-    double resolve_variable_from_context(std::string_view var_name, bool& found);
     void skip_whitespace(std::string_view expr, size_t& pos);
 
     // Removed unused constant MONTHS_PER_YEAR
@@ -433,23 +431,13 @@ double parse_identifier_or_variable(std::string_view expr, size_t& pos)
     size_t start_pos = pos;
     std::string var_name = extract_variable_name(expr, start_pos, pos);
     
-    // Try to extend variable name with spaces if needed
-    if (orion::bre::detail::current_eval_context)
-    {
-        var_name = try_extend_variable_name(expr, var_name, start_pos, pos);
-    }
-    
-    // Handle FEEL literal constants
+    // Only FEEL literal constants resolve here; any other name is treated as 0.0
     double constant_value = resolve_feel_constant(var_name);
     if (!std::isnan(constant_value) || var_name == "null")
     {
         return constant_value;
     }
-    
-    // Resolve from context
-    bool found = false;
-    double var_value = resolve_variable_from_context(var_name, found);
-    return found ? var_value : 0.0; // Unresolved: treat as 0.0
+    return 0.0;
 }
 
 std::string extract_variable_name(std::string_view expr, size_t start_pos, size_t& pos)
@@ -459,49 +447,6 @@ std::string extract_variable_name(std::string_view expr, size_t start_pos, size_
         pos++;
     }
     return string(expr.substr(start_pos, pos - start_pos));
-}
-
-std::string try_extend_variable_name(std::string_view expr, std::string_view var_name, size_t start_pos, size_t& pos)
-{
-    const auto& ctx = *orion::bre::detail::current_eval_context;
-    
-    // If standard name exists, use it
-    if (ctx.contains(var_name))
-    {
-        return std::string(var_name);
-    }
-    
-    // Try to extend with spaces for variable names like "Monthly Salary"
-    size_t extended_pos = pos;
-    while (extended_pos < expr.length())
-    {
-        // Skip whitespace
-        while (extended_pos < expr.length() && std::isspace(static_cast<unsigned char>(expr[extended_pos]))) {
-            extended_pos++;
-        }
-        
-        // Check if next part looks like continuation
-        if (extended_pos < expr.length() && std::isalpha(static_cast<unsigned char>(expr[extended_pos])))
-        {
-            // Found potential continuation
-            while (extended_pos < expr.length() && (std::isalnum(static_cast<unsigned char>(expr[extended_pos])) || expr[extended_pos] == '_' || expr[extended_pos] == '-')) {
-                extended_pos++;
-            }
-            
-            std::string potential_name(expr.substr(start_pos, extended_pos - start_pos));
-            if (ctx.contains(potential_name))
-            {
-                pos = extended_pos;
-                return potential_name;
-            }
-        }
-        else
-        {
-            break;
-        }
-    }
-    
-    return std::string(var_name); // Return original if extension didn't help
 }
 
 double resolve_feel_constant(std::string_view var_name)
@@ -519,62 +464,6 @@ double resolve_feel_constant(std::string_view var_name)
         return 0.0;
     }
     return std::numeric_limits<double>::quiet_NaN(); // Not a constant
-}
-
-double resolve_variable_from_context(std::string_view var_name, bool& found)
-{
-    found = false;
-    if (!orion::bre::detail::current_eval_context)
-    {
-        return 0.0;
-    }
-    
-    const auto& ctx = *orion::bre::detail::current_eval_context;
-    if (!ctx.contains(var_name))
-    {
-        return 0.0;
-    }
-    
-    const auto& value = ctx[var_name];
-    
-    if (value.is_number())
-    {
-        found = true;
-        return value.get<double>();
-    }
-    
-    if (value.is_string())
-    {
-        try
-        {
-            found = true;
-            return std::stod(value.get<std::string>());
-        }
-        catch (const std::invalid_argument&)
-        {
-            // String to number conversion failed - not a valid number
-            return 0.0;
-        }
-        catch (const std::out_of_range&)
-        {
-            // Number out of range
-            return 0.0;
-        }
-    }
-    
-    if (value.is_boolean())
-    {
-        found = true;
-        return value.get<bool>() ? 1.0 : 0.0;
-    }
-    
-    if (value.is_null())
-    {
-        found = true;
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-    
-    return 0.0;
 }
 
     void skip_whitespace(std::string_view expr, size_t& pos)

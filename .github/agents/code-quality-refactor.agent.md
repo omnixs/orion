@@ -192,10 +192,11 @@ You execute systematic code quality improvements with automated verification and
       - **Focus on checklist sections relevant to the change type:**
         * For string_view changes → Section "Special Focus Areas: String_view Changes"
         * For FEEL evaluator → Section "Special Focus Areas: FEEL Evaluator Changes"
+        * For lookup tables, caches, singletons → Section "Special Focus Areas: Lookup Tables, Caches and Singletons"
         * For all changes → Core criteria: Naming, Correctness, Standards, Performance
       
       - **Apply appropriate severity thresholds:**
-        * CRITICAL issues → Must fix (dangling refs, hardcoded values, spec violations)
+        * CRITICAL issues → Must fix (dangling refs, hardcoded values, spec violations, static/thread-local variables that are not `constexpr`/`constinit`)
         * WARNING issues → Should fix (const-correctness, [[nodiscard]], allocations)
         * SUGGESTION issues → Optional improvements (can skip for iteration speed)
       
@@ -547,5 +548,6 @@ Progress: 17/47 completed (36%), 1 skipped, 29 remaining
 - ✅ Build succeeds after all changes
 - ✅ All unit tests pass
 - ✅ No TCK regressions
+- ✅ `tools/scripts/check_static_init.ps1` passes
 - ✅ Task file updated with results
 - ✅ Ready for code review handoff

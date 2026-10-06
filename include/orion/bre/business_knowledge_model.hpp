@@ -36,6 +36,7 @@ namespace orion::bre
         std::string name;
         std::vector<std::string> parameters;
         std::string expression_text;
+        std::unique_ptr<ASTNode> expression_ast; ///< Parsed expression_text (nullptr: evaluated from text)
         std::unique_ptr<DecisionTable> decision_table;
         std::string result_type_ref;
         std::string result_element_type_ref;

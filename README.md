@@ -6,7 +6,7 @@
 [![CI](https://github.com/omnixs/orion/actions/workflows/ci-full.yml/badge.svg)](https://github.com/omnixs/orion/actions/workflows/ci-full.yml)
 [![C++](https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus)](https://en.cppreference.com/w/cpp/23)
 [![DMN](https://img.shields.io/badge/DMN-1.5-orange)](https://www.omg.org/spec/DMN/)
-[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/2.2.3/)
+[![TCK](https://img.shields.io/badge/TCK%20Level%202-100%25-success)](dat/tck-baselines/2.2.4/)
 
 <img src="docs/orion.png" align="right" width="180" alt="ORION Logo">
 
@@ -71,7 +71,7 @@ Each release includes:
 - ❌ Advanced functions, quantified expressions (some, every)
 
 **API Stability:**
-- Version 2.2.3 released: Performance optimizations for FEEL parsing and evaluation
+- Version 2.2.4 released: No runtime-initialized static state (fixes leak reports in hosts that fence per-command heap usage); thread-safe logger configuration
 - Version 2.1.1 released: FEEL function evaluation improvements
 - Breaking change from v1.x: evaluate() now uses nlohmann::json directly
 - Thread-safety: Single-threaded usage model (share-nothing across threads)

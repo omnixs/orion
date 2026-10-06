@@ -32,7 +32,7 @@
 #include <map>
 #include <optional>
 #include <string_view>
-#include <unordered_map>
+#include <array>
 #include <limits>
 
 namespace orion::bre::feel {
@@ -2173,7 +2173,7 @@ static TimeComponents parse_time_components(const std::string& s)
                 if (tz_name.find('/') == std::string::npos) return tc;
                 std::string region = tz_name.substr(0, tz_name.find('/'));
                 // Known IANA top-level regions
-                static const std::vector<std::string> valid_regions = {
+                static constexpr std::array<std::string_view, 12> valid_regions = {
                     "Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic",
                     "Australia", "Europe", "Indian", "Pacific", "Etc", "US"
                 };
@@ -2683,7 +2683,7 @@ json evaluate_day_of_year_function(const std::vector<json>& args)
     auto dc = parse_date_components(s);
     if (!dc.valid) return nullptr;
 
-    static const int days_before_month[] = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    static constexpr std::array<int, 13> days_before_month = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
     int doy = days_before_month[dc.month] + dc.day;
     // Leap year adjustment
     bool leap = (dc.year % 4 == 0 && dc.year % 100 != 0) || (dc.year % 400 == 0);
@@ -2711,7 +2711,7 @@ json evaluate_day_of_week_function(const std::vector<json>& args)
     int dow = (d + 13*(m+1)/5 + y + y/4 - y/100 + y/400) % 7;
     // Zeller: 0=Sat, 1=Sun, ..., 6=Fri → ISO: Mon=1..Sun=7
     int iso = ((dow + 5) % 7) + 1;
-    static const char* names[] = {"", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+    static constexpr std::array<std::string_view, 8> names = {"", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
     return std::string(names[iso]);
 }
 
@@ -2729,7 +2729,7 @@ json evaluate_month_of_year_function(const std::vector<json>& args)
     auto dc = parse_date_components(s);
     if (!dc.valid) return nullptr;
 
-    static const char* names[] = {"", "January", "February", "March", "April", "May", "June",
+    static constexpr std::array<std::string_view, 13> names = {"", "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"};
     if (dc.month < 1 || dc.month > 12) return nullptr;
     return std::string(names[dc.month]);
@@ -2751,7 +2751,7 @@ json evaluate_week_of_year_function(const std::vector<json>& args)
 
     // ISO 8601 week number calculation
     // First compute day-of-year
-    static const int days_before_month[] = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    static constexpr std::array<int, 13> days_before_month = {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
     int doy = days_before_month[dc.month] + dc.day;
     bool leap = (dc.year % 4 == 0 && dc.year % 100 != 0) || (dc.year % 400 == 0);
     if (leap && dc.month > 2) doy++;
@@ -4019,9 +4019,16 @@ namespace {
         return evaluate_replace_function(args, eval_ctx);
     }
 
-    const std::unordered_map<std::string_view, BuiltinHandler>& builtin_table()
+    struct BuiltinEntry
     {
-        static const std::unordered_map<std::string_view, BuiltinHandler> table = {
+        std::string_view name;
+        BuiltinHandler handler;
+    };
+
+    // Built at compile time: no heap allocation and no lazy (first-call) initialization.
+    constexpr auto make_builtin_table()
+    {
+        auto table = std::to_array<BuiltinEntry>({
             // Boolean / list predicates
             {"not",                       adapt_args_only<&evaluate_not_function>},
             {"all",                       adapt_args_only<&evaluate_all_function>},
@@ -4125,16 +4132,20 @@ namespace {
             {"starts",                    adapt_args_only<&evaluate_starts_function>},
             {"started by",                adapt_args_only<&evaluate_started_by_function>},
             {"coincides",                 adapt_args_only<&evaluate_coincides_function>},
-        };
+        });
+        std::ranges::sort(table, {}, &BuiltinEntry::name);
         return table;
     }
+
+    constexpr auto builtin_table = make_builtin_table();
+    static_assert(std::ranges::adjacent_find(builtin_table, {}, &BuiltinEntry::name) == builtin_table.end(),
+                  "duplicate built-in function name");
 } // namespace
 
 const BuiltinHandler* find_builtin_handler(std::string_view name)
 {
-    const auto& table = builtin_table();
-    const auto it = table.find(name);
-    return it != table.end() ? &it->second : nullptr;
+    const auto it = std::ranges::lower_bound(builtin_table, name, {}, &BuiltinEntry::name);
+    return (it != builtin_table.end() && it->name == name) ? &it->handler : nullptr;
 }
 
 } // namespace orion::bre::feel

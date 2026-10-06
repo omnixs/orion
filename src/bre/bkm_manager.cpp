@@ -27,7 +27,8 @@
 #include <ctre.hpp>
 #include <stdexcept>
 #include <algorithm>
-#include <set>       // For std::set
+#include <array>
+#include <string_view>
 
 using json = nlohmann::json;
 using std::string;
@@ -168,10 +169,10 @@ namespace orion::bre
         return bkm_map;
     }
 
-    // Helper function to get FEEL built-in functions
-    static const std::set<std::string>& get_builtin_functions()
+    // Helper function to check for FEEL built-in functions
+    static bool is_builtin_function(std::string_view name)
     {
-        static const std::set<std::string> builtin_functions = {
+        static constexpr auto builtin_functions = std::to_array<std::string_view>({
             "all", "any", "sum", "count", "min", "max", "mean", "median", "mode", "stddev",
             "contains", "starts with", "ends with", "matches", "replace", "split",
             "substring", "string length", "upper case", "lower case",
@@ -181,8 +182,8 @@ namespace orion::bre
             "insert before", "remove", "reverse", "index of", "sublist", "union",
             "distinct values", "flatten", "sort", "list replace", "product",
             "not" // Add logical NOT function
-        };
-        return builtin_functions;
+        });
+        return std::ranges::find(builtin_functions, name) != builtin_functions.end();
     }
 
     // Helper function to handle arithmetic operations on BKM results
@@ -266,8 +267,7 @@ namespace orion::bre
             debug("Found function call: {} with args: {}", func_name, args_str);
 
             // Check if this is a built-in function - if so, fall back to FEEL evaluation
-            const auto& builtin_functions = get_builtin_functions();
-            if (builtin_functions.find(func_name) != builtin_functions.end())
+            if (is_builtin_function(func_name))
             {
                 debug("Using FEEL evaluator for builtin function: {}", func_name);
                 return feel::Evaluator::evaluate(expression, input, eval_ctx);

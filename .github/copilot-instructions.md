@@ -205,6 +205,7 @@ User should provide:
 - **Naming**: CamelCase classes, snake_case functions (enforced by clang-tidy)
 - **Error Handling**: `ContractViolation` for programming errors, `std::expected` for business logic
 - **Memory**: RAII, smart pointers, move semantics
+- **Static State**: every static/`thread_local` variable in library code must be `constexpr` or `constinit` (no lazily built tables, allocating singletons or `thread_local` caches); verify with `tools/scripts/check_static_init.ps1`
 - See [CODING_STANDARDS.md](../CODING_STANDARDS.md) for complete guidelines
 
 ## Task Retrospective Process

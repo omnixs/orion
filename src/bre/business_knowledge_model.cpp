@@ -115,6 +115,20 @@ namespace orion::bre
         {
             return coerce_bkm_result(decision_table->evaluate(bkm_context, bkm_eval_ctx), *this);
         }
+        if (expression_ast)
+        {
+            json result;
+            try
+            {
+                result = expression_ast->evaluate(bkm_context, bkm_eval_ctx);
+            }
+            catch (const std::exception& e)
+            {
+                // Same error as feel::Evaluator::evaluate() reports for the text path
+                throw std::runtime_error(std::string("FEEL expression evaluation failed: ").append(expression_text) + " - " + e.what());
+            }
+            return coerce_bkm_result(std::move(result), *this);
+        }
         return coerce_bkm_result(
             feel::Evaluator::evaluate(expression_text, bkm_context, bkm_eval_ctx), *this);
     }

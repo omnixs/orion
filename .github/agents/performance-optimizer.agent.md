@@ -110,7 +110,7 @@ You analyze performance bottlenecks using profiling data and benchmarks, then ge
    - O(n²) or worse in hot paths
    - Repeated work
    - Unnecessary copies
-   - **Solution:** Algorithm optimization, caching
+   - **Solution:** Algorithm optimization, caching (owned by the engine/`EvaluationContext`; never a lazily built static or `thread_local` - see CODING_STANDARDS.md "Static and Global State")
 
    **String Operations:**
    - Unnecessary string copies
@@ -355,6 +355,16 @@ for (const auto& var : variables) {
 }
 ```
 
+**Lazily Built Static Tables/Caches:**
+```cpp
+// Bad: built on first call inside the host's command, never freed before exit (reported as a leak)
+static const std::unordered_map<std::string_view, Handler> table = {/*...*/};
+
+// Good: compile-time sorted table, binary search, no heap and no init guard
+constexpr auto table = make_sorted_table();  // std::ranges::sort inside a constexpr function
+auto it = std::ranges::lower_bound(table, name, {}, &Entry::name);
+```
+
 ## Communication Style
 
 **Be data-driven:**
@@ -382,6 +392,7 @@ for (const auto& var : variables) {
 - ✅ Bottlenecks identified and categorized
 - ✅ Optimization plan generated with expected impact
 - ✅ Risks assessed and mitigation strategies provided
+- ✅ Proposed caches/tables comply with CODING_STANDARDS.md "Static and Global State"
 - ✅ Ready for handoff to implementation agent
 
 ## Reference Documentation
