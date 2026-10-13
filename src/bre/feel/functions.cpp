@@ -28,7 +28,7 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
-#include <chrono>
+#include <ctime>
 #include <map>
 #include <optional>
 #include <string_view>
@@ -2803,8 +2803,7 @@ json evaluate_now_function(const std::vector<json>& args)
 {
     if (!args.empty()) return nullptr;
 
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    const std::time_t time_t_now = std::time(nullptr);
     struct tm tm_now;
 #ifdef _WIN32
     localtime_s(&tm_now, &time_t_now);
@@ -2827,8 +2826,7 @@ json evaluate_today_function(const std::vector<json>& args)
 {
     if (!args.empty()) return nullptr;
 
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    const std::time_t time_t_now = std::time(nullptr);
     struct tm tm_now;
 #ifdef _WIN32
     localtime_s(&tm_now, &time_t_now);

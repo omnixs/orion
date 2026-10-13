@@ -135,6 +135,42 @@ If you skip the submodule initialization, the build will succeed but some tests 
 **Performance Tip**: Unit tests run in selective mode by default (0.9s vs 25s), executing only passing Level 3 TCK tests. 
 Level 2 tests always run in full (DMN compliance requirement). Set `ORION_TCK_RUN_ALL=1` for comprehensive validation.
 
+### Build Options
+
+| CMake option | Default | Purpose |
+|---|---|---|
+| `ORION_BUILD_TESTS` | `ON` | Build unit tests and benchmarks |
+| `ORION_BUILD_APPS` | `ON` | Build `orion_app` and `orion_tck_runner` |
+| `ORION_ENABLE_TZDB` | `ON` | Resolve named FEEL time zones with the `std::chrono` time zone database |
+
+#### Named time zones (`ORION_ENABLE_TZDB`)
+
+FEEL date-and-time values may carry an IANA zone name, e.g. `@"2021-01-02T10:10:10@Europe/Paris"`.
+Converting such a value to UTC needs the zone's rules (including daylight saving time), which Orion
+takes from the standard library's `std::chrono` time zone database. With MSVC that database is loaded
+on first use and never freed, so hosts that fence or profile heap usage per request see it as a leak
+(load it once at startup with `std::chrono::get_tzdb()` to avoid that).
+
+Building with `-DORION_ENABLE_TZDB=OFF` removes `std::chrono` from the library entirely:
+
+- Named zones still parse (`.timezone` still returns the name), but resolve to offset `0`, i.e. they
+  are treated as UTC in comparisons, range functions and date-and-time subtraction. Expect 7 fewer
+  passing Level 3 TCK cases (`0100-arithmetic`); Level 2 compliance is unaffected.
+- Fixed offsets (`Z`, `+01:00`), all other temporal functions, and `now()`/`today()` behave identically.
+- When `ON` but the standard library has no time zone database (e.g. GCC 13's libstdc++), the library
+  behaves as `OFF`.
+
+Selecting the variant as a consumer:
+
+- **CMake**: `-DORION_ENABLE_TZDB=OFF` (or `ON`).
+- **vcpkg**: the `orion` port enables this through its default `tzdb` feature; disable it with
+  `{ "name": "orion", "default-features": false }`. Overlay ports can pass `-DORION_ENABLE_TZDB=OFF`
+  in `vcpkg_cmake_configure(OPTIONS ...)`.
+- **Detecting the variant**: `ORION_TZDB_ENABLED` (`0`/`1`) is a public compile definition of
+  `orion::orion_lib`, `orion_TZDB_ENABLED` is set by `find_package(orion)`, and
+  `orion::api::named_time_zones_supported()` answers at runtime, e.g. to only call
+  `std::chrono::get_tzdb()` at startup when the library uses it.
+
 ### Minimal Usage Example
 
 ```cpp

@@ -223,23 +223,34 @@ file(GLOB ORION_INTERNAL_HDRS CONFIGURE_DEPENDS
   "${CMAKE_SOURCE_DIR}/src/bre/feel/*.hpp"
 )
 
-# Detect whether the standard library ships a usable IANA time zone database.
-# libstdc++ advertises __cpp_lib_chrono before implementing tzdb, so probe by compiling.
-include(CheckCXXSourceCompiles)
-set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX23_STANDARD_COMPILE_OPTION}")
-check_cxx_source_compiles("
+# Named FEEL time zones (e.g. @"2021-01-01T10:00:00@Europe/Paris") need the std::chrono IANA
+# time zone database. MSVC's STL loads it on first use and never frees it; OFF builds the
+# library without std::chrono (named zones then resolve to offset 0, see CODING_STANDARDS.md).
+option(ORION_ENABLE_TZDB "Resolve named FEEL time zones with the std::chrono time zone database" ON)
+set(ORION_TZDB_ENABLED 0)
+if(ORION_ENABLE_TZDB)
+  # libstdc++ advertises __cpp_lib_chrono before implementing tzdb, so probe by compiling.
+  include(CheckCXXSourceCompiles)
+  set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX23_STANDARD_COMPILE_OPTION}")
+  check_cxx_source_compiles("
 #include <chrono>
 int main() { return std::chrono::locate_zone(\"Etc/UTC\") == nullptr; }
 " ORION_HAS_STD_TZDB)
-unset(CMAKE_REQUIRED_FLAGS)
+  unset(CMAKE_REQUIRED_FLAGS)
+  if(ORION_HAS_STD_TZDB)
+    set(ORION_TZDB_ENABLED 1)
+  else()
+    message(STATUS "ORION_ENABLE_TZDB is ON but the standard library has no time zone database")
+  endif()
+endif()
+message(STATUS "Orion named time zone support (ORION_TZDB_ENABLED): ${ORION_TZDB_ENABLED}")
 
 # Create the main library
 add_library(orion_lib STATIC ${ORION_SRC})
 add_library(orion::orion_lib ALIAS orion_lib)
 
-if(ORION_HAS_STD_TZDB)
-  target_compile_definitions(orion_lib PRIVATE ORION_HAS_STD_TZDB=1)
-endif()
+# PUBLIC so consumers and tests can see which variant they link against.
+target_compile_definitions(orion_lib PUBLIC ORION_TZDB_ENABLED=${ORION_TZDB_ENABLED})
 
 # Attach headers (no compile impact) for IDE view
 target_sources(orion_lib PRIVATE ${ORION_PUBLIC_HDRS} ${ORION_INTERNAL_HDRS})
@@ -317,6 +328,7 @@ if(ORION_BUILD_TESTS)
       tst/bre/feel/test_evaluator_builtin_math.cpp
       tst/bre/feel/test_evaluator_duration.cpp
       tst/bre/feel/test_temporal_timezones.cpp
+      tst/bre/feel/test_time_zone_build_modes.cpp
       tst/bre/feel/test_unary_feel_functions.cpp
       tst/bre/feel/test_compiled_unary_tests.cpp
       tst/bre/feel/test_feel_segfault_debug.cpp

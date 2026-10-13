@@ -70,4 +70,14 @@ namespace orion::api
         [[nodiscard]] std::vector<std::string> validate_models() const;
     };
 
+    /**
+     * @brief Whether this library build resolves named FEEL time zones (e.g. `@Europe/Paris`)
+     *
+     * True when built with CMake option ORION_ENABLE_TZDB=ON and a standard library time zone
+     * database is available. Hosts that pre-load `std::chrono::get_tzdb()` at startup only need
+     * to do so when this returns true. When false, the library does not use std::chrono and
+     * named zones resolve to offset 0.
+     */
+    [[nodiscard]] bool named_time_zones_supported() noexcept;
+
 } // namespace orion::api

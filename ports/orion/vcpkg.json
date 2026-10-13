@@ -17,12 +17,18 @@
     "nlohmann-json",
     "rapidxml"
   ],
+  "default-features": [
+    "tzdb"
+  ],
   "features": {
     "spdlog": {
       "description": "Enable spdlog logger implementation (optional)",
       "dependencies": [
         "spdlog"
       ]
+    },
+    "tzdb": {
+      "description": "Resolve named FEEL time zones (e.g. @Europe/Paris) with the std::chrono time zone database (CMake option ORION_ENABLE_TZDB)"
     }
   }
 }

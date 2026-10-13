@@ -21,10 +21,10 @@
 #include <climits>  // For INT_MAX
 #include <charconv> // For std::from_chars
 
-// ORION_HAS_STD_TZDB is set by CMake after probing for std::chrono::locate_zone. libstdc++
-// advertises __cpp_lib_chrono without shipping a time zone database, so a compile probe is
-// the only reliable detection. Without it, named zones resolve to an unknown offset.
-#ifdef ORION_HAS_STD_TZDB
+// ORION_TZDB_ENABLED comes from the CMake option ORION_ENABLE_TZDB (and a probe for a usable
+// time zone database). When 0, this is the only place that would need <chrono>, and named
+// zones resolve to an unknown offset.
+#if ORION_TZDB_ENABLED
 #include <chrono>
 #endif
 
@@ -40,7 +40,7 @@ namespace orion::bre::feel {
                                                      const Date& date,
                                                      const Time& time)
     {
-#ifdef ORION_HAS_STD_TZDB
+#if ORION_TZDB_ENABLED
         // std::chrono::year only models a limited range; FEEL allows far wider years.
         if (date.y < static_cast<int>(std::chrono::year::min()) ||
             date.y > static_cast<int>(std::chrono::year::max()))

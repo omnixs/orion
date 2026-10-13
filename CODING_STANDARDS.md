@@ -4,6 +4,7 @@
 - [General Principles](#general-principles)
 - [C++ Language Standards](#cpp-language-standards)
 - [Static and Global State](#static-and-global-state)
+- [Optional std::chrono (ORION_ENABLE_TZDB)](#optional-stdchrono-orion_enable_tzdb)
 - [DMN 1.5 Compliance](#dmn-15-compliance)
 - [Error Handling](#error-handling)
 - [Memory Management](#memory-management)
@@ -328,13 +329,69 @@ namespace { constinit Logger global_logger; }
   library state must be documented here. Known case: named time zones use
   `std::chrono::locate_zone()`; MSVC's STL loads the IANA time zone database on first use and
   never frees it. Hosts that profile per-command allocations should call
-  `std::chrono::get_tzdb()` once at startup. Do not add new uses of such facilities (e.g.
-  `std::regex`, `std::locale` construction) without documenting them here.
+  `std::chrono::get_tzdb()` once at startup, or build Orion with `ORION_ENABLE_TZDB=OFF` (see
+  [Optional std::chrono](#optional-stdchrono-orion_enable_tzdb)). Do not add new uses of such
+  facilities (e.g. `std::regex`, `std::locale` construction) without documenting them here.
 - **Exceptions** need reviewer approval and a `// static-init-ok: <reason>` comment on the
   declaration line or the line directly above it.
 
 **Enforcement:** `tools/scripts/check_static_init.ps1` scans the library and fails on any
 violation; it runs in CI (`ci-fast.yml`, job *Static Initialization Guard*).
+
+## Optional std::chrono (ORION_ENABLE_TZDB)
+
+The library is shipped in two variants, selected with the CMake option `ORION_ENABLE_TZDB`
+(vcpkg feature `tzdb`):
+
+| Variant | `ORION_TZDB_ENABLED` | Named zones (`@Europe/Paris`) |
+|---|---|---|
+| `ON` (default) | `1` | Resolved with the `std::chrono` time zone database |
+| `OFF` | `0` | Parsed, but resolve to offset 0 (treated as UTC); no `std::chrono` in the library |
+
+`ORION_TZDB_ENABLED` is also `0` when the option is `ON` but the standard library lacks a time zone
+database (e.g. GCC 13). Consumers such as TripPlanner choose the variant, so **every change must
+keep both variants building, correct and tested**.
+
+### Rules
+
+- **`std::chrono` only behind the flag**: `#include <chrono>` and any `std::chrono` use in library
+  code must sit inside `#if ORION_TZDB_ENABLED`. Today that is only `named_timezone_offset_seconds()`
+  in `src/bre/feel/types.cpp`; keep it that way. Other headers that drag in `std::chrono` symbols
+  count too: the `OFF` library must contain no `std::chrono` symbols.
+- **Wall-clock time without `std::chrono`**: use `std::time()` with `localtime_s`/`localtime_r`
+  (as `now()`/`today()` do). Use hand-written calendar arithmetic (`days_from_civil`, ...) for
+  dates, durations and fixed offsets; these must not depend on the flag.
+- **Named-zone behaviour must stay defined in both variants**: new temporal features that consume
+  `tz_offset_seconds` or `named_timezone_offset_seconds()` must handle `std::nullopt` (database
+  unavailable or unknown zone) explicitly, and document what the `OFF` variant returns.
+- **Use the public macro, not a new one**: branch on `ORION_TZDB_ENABLED` (exported by
+  `orion::orion_lib`); do not test `__cpp_lib_chrono` or add another detection macro.
+- **Tests for both variants**: put variant-specific expectations in
+  `tst/bre/feel/test_time_zone_build_modes.cpp` under `#if ORION_TZDB_ENABLED` / `#else`. Shared
+  tests must pass in both variants (no hidden dependency on named-zone offsets).
+- **Verify both variants before committing** temporal changes: build and run the unit tests with
+  `-DORION_ENABLE_TZDB=ON` and `OFF`, and run
+  `tools/scripts/check_no_chrono_symbols.ps1` on the `OFF` library (see `docs/testing.md` 3.1).
+
+```cpp
+// ❌ BAD: unconditional std::chrono in library code
+#include <chrono>
+auto now = std::chrono::system_clock::now();
+
+// ✅ GOOD: no std::chrono needed
+const std::time_t now = std::time(nullptr);
+
+// ✅ GOOD: time zone database use isolated behind the flag, with a defined fallback
+#if ORION_TZDB_ENABLED
+    const auto* zone = std::chrono::locate_zone(name);
+    ...
+#else
+    return std::nullopt;  // OFF variant: offset unknown, callers treat as 0
+#endif
+```
+
+**Enforcement:** CI (`ci-fast.yml`) builds and tests both variants on Windows and Linux and runs
+`tools/scripts/check_no_chrono_symbols.ps1` on the `OFF` library.
 
 ## DMN 1.5 Compliance
 
@@ -800,6 +857,7 @@ bool debug_output = (expression.find("PMT") != string::npos &&
 3. **clang-tidy passes** with no warnings (naming conventions, code quality)
 4. **No hardcoded values** detected by scanner
 5. **No runtime-initialized statics**: `tools/scripts/check_static_init.ps1` passes
+6. **Both `ORION_ENABLE_TZDB` variants** build and pass unit tests when temporal code changed
 6. **Documentation updated** for API changes
 7. **Performance benchmarks** pass (if applicable)
 
@@ -807,6 +865,7 @@ bool debug_output = (expression.find("PMT") != string::npos &&
 - [ ] DMN 1.5 specification compliance
 - [ ] No hardcoded test values or domain assumptions
 - [ ] No static/thread-local variables unless `constexpr` or `constinit` (see [Static and Global State](#static-and-global-state))
+- [ ] No `std::chrono` outside `#if ORION_TZDB_ENABLED`; behaviour defined and tested for both variants (see [Optional std::chrono](#optional-stdchrono-orion_enable_tzdb))
 - [ ] Proper error handling and contract validation
 - [ ] Modern C++ best practices followed
 - [ ] clang-tidy warnings addressed (naming, code quality)
@@ -820,6 +879,7 @@ bool debug_output = (expression.find("PMT") != string::npos &&
 clang-tidy -p build src/**/*.cpp     # Check code quality and naming
 .\scripts\scan-hardcoded-values.ps1  # Check for hardcoded values
 .\tools\scripts\check_static_init.ps1  # Check for runtime-initialized statics
+.\tools\scripts\check_no_chrono_symbols.ps1 -Library <OFF-variant orion_lib>  # ORION_ENABLE_TZDB=OFF build
 cmake --build build --target test    # Run all tests
 cmake --build build --target tst_bre # Run BRE-specific tests
 ```
@@ -845,6 +905,8 @@ clang-tidy -p build --fix-errors src/bre/bkm_manager.cpp
 - **Automated scanning**: `.\scripts\scan-hardcoded-values.ps1` catches hardcoded values
 - **Static initialization guard**: `tools/scripts/check_static_init.ps1` (CI) rejects static or
   thread-local variables that are not `constexpr`/`constinit`
+- **Both `ORION_ENABLE_TZDB` variants**: CI builds and tests `ON` and `OFF`;
+  `tools/scripts/check_no_chrono_symbols.ps1` rejects `std::chrono` symbols in the `OFF` library
 - **CI/CD pipeline**: All checks must pass before merge (build, tests, clang-tidy, code quality)
 - **Code review**: Mandatory review by BRE team member
 - **Documentation**: API changes require documentation updates

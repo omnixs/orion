@@ -52,6 +52,30 @@ Running 279 test cases...
 *** No errors detected
 ```
 
+### 3.1 Testing with and without `std::chrono` (`ORION_ENABLE_TZDB`)
+
+The library has two variants (see README "Named time zones"): with the `std::chrono` time zone
+database (`-DORION_ENABLE_TZDB=ON`, default) and without it (`OFF`). Changes that touch temporal
+values, date/time functions or `types.cpp` must be tested in **both** variants. The CI fast workflow
+builds and tests both on Windows and Linux.
+
+```powershell
+# Variant without std::chrono, in a separate build directory
+cmake -S . -B build-notz -DORION_ENABLE_TZDB=OFF `
+  -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+cmake --build build-notz --config Debug
+
+# Run unit tests (mode-specific cases are in tst/bre/feel/test_time_zone_build_modes.cpp)
+.\build\Debug\tst_orion.exe --log_level=test_suite
+
+# Verify the library contains no std::chrono symbols
+.\tools\scripts\check_no_chrono_symbols.ps1 -Library build\Debug\orion_lib.lib
+```
+
+Note: binaries are written to `build/` regardless of the build directory, so the last variant you
+built is the one under `build/`. Expect 7 fewer passing TCK cases (`0100-arithmetic`, named-zone
+arithmetic) in the `OFF` variant; Level 2 must stay at 100%.
+
 ---
 
 ## 4. Running DMN TCK Tests
@@ -129,6 +153,7 @@ If a TCK or unit test fails:
 
 - Before PR submission: run **unit tests** + **quick TCK**.
 - For major changes: run **full TCK**.
+- For changes to temporal code: run unit tests with `ORION_ENABLE_TZDB=ON` **and** `OFF` (section 3.1).
 - Ensure no new warnings appear under Clang‑Tidy.
 - Include new tests when adding FEEL functions or rule types.
 

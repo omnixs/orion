@@ -29,6 +29,7 @@ dat/log/
 
 # TCK test output files (temporary verification outputs)
 dat/tst/temp/
+dat/tst/**/actual_output/
 dat/tck_*.csv
 dat/tck_*.properties
 dat/dmn-tck/TestResults/Orion/

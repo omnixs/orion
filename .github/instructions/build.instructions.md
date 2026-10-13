@@ -132,7 +132,23 @@ cmake --build build-release -j$(nproc)
 
 - `CMAKE_BUILD_TYPE`: Debug, Release, RelWithDebInfo
 - `ORION_BUILD_TESTS`: ON (default) or OFF
+- `ORION_ENABLE_TZDB`: ON (default) or OFF - OFF builds the library without `std::chrono` (named FEEL
+  time zones then resolve to offset 0). See README "Named time zones". CMake prints
+  `Orion named time zone support (ORION_TZDB_ENABLED): 0|1` to show the effective variant.
 - `CMAKE_EXPORT_COMPILE_COMMANDS`: ON (for clang-tidy)
+
+### Building the variant without `std::chrono`
+
+Use a separate build directory so both variants can be configured side by side:
+```powershell
+cmake -S . -B build-notz -G "Visual Studio 17 2022" -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+  -DORION_ENABLE_TZDB=OFF
+cmake --build build-notz --config Debug
+```
+Outputs still land in `build/<Config>/` (the project sets the output directory), overwriting the
+default variant; rebuild `build` afterwards to restore it.
 
 ## Expected Output
 

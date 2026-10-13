@@ -444,5 +444,10 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
         // The DmnParser should have a parse() method that returns a DmnModel
 
         // ...existing code...
+
+        bool named_time_zones_supported() noexcept
+        {
+            return ORION_TZDB_ENABLED != 0;
+        }
     }
 } // namespace orion::api

@@ -286,5 +286,6 @@ nlohmann::json evaluate(const nlohmann::json& context) {
 - ✅ References to CODING_STANDARDS.md included
 - ✅ No hardcoded values detected
 - ✅ No runtime-initialized statics introduced (`check_static_init.ps1` passes)
+- ✅ Both `ORION_ENABLE_TZDB` variants considered: no `std::chrono` outside `#if ORION_TZDB_ENABLED`
 - ✅ Performance impact assessed
 - ✅ Clear next steps provided
