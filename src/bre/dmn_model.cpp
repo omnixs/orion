@@ -655,7 +655,18 @@ namespace orion::bre
         // Step 3: If no matches, return empty result
         if (matching_outputs.empty())
         {
-            return json::object();
+            const bool returns_list = hitPolicy == HitPolicy::RULE_ORDER ||
+                                      hitPolicy == HitPolicy::OUTPUT_ORDER ||
+                                      (hitPolicy == HitPolicy::COLLECT && aggregation == CollectAggregation::NONE);
+            if (!returns_list)
+            {
+                return json::object();
+            }
+            if (hitPolicy == HitPolicy::COLLECT && outputs.size() == 1 && !outputs[0].label.empty())
+            {
+                return json{{outputs[0].label, json::array()}};
+            }
+            return json::array();
         }
 
         // Step 4: Handle early exit for FIRST/UNIQUE/ANY policies

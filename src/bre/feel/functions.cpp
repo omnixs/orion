@@ -3128,6 +3128,383 @@ json evaluate_string_function(const std::vector<json>& args)
     return nullptr;
 }
 
+namespace {
+
+struct NumberPicture
+{
+    std::string prefix;
+    std::string suffix;
+    size_t minimum_integer_digits = 0;
+    size_t maximum_fraction_digits = 0;
+    size_t minimum_fraction_digits = 0;
+    size_t grouping_size = 0;
+    size_t minimum_exponent_digits = 0;
+    double multiplier = 1.0;
+    bool exponent = false;
+    bool regular_grouping = false;
+    std::vector<size_t> grouping_positions;
+};
+
+struct NumberPictureToken
+{
+    std::string text;
+    char symbol = '\0';
+    bool active = false;
+};
+
+bool is_number_picture_symbol(char symbol)
+{
+    return (symbol >= '0' && symbol <= '9') || symbol == '#' || symbol == ',' || symbol == '.' ||
+           symbol == '%' || symbol == 'E';
+}
+
+bool parse_number_subpicture(std::string_view text, NumberPicture& picture)
+{
+    if (text.empty() || text.size() > 1000) return false;
+
+    std::vector<NumberPictureToken> tokens;
+    bool quoted = false;
+    for (size_t offset = 0; offset < text.size();)
+    {
+        if (text[offset] == '\'')
+        {
+            if (offset + 1 < text.size() && text[offset + 1] == '\'')
+            {
+                tokens.push_back({"'", '\0', false});
+                offset += 2;
+                continue;
+            }
+            quoted = !quoted;
+            ++offset;
+            continue;
+        }
+
+        if (text.substr(offset).starts_with("\xE2\x80\xB0"))
+        {
+            tokens.push_back({"\xE2\x80\xB0", '\x01', !quoted});
+            offset += 3;
+            continue;
+        }
+
+        const char symbol = text[offset++];
+        tokens.push_back({std::string(1, symbol), symbol, !quoted && is_number_picture_symbol(symbol)});
+    }
+    if (quoted) return false;
+
+    for (size_t index = 0; index < tokens.size(); ++index)
+    {
+        if (tokens[index].symbol != 'E' || !tokens[index].active) continue;
+        const bool preceded_by_active = std::ranges::any_of(
+            std::ranges::subrange(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(index)),
+            [](const NumberPictureToken& token) { return token.active; });
+        const bool followed_by_active = std::ranges::any_of(
+            std::ranges::subrange(tokens.begin() + static_cast<std::ptrdiff_t>(index + 1), tokens.end()),
+            [](const NumberPictureToken& token) { return token.active; });
+        tokens[index].active = preceded_by_active && followed_by_active;
+    }
+
+    size_t first_numeric = tokens.size();
+    size_t last_numeric = 0;
+    for (size_t index = 0; index < tokens.size(); ++index)
+    {
+        if (tokens[index].active &&
+            ((tokens[index].symbol >= '0' && tokens[index].symbol <= '9') ||
+             std::string_view("#,.E").find(tokens[index].symbol) != std::string_view::npos))
+        {
+            first_numeric = std::min(first_numeric, index);
+            last_numeric = index;
+        }
+    }
+    if (first_numeric == tokens.size()) return false;
+
+    for (size_t index = 0; index < first_numeric; ++index)
+    {
+        auto& token = tokens[index];
+        if (token.active)
+        {
+            if (token.symbol == '%' || token.symbol == '\x01')
+            {
+                if (picture.multiplier != 1.0) return false;
+                picture.multiplier = token.symbol == '%' ? 100.0 : 1000.0;
+            }
+            else return false;
+        }
+        picture.prefix += token.text;
+    }
+    for (size_t index = last_numeric + 1; index < tokens.size(); ++index)
+    {
+        auto& token = tokens[index];
+        if (token.active)
+        {
+            if (token.symbol == '%' || token.symbol == '\x01')
+            {
+                if (picture.multiplier != 1.0) return false;
+                picture.multiplier = token.symbol == '%' ? 100.0 : 1000.0;
+            }
+            else return false;
+        }
+        picture.suffix += token.text;
+    }
+
+    bool in_fraction = false;
+    bool in_exponent = false;
+    bool saw_decimal = false;
+    bool saw_exponent = false;
+    size_t integer_digits = 0;
+    size_t digit_position = 0;
+    bool saw_optional_integer = false;
+    bool saw_optional_fraction = false;
+    bool saw_mandatory_integer = false;
+    std::vector<size_t> group_positions;
+    for (size_t index = first_numeric; index <= last_numeric; ++index)
+    {
+        const auto& token = tokens[index];
+        if (!token.active) return false;
+        const char symbol = token.symbol;
+        if (symbol == '.' && !saw_decimal && !saw_exponent)
+        {
+            saw_decimal = true;
+            in_fraction = true;
+            continue;
+        }
+        if (symbol == 'E' && !saw_exponent)
+        {
+            saw_exponent = true;
+            in_exponent = true;
+            picture.exponent = true;
+            continue;
+        }
+        if (symbol == ',' && !in_fraction && !in_exponent)
+        {
+            if (digit_position == 0 || (!group_positions.empty() && group_positions.back() == digit_position)) return false;
+            group_positions.push_back(digit_position);
+            continue;
+        }
+        const bool mandatory_digit = symbol >= '0' && symbol <= '9';
+        if (!mandatory_digit && symbol != '#') return false;
+        if (in_exponent)
+        {
+            if (!mandatory_digit) return false;
+            ++picture.minimum_exponent_digits;
+        }
+        else if (in_fraction)
+        {
+            if (mandatory_digit && saw_optional_fraction) return false;
+            saw_optional_fraction = saw_optional_fraction || !mandatory_digit;
+            ++picture.maximum_fraction_digits;
+            if (mandatory_digit) ++picture.minimum_fraction_digits;
+        }
+        else
+        {
+            if (!mandatory_digit && saw_mandatory_integer) return false;
+            saw_mandatory_integer = saw_mandatory_integer || mandatory_digit;
+            saw_optional_integer = saw_optional_integer || !mandatory_digit;
+            ++integer_digits;
+            if (mandatory_digit) ++picture.minimum_integer_digits;
+            ++digit_position;
+        }
+    }
+    if (integer_digits + picture.maximum_fraction_digits == 0 ||
+        (!group_positions.empty() && group_positions.back() == digit_position) ||
+        (saw_exponent && (picture.minimum_exponent_digits == 0 || picture.multiplier != 1.0))) return false;
+
+    if (picture.minimum_integer_digits == 0 && picture.maximum_fraction_digits == 0)
+        picture.minimum_integer_digits = 1;
+    if (picture.exponent && picture.minimum_integer_digits == 0 && saw_optional_integer)
+        picture.minimum_integer_digits = 1;
+    if (picture.minimum_integer_digits == 0 && picture.minimum_fraction_digits == 0)
+    {
+        picture.minimum_fraction_digits = 1;
+        picture.maximum_fraction_digits = std::max<size_t>(1, picture.maximum_fraction_digits);
+    }
+
+    if (!group_positions.empty())
+    {
+        for (const auto position_from_left : group_positions)
+            picture.grouping_positions.push_back(digit_position - position_from_left);
+
+        for (size_t group_size = 1; group_size <= digit_position; ++group_size)
+        {
+            const bool positions_are_regular = std::ranges::all_of(
+                picture.grouping_positions,
+                [group_size](size_t position) { return position % group_size == 0; });
+            if (!positions_are_regular) continue;
+
+            const bool all_groups_present = std::ranges::all_of(
+                std::views::iota(group_size, digit_position),
+                [&picture, group_size](size_t position)
+                {
+                    return position % group_size != 0 ||
+                           std::ranges::find(picture.grouping_positions, position) != picture.grouping_positions.end();
+                });
+            if (all_groups_present)
+            {
+                picture.regular_grouping = true;
+                picture.grouping_size = group_size;
+                break;
+            }
+        }
+    }
+    return true;
+}
+
+bool split_number_picture(std::string_view text, std::string_view& positive, std::string_view& negative)
+{
+    bool quoted = false;
+    for (size_t index = 0; index < text.size(); ++index)
+    {
+        if (text[index] != '\'') continue;
+        if (index + 1 < text.size() && text[index + 1] == '\'') ++index;
+        else quoted = !quoted;
+    }
+    if (quoted) return false;
+
+    quoted = false;
+    bool found_separator = false;
+    for (size_t index = 0; index < text.size(); ++index)
+    {
+        if (text[index] == '\'')
+        {
+            if (index + 1 < text.size() && text[index + 1] == '\'') ++index;
+            else quoted = !quoted;
+        }
+        else if (text[index] == ';' && !quoted)
+        {
+            if (found_separator) return false;
+            found_separator = true;
+            positive = text.substr(0, index);
+            negative = text.substr(index + 1);
+        }
+    }
+    if (!found_separator) positive = text;
+    return !positive.empty() && (!found_separator || !negative.empty());
+}
+
+std::string group_number_integer(std::string integer, const NumberPicture& picture)
+{
+    if (picture.grouping_positions.empty()) return integer;
+    std::string grouped;
+    for (size_t index = 0; index < integer.size(); ++index)
+    {
+        grouped += integer[index];
+        const size_t remaining = integer.size() - index - 1;
+        const bool insert_separator = picture.regular_grouping
+            ? remaining != 0 && remaining % picture.grouping_size == 0
+            : std::ranges::find(picture.grouping_positions, remaining) != picture.grouping_positions.end();
+        if (insert_separator)
+        {
+            grouped += ',';
+        }
+    }
+    return grouped;
+}
+
+double round_number_half_even(double value)
+{
+    const double integral = std::floor(value);
+    const double fractional = value - integral;
+    if (fractional < 0.5) return integral;
+    if (fractional > 0.5) return integral + 1.0;
+    return std::fmod(integral, 2.0) == 0.0 ? integral : integral + 1.0;
+}
+
+std::string render_number_picture(double value, const NumberPicture& picture, bool negative, bool has_negative_picture)
+{
+    double magnitude = std::abs(value) * picture.multiplier;
+    if (std::isnan(value)) return "NaN";
+    if (std::isinf(value) || std::isinf(magnitude))
+    {
+        std::string result = picture.prefix;
+        if (negative && !has_negative_picture) result.insert(0, "-");
+        return result + "Infinity" + picture.suffix;
+    }
+
+    if (picture.maximum_fraction_digits <= 15)
+    {
+        const double fractional_scale = std::pow(10.0, static_cast<double>(picture.maximum_fraction_digits));
+        const double scaled = magnitude * fractional_scale;
+        if (std::isfinite(scaled)) magnitude = round_number_half_even(scaled) / fractional_scale;
+    }
+
+    int exponent = 0;
+    if (picture.exponent && magnitude != 0.0)
+    {
+        if (picture.minimum_integer_digits != 0)
+        {
+            exponent = static_cast<int>(std::floor(std::log10(magnitude))) -
+                       static_cast<int>(picture.minimum_integer_digits - 1);
+            magnitude /= std::pow(10.0, exponent);
+        }
+    }
+
+    std::ostringstream stream;
+    stream.imbue(std::locale::classic());
+    stream << std::fixed << std::setprecision(static_cast<int>(picture.maximum_fraction_digits)) << magnitude;
+    std::string digits = stream.str();
+    const auto decimal = digits.find('.');
+    std::string integer = digits.substr(0, decimal);
+    std::string fraction = decimal == std::string::npos ? std::string() : digits.substr(decimal + 1);
+    if (picture.exponent && picture.minimum_integer_digits != 0 &&
+        integer.size() > picture.minimum_integer_digits)
+    {
+        const size_t carry = integer.size() - picture.minimum_integer_digits;
+        exponent += static_cast<int>(carry);
+        std::string normalized = integer + fraction;
+        integer = normalized.substr(0, picture.minimum_integer_digits);
+        fraction = normalized.substr(picture.minimum_integer_digits, picture.maximum_fraction_digits);
+    }
+    while (fraction.size() > picture.minimum_fraction_digits && !fraction.empty() && fraction.back() == '0')
+        fraction.pop_back();
+    if (integer.size() < picture.minimum_integer_digits)
+        integer.insert(0, picture.minimum_integer_digits - integer.size(), '0');
+    if (picture.minimum_integer_digits == 0 && integer == "0") integer.clear();
+    if (integer.empty() && picture.minimum_integer_digits != 0) integer = "0";
+    if (!integer.empty()) integer = group_number_integer(std::move(integer), picture);
+
+    std::string result = picture.prefix;
+    if (negative && !has_negative_picture) result.insert(0, "-");
+    result += integer;
+    if (!fraction.empty())
+        result += "." + fraction;
+    if (picture.exponent)
+    {
+        result += "E";
+        if (exponent < 0) result += "-";
+        auto exponent_digits = std::to_string(std::abs(exponent));
+        if (exponent_digits.size() < picture.minimum_exponent_digits)
+            exponent_digits.insert(0, picture.minimum_exponent_digits - exponent_digits.size(), '0');
+        result += exponent_digits;
+    }
+    result += picture.suffix;
+    return result;
+}
+
+} // namespace
+
+json evaluate_format_number_function(const std::vector<json>& args)
+{
+    if (args.size() != 2 || !args[0].is_number() || !args[1].is_string()) return nullptr;
+    const double value = args[0].get<double>();
+
+    std::string_view positive_text;
+    std::string_view negative_text;
+    if (!split_number_picture(args[1].get_ref<const std::string&>(), positive_text, negative_text)) return nullptr;
+
+    NumberPicture positive_picture;
+    NumberPicture negative_picture;
+    if (!parse_number_subpicture(positive_text, positive_picture)) return nullptr;
+    if (!negative_text.empty() && !parse_number_subpicture(negative_text, negative_picture)) return nullptr;
+
+    const bool negative = !std::isnan(value) && std::signbit(value);
+    if (negative && !negative_text.empty())
+    {
+        auto formatted = render_number_picture(value, negative_picture, true, true);
+        return formatted.empty() ? json(nullptr) : json(formatted);
+    }
+    auto formatted = render_number_picture(value, positive_picture, negative, false);
+    return formatted.empty() ? json(nullptr) : json(formatted);
+}
+
 json evaluate_is_function(const std::vector<json>& args)
 {
     if (args.size() != 2)
@@ -4079,6 +4456,7 @@ namespace {
             {"odd",                       adapt_args_only<&evaluate_odd_function>},
             {"even",                      adapt_args_only<&evaluate_even_function>},
             {"number",                    adapt_args_only<&evaluate_number_function>},
+            {"format number",             adapt_args_only<&evaluate_format_number_function>},
             {"string",                    adapt_args_only<&evaluate_string_function>},
             {"is",                        adapt_args_only<&evaluate_is_function>},
 
