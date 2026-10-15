@@ -358,6 +358,9 @@ keep both variants building, correct and tested**.
   code must sit inside `#if ORION_TZDB_ENABLED`. Today that is only `named_timezone_offset_seconds()`
   in `src/bre/feel/types.cpp`; keep it that way. Other headers that drag in `std::chrono` symbols
   count too: the `OFF` library must contain no `std::chrono` symbols.
+- **No spdlog (or other logging library) headers in library code**: spdlog instantiates
+  `std::chrono` templates (e.g. its pattern formatters). The library logs through
+  `orion::api::ILogger`; only applications and tests include spdlog.
 - **Wall-clock time without `std::chrono`**: use `std::time()` with `localtime_s`/`localtime_r`
   (as `now()`/`today()` do). Use hand-written calendar arithmetic (`days_from_civil`, ...) for
   dates, durations and fixed offsets; these must not depend on the flag.
@@ -391,7 +394,8 @@ const std::time_t now = std::time(nullptr);
 ```
 
 **Enforcement:** CI (`ci-fast.yml`) builds and tests both variants on Windows and Linux and runs
-`tools/scripts/check_no_chrono_symbols.ps1` on the `OFF` library.
+`tools/scripts/check_no_chrono_symbols.ps1 -CMakeCache build/CMakeCache.txt` on each: no
+`std::chrono` symbols when `ORION_TZDB_ENABLED=0`, and at least one when it is `1`.
 
 ## DMN 1.5 Compliance
 

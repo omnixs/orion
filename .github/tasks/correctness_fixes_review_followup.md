@@ -30,6 +30,7 @@ Fix the defects, coverage gaps and nits found in the code review of `feature/cor
 - [x] `#error` guard when `ORION_TZDB_ENABLED` is undefined
 - [x] Docs: CODING_STANDARDS numbering, remove consumer name references
 - [x] TCK baseline for 2.2.5 (README badge target)
+- [x] CI (ubuntu, tzdb OFF): remove the unused `<spdlog/spdlog.h>` include from `engine.cpp` (GCC emitted spdlog's `std::chrono` template instances into `liborion_lib.a`); symbol check reads the effective `ORION_TZDB_ENABLED` from `CMakeCache.txt` and also requires symbols when it is 1
 
 **Explicitly excluded:**
 - Squashing/rewriting already pushed commits (needs a force push; owner decision)

@@ -37,7 +37,6 @@
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/ast_node.hpp>
 #include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
 
 using namespace std;
 using json = nlohmann::json;

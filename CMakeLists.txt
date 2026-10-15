@@ -244,6 +244,8 @@ int main() { return std::chrono::locate_zone(\"Etc/UTC\") == nullptr; }
   endif()
 endif()
 message(STATUS "Orion named time zone support (ORION_TZDB_ENABLED): ${ORION_TZDB_ENABLED}")
+# Read from CMakeCache.txt by tools/scripts/check_no_chrono_symbols.ps1 -CMakeCache
+set(ORION_TZDB_ENABLED_EFFECTIVE ${ORION_TZDB_ENABLED} CACHE INTERNAL "Effective ORION_TZDB_ENABLED of the last configure")
 
 # Create the main library
 add_library(orion_lib STATIC ${ORION_SRC})

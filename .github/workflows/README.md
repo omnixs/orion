@@ -16,8 +16,9 @@
 - Builds ORION in Debug mode, once with `-DORION_ENABLE_TZDB=ON` and once with `OFF`
   (with and without the `std::chrono` time zone database)
 - Runs all unit tests (Boost.Test suite) for both variants
-- For the `OFF` variant, verifies the library contains no `std::chrono` symbols
-  (`tools/scripts/check_no_chrono_symbols.ps1`)
+- Verifies `std::chrono` symbols in the library match the variant: none when the time zone
+  database is disabled or unavailable, present when it is enabled
+  (`tools/scripts/check_no_chrono_symbols.ps1 -CMakeCache build/CMakeCache.txt`)
 - Validates basic functionality across platforms
 - Provides fast feedback for development
 
