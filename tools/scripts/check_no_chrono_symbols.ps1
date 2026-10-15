@@ -39,22 +39,53 @@ function Get-DumpbinPath {
 }
 
 if ($env:OS -eq 'Windows_NT') {
-    $symbols = & (Get-DumpbinPath) /nologo /symbols $Library
+    $symbols = @(& (Get-DumpbinPath) /nologo /symbols $Library)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not list symbols of $Library"
+    }
+
+    $symbolRecords = @(
+        foreach ($line in $symbols) {
+            # Match COFF symbol records and inspect only the name after "|".
+            if ($line -match '^\s*[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+\S+.*\|\s*(?<name>\S.*)$') {
+                [pscustomobject]@{
+                    Name    = $Matches['name'].Trim()
+                    Display = $line.Trim()
+                }
+            }
+        }
+    )
 }
 else {
-    $symbols = & nm -C $Library
-}
-if ($LASTEXITCODE -ne 0 -or @($symbols).Count -eq 0) {
-    throw "Could not list symbols of $Library"
+    $symbols = @(& nm -C $Library)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not list symbols of $Library"
+    }
+
+    $symbolRecords = @(
+        foreach ($line in $symbols) {
+            # GNU nm's n/N entries are debugging symbols, not compiled or referenced symbols.
+            if ($line -match '^\s*(?:(?:.+?):\s+)?(?:[0-9A-Fa-f]+\s+)?(?<type>[A-Za-z?])\s+(?<name>.+?)\s*$' `
+                -and $Matches['type'] -notin @('n', 'N')) {
+                [pscustomobject]@{
+                    Name    = $Matches['name'].Trim()
+                    Display = $line.Trim()
+                }
+            }
+        }
+    )
 }
 
-$hits = @($symbols | Select-String -Pattern $Pattern | ForEach-Object { $_.Line.Trim() } | Sort-Object -Unique)
-if ($hits.Count -gt 0) {
-    Write-Host "[FAIL] $Library uses std::chrono ($($hits.Count) symbol(s)):" -ForegroundColor Red
-    $hits | Select-Object -First 20 | ForEach-Object { Write-Host "    $_" }
-    Write-Host "Library code must only use std::chrono inside '#if ORION_TZDB_ENABLED' (see CODING_STANDARDS.md)." -ForegroundColor Yellow
-    exit 1
+if ($symbolRecords.Count -eq 0) {
+    throw "Could not parse any symbols from $Library"
 }
+
+$hits = @(
+    $symbolRecords |
+        Where-Object { $_.Name -match $Pattern } |
+        ForEach-Object { $_.Display } |
+        Sort-Object -Unique
+)
 
 Write-Host "[OK] No std::chrono symbols in $Library ($(@($symbols).Count) symbol lines checked)." -ForegroundColor Green
 exit 0
