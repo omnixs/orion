@@ -179,6 +179,40 @@ namespace orion::bre
 
             return text_entry_matches(entry, col);
         }
+
+        // DMN 1.5 §10.3.2.10 step 2: without matching rules the result is null. ORION extension:
+        // list-producing hit policies return an empty list and C# returns 0, as if aggregating an
+        // empty list, so downstream expressions such as count(decision) keep working.
+        json no_match_result(const DecisionTable& table)
+        {
+            json result;
+            if (table.hitPolicy == HitPolicy::RULE_ORDER || table.hitPolicy == HitPolicy::OUTPUT_ORDER)
+            {
+                return json::array();
+            }
+            if (table.hitPolicy != HitPolicy::COLLECT)
+            {
+                return result;
+            }
+            if (table.aggregation == CollectAggregation::NONE)
+            {
+                result = json::array();
+            }
+            else if (table.aggregation == CollectAggregation::COUNT)
+            {
+                result = 0.0;
+            }
+            else
+            {
+                return result;
+            }
+            // Same shape as apply_collect_aggregation() for a single named output
+            if (table.outputs.size() == 1 && !table.outputs[0].label.empty())
+            {
+                return json{{table.outputs[0].label, std::move(result)}};
+            }
+            return result;
+        }
     } // namespace
 
     // Helper: Validate input data against allowed values (DMN 1.5 Section 8.2.2)
@@ -652,21 +686,10 @@ namespace orion::bre
         // Step 2: Find all matching rules based on input conditions
         vector<json> matching_outputs = find_matching_rules(input, eval_ctx);
 
-        // Step 3: If no matches, return empty result
+        // Step 3: No matching rules
         if (matching_outputs.empty())
         {
-            const bool returns_list = hitPolicy == HitPolicy::RULE_ORDER ||
-                                      hitPolicy == HitPolicy::OUTPUT_ORDER ||
-                                      (hitPolicy == HitPolicy::COLLECT && aggregation == CollectAggregation::NONE);
-            if (!returns_list)
-            {
-                return json::object();
-            }
-            if (hitPolicy == HitPolicy::COLLECT && outputs.size() == 1 && !outputs[0].label.empty())
-            {
-                return json{{outputs[0].label, json::array()}};
-            }
-            return json::array();
+            return no_match_result(*this);
         }
 
         // Step 4: Handle early exit for FIRST/UNIQUE/ANY policies

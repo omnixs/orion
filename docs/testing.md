@@ -73,8 +73,10 @@ cmake --build build-notz --config Debug
 ```
 
 Note: binaries are written to `build/` regardless of the build directory, so the last variant you
-built is the one under `build/`. Expect 7 fewer passing TCK cases (`0100-arithmetic`, named-zone
-arithmetic) in the `OFF` variant; Level 2 must stay at 100%.
+built is the one under `build/`. MSBuild does not notice when the other variant overwrote them, so
+delete `build\<Config>\orion_lib.lib` and `tst_orion.exe` before rebuilding the default variant.
+Expect 7 fewer passing TCK cases (`0100-arithmetic`, named-zone arithmetic) in the `OFF` variant;
+Level 2 must stay at 100%.
 
 ---
 

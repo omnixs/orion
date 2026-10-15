@@ -349,7 +349,7 @@ The library is shipped in two variants, selected with the CMake option `ORION_EN
 | `OFF` | `0` | Parsed, but resolve to offset 0 (treated as UTC); no `std::chrono` in the library |
 
 `ORION_TZDB_ENABLED` is also `0` when the option is `ON` but the standard library lacks a time zone
-database (e.g. GCC 13). Consumers such as TripPlanner choose the variant, so **every change must
+database (e.g. GCC 13). Host applications choose the variant, so **every change must
 keep both variants building, correct and tested**.
 
 ### Rules
@@ -858,8 +858,8 @@ bool debug_output = (expression.find("PMT") != string::npos &&
 4. **No hardcoded values** detected by scanner
 5. **No runtime-initialized statics**: `tools/scripts/check_static_init.ps1` passes
 6. **Both `ORION_ENABLE_TZDB` variants** build and pass unit tests when temporal code changed
-6. **Documentation updated** for API changes
-7. **Performance benchmarks** pass (if applicable)
+7. **Documentation updated** for API changes
+8. **Performance benchmarks** pass (if applicable)
 
 ### Review Checklist
 - [ ] DMN 1.5 specification compliance

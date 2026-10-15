@@ -24,6 +24,9 @@
 // ORION_TZDB_ENABLED comes from the CMake option ORION_ENABLE_TZDB (and a probe for a usable
 // time zone database). When 0, this is the only place that would need <chrono>, and named
 // zones resolve to an unknown offset.
+#ifndef ORION_TZDB_ENABLED
+#error "ORION_TZDB_ENABLED must be defined (0 or 1); it is set by the orion_lib CMake target"
+#endif
 #if ORION_TZDB_ENABLED
 #include <chrono>
 #endif

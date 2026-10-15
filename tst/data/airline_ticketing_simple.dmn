@@ -2,9 +2,25 @@
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
              xmlns:feel="https://www.omg.org/spec/DMN/20191111/FEEL/"
              id="airline-ticketing"
-             name="AirlineTicketing">
+             name="AirlineTicketing"
+             namespace="http://example.com/dmn/airline-ticketing">
+  <inputData id="i_PassengerType" name="PassengerType">
+    <variable name="PassengerType" typeRef="string"/>
+  </inputData>
+  <inputData id="i_Class" name="Class">
+    <variable name="Class" typeRef="string"/>
+  </inputData>
+  <inputData id="i_BaggageCount" name="BaggageCount">
+    <variable name="BaggageCount" typeRef="number"/>
+  </inputData>
   <decision id="d_BaseFare" name="BaseFare">
     <variable name="BaseFare" typeRef="number"/>
+    <informationRequirement>
+      <requiredInput href="#i_PassengerType"/>
+    </informationRequirement>
+    <informationRequirement>
+      <requiredInput href="#i_Class"/>
+    </informationRequirement>
     <decisionTable id="dt_BaseFare" hitPolicy="UNIQUE">
       <input id="input1">
         <inputExpression typeRef="string">
@@ -66,12 +82,21 @@
   </decision>
   <decision id="d_BaggageFee" name="BaggageFee">
     <variable name="BaggageFee" typeRef="number"/>
+    <informationRequirement>
+      <requiredInput href="#i_BaggageCount"/>
+    </informationRequirement>
     <literalExpression>
       <text>if BaggageCount &lt;= 1 then 0 else if BaggageCount = 2 then 30 else 30 + (BaggageCount - 2) * 50</text>
     </literalExpression>
   </decision>
   <decision id="d_TotalPrice" name="TotalPrice">
     <variable name="TotalPrice" typeRef="number"/>
+    <informationRequirement>
+      <requiredDecision href="#d_BaseFare"/>
+    </informationRequirement>
+    <informationRequirement>
+      <requiredDecision href="#d_BaggageFee"/>
+    </informationRequirement>
     <literalExpression>
       <text>BaseFare + BaggageFee</text>
     </literalExpression>

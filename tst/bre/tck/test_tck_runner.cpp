@@ -585,32 +585,11 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
     BOOST_TEST_MESSAGE("Level-3 Results: " << level3_passed_cases << "/" << level3_total_cases 
                       << " passed (" << format_percentage(level3_rate) << "% success rate)");
     
-    // Process dmn-tck-extra tests (if any)
-    int extra_total_cases = 0;
-    int extra_passed_cases = 0;
-    int extra_features = 0;
-    
-    auto extra_path = fs::path("dat") / "tst" / "dmn-tck-extra";
-    if (fs::exists(extra_path) && fs::is_directory(extra_path)) {
-        BOOST_TEST_MESSAGE("Processing dmn-tck-extra");
-        
-        for (auto& entry : fs::directory_iterator(extra_path)) {
-            if (entry.is_directory()) {
-                extra_features++;
-                auto [executed, passed] = process_test_case_directory(entry.path());
-                extra_total_cases += executed;
-                extra_passed_cases += passed;
-            }
-        }
-        
-        BOOST_TEST_MESSAGE("Processed " << extra_features << " test cases from dmn-tck-extra");
-    }
-    
     // Final summary
-    int total_features = level2_features + level3_features + extra_features;
+    int total_features = level2_features + level3_features;
     int passed_features = level2_passed_features + level3_passed_features;
-    int total_cases = level2_total_cases + level3_total_cases + extra_total_cases;
-    int passed_cases = level2_passed_cases + level3_passed_cases + extra_passed_cases;
+    int total_cases = level2_total_cases + level3_total_cases;
+    int passed_cases = level2_passed_cases + level3_passed_cases;
     
     BOOST_TEST_MESSAGE("Found and processed " << total_cases << " external TCK test cases");
     
@@ -635,13 +614,6 @@ BOOST_AUTO_TEST_CASE(dmn_tck_comprehensive) {
                       << "% success rate)");
     BOOST_TEST_MESSAGE("  Level-3 Cases: " << level3_passed_cases << "/" << level3_total_cases 
                       << " individual test cases passed (" << format_percentage(level3_rate) << "% success rate)");
-                      
-    if (extra_total_cases > 0) {
-        BOOST_TEST_MESSAGE("  dmn-tck-extra Cases: " << extra_passed_cases << "/" << extra_total_cases 
-                          << " individual test cases passed (" 
-                          << format_percentage(extra_total_cases > 0 ? (double(extra_passed_cases) / double(extra_total_cases)) * 100.0 : 0.0) 
-                          << "% success rate)");
-    }
     
     BOOST_TEST_MESSAGE("All DMN TCK tests completed successfully!");
     

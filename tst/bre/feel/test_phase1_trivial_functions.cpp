@@ -222,6 +222,23 @@ BOOST_AUTO_TEST_CASE(test_format_number_picture_string)
     result = Evaluator::evaluate(R"FEEL(format number(999.9, "0.0E0"))FEEL", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "1.0E3");
 
+    // The exponent is chosen before rounding, so small values keep their significant digits.
+    result = Evaluator::evaluate(R"FEEL(format number(0.000123456, "0.00E0"))FEEL", {}, get_test_eval_ctx());
+    BOOST_CHECK_EQUAL(result.get<std::string>(), "1.23E-4");
+    result = Evaluator::evaluate(R"FEEL(format number(-0.000123456, "0.00E00"))FEEL", {}, get_test_eval_ctx());
+    BOOST_CHECK_EQUAL(result.get<std::string>(), "-1.23E-04");
+    result = Evaluator::evaluate(R"FEEL(format number(1234.5, "00.0E0"))FEEL", {}, get_test_eval_ctx());
+    BOOST_CHECK_EQUAL(result.get<std::string>(), "12.3E2");
+
+    // Without integer digits the mantissa is scaled into [0.1, 1).
+    result = Evaluator::evaluate(R"FEEL(format number(23.4, ".00E0"))FEEL", {}, get_test_eval_ctx());
+    BOOST_CHECK_EQUAL(result.get<std::string>(), ".23E2");
+    result = Evaluator::evaluate(R"FEEL(format number(0.999, ".00E0"))FEEL", {}, get_test_eval_ctx());
+    BOOST_CHECK_EQUAL(result.get<std::string>(), ".10E1");
+
+    result = Evaluator::evaluate(R"FEEL(format number(0, "0.0E0"))FEEL", {}, get_test_eval_ctx());
+    BOOST_CHECK_EQUAL(result.get<std::string>(), "0.0E0");
+
     result = Evaluator::evaluate(R"FEEL(format number(1.2, "'USD '0.##"))FEEL", {}, get_test_eval_ctx());
     BOOST_CHECK_EQUAL(result.get<std::string>(), "USD 1.2");
 

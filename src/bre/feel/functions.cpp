@@ -33,7 +33,11 @@
 #include <optional>
 #include <string_view>
 #include <array>
+#include <charconv>
 #include <limits>
+#include <ranges>
+#include <span>
+#include <system_error>
 
 namespace orion::bre::feel {
 
@@ -3130,6 +3134,13 @@ json evaluate_string_function(const std::vector<json>& args)
 
 namespace {
 
+// `format number` is an ORION extension (not a DMN 1.5 built-in). The picture string follows
+// XPath 3.1 fn:format-number (F&O §4.7) with the default decimal format; rounding is half-to-even.
+constexpr size_t MAX_NUMBER_PICTURE_LENGTH = 1000;
+constexpr size_t MAX_HALF_EVEN_FRACTION_DIGITS = 15;
+constexpr std::string_view PER_MILLE_UTF8 = "\xE2\x80\xB0";
+constexpr char PER_MILLE_SYMBOL = '\x01';
+
 struct NumberPicture
 {
     std::string prefix;
@@ -3147,7 +3158,7 @@ struct NumberPicture
 
 struct NumberPictureToken
 {
-    std::string text;
+    std::string_view text;  // view into the picture argument, which outlives the parse
     char symbol = '\0';
     bool active = false;
 };
@@ -3158,11 +3169,27 @@ bool is_number_picture_symbol(char symbol)
            symbol == '%' || symbol == 'E';
 }
 
+// Prefix/suffix may only contain literal text and at most one percent or per-mille sign.
+bool append_affix(std::span<const NumberPictureToken> tokens, NumberPicture& picture, std::string& affix)
+{
+    for (const auto& token : tokens)
+    {
+        if (token.active)
+        {
+            if ((token.symbol != '%' && token.symbol != PER_MILLE_SYMBOL) || picture.multiplier != 1.0) return false;
+            picture.multiplier = token.symbol == '%' ? 100.0 : 1000.0;
+        }
+        affix += token.text;
+    }
+    return true;
+}
+
 bool parse_number_subpicture(std::string_view text, NumberPicture& picture)
 {
-    if (text.empty() || text.size() > 1000) return false;
+    if (text.empty() || text.size() > MAX_NUMBER_PICTURE_LENGTH) return false;
 
     std::vector<NumberPictureToken> tokens;
+    tokens.reserve(text.size());
     bool quoted = false;
     for (size_t offset = 0; offset < text.size();)
     {
@@ -3170,7 +3197,7 @@ bool parse_number_subpicture(std::string_view text, NumberPicture& picture)
         {
             if (offset + 1 < text.size() && text[offset + 1] == '\'')
             {
-                tokens.push_back({"'", '\0', false});
+                tokens.push_back({text.substr(offset, 1), '\0', false});
                 offset += 2;
                 continue;
             }
@@ -3179,15 +3206,15 @@ bool parse_number_subpicture(std::string_view text, NumberPicture& picture)
             continue;
         }
 
-        if (text.substr(offset).starts_with("\xE2\x80\xB0"))
+        if (text.substr(offset).starts_with(PER_MILLE_UTF8))
         {
-            tokens.push_back({"\xE2\x80\xB0", '\x01', !quoted});
-            offset += 3;
+            tokens.push_back({PER_MILLE_UTF8, PER_MILLE_SYMBOL, !quoted});
+            offset += PER_MILLE_UTF8.size();
             continue;
         }
 
-        const char symbol = text[offset++];
-        tokens.push_back({std::string(1, symbol), symbol, !quoted && is_number_picture_symbol(symbol)});
+        const char symbol = text[offset];
+        tokens.push_back({text.substr(offset++, 1), symbol, !quoted && is_number_picture_symbol(symbol)});
     }
     if (quoted) return false;
 
@@ -3217,34 +3244,10 @@ bool parse_number_subpicture(std::string_view text, NumberPicture& picture)
     }
     if (first_numeric == tokens.size()) return false;
 
-    for (size_t index = 0; index < first_numeric; ++index)
-    {
-        auto& token = tokens[index];
-        if (token.active)
-        {
-            if (token.symbol == '%' || token.symbol == '\x01')
-            {
-                if (picture.multiplier != 1.0) return false;
-                picture.multiplier = token.symbol == '%' ? 100.0 : 1000.0;
-            }
-            else return false;
-        }
-        picture.prefix += token.text;
-    }
-    for (size_t index = last_numeric + 1; index < tokens.size(); ++index)
-    {
-        auto& token = tokens[index];
-        if (token.active)
-        {
-            if (token.symbol == '%' || token.symbol == '\x01')
-            {
-                if (picture.multiplier != 1.0) return false;
-                picture.multiplier = token.symbol == '%' ? 100.0 : 1000.0;
-            }
-            else return false;
-        }
-        picture.suffix += token.text;
-    }
+    const auto prefix_tokens = std::span(tokens).first(first_numeric);
+    const auto suffix_tokens = std::span(tokens).subspan(last_numeric + 1);
+    if (!append_affix(prefix_tokens, picture, picture.prefix) ||
+        !append_affix(suffix_tokens, picture, picture.suffix)) return false;
 
     bool in_fraction = false;
     bool in_exponent = false;
@@ -3408,61 +3411,79 @@ double round_number_half_even(double value)
     return std::fmod(integral, 2.0) == 0.0 ? integral : integral + 1.0;
 }
 
-std::string render_number_picture(double value, const NumberPicture& picture, bool negative, bool has_negative_picture)
+// Splits the scaling so that subnormal magnitudes and large exponents do not overflow 10^power.
+double scale_by_power_of_ten(double value, int power)
 {
-    double magnitude = std::abs(value) * picture.multiplier;
-    if (std::isnan(value)) return "NaN";
-    if (std::isinf(value) || std::isinf(magnitude))
-    {
-        std::string result = picture.prefix;
-        if (negative && !has_negative_picture) result.insert(0, "-");
-        return result + "Infinity" + picture.suffix;
-    }
+    constexpr int MAX_SAFE_POWER = 300;
+    for (; power > MAX_SAFE_POWER; power -= MAX_SAFE_POWER) value *= std::pow(10.0, MAX_SAFE_POWER);
+    for (; power < -MAX_SAFE_POWER; power += MAX_SAFE_POWER) value /= std::pow(10.0, MAX_SAFE_POWER);
+    return value * std::pow(10.0, power);
+}
 
-    if (picture.maximum_fraction_digits <= 15)
+double round_fraction_digits(double magnitude, size_t fraction_digits)
+{
+    if (fraction_digits > MAX_HALF_EVEN_FRACTION_DIGITS) return magnitude;
+    const double fractional_scale = std::pow(10.0, static_cast<double>(fraction_digits));
+    const double scaled = magnitude * fractional_scale;
+    return std::isfinite(scaled) ? round_number_half_even(scaled) / fractional_scale : magnitude;
+}
+
+// XPath 3.1 fn:format-number: with N mandatory integer digits the mantissa lies in [10^(N-1), 10^N),
+// with N = 0 in [0.1, 1). Returns the rounded mantissa and stores the exponent.
+double to_mantissa(double magnitude, const NumberPicture& picture, int& exponent)
+{
+    const int integer_digits = static_cast<int>(picture.minimum_integer_digits);
+    exponent = 0;
+    if (magnitude == 0.0 || integer_digits > std::numeric_limits<double>::max_exponent10) return magnitude;
+    const double lower = integer_digits == 0 ? 0.1 : std::pow(10.0, integer_digits - 1);
+    const double upper = integer_digits == 0 ? 1.0 : std::pow(10.0, integer_digits);
+
+    exponent = static_cast<int>(std::floor(std::log10(magnitude))) + 1 - integer_digits;
+    double mantissa = scale_by_power_of_ten(magnitude, -exponent);
+    for (; mantissa >= upper; ++exponent) mantissa /= 10.0;
+    for (; mantissa < lower; --exponent) mantissa *= 10.0;
+
+    mantissa = round_fraction_digits(mantissa, picture.maximum_fraction_digits);
+    if (mantissa >= upper)
     {
-        const double fractional_scale = std::pow(10.0, static_cast<double>(picture.maximum_fraction_digits));
-        const double scaled = magnitude * fractional_scale;
-        if (std::isfinite(scaled)) magnitude = round_number_half_even(scaled) / fractional_scale;
+        mantissa /= 10.0;
+        ++exponent;
     }
+    return mantissa;
+}
+
+std::string to_fixed_digits(double magnitude, size_t fraction_digits)
+{
+    constexpr size_t MAX_DOUBLE_INTEGER_DIGITS = 310;
+    std::string digits(MAX_DOUBLE_INTEGER_DIGITS + fraction_digits + 2, '\0');
+    const auto [end, error] = std::to_chars(digits.data(), digits.data() + digits.size(), magnitude,
+                                            std::chars_format::fixed, static_cast<int>(fraction_digits));
+    digits.resize(error == std::errc{} ? static_cast<size_t>(end - digits.data()) : 0);
+    return digits;
+}
+
+std::string render_number_picture(double value, const NumberPicture& picture, bool minus_sign)
+{
+    if (std::isnan(value)) return "NaN";
+    std::string result = minus_sign ? "-" + picture.prefix : picture.prefix;
+    double magnitude = std::abs(value) * picture.multiplier;
+    if (std::isinf(magnitude)) return result + "Infinity" + picture.suffix;
 
     int exponent = 0;
-    if (picture.exponent && magnitude != 0.0)
-    {
-        if (picture.minimum_integer_digits != 0)
-        {
-            exponent = static_cast<int>(std::floor(std::log10(magnitude))) -
-                       static_cast<int>(picture.minimum_integer_digits - 1);
-            magnitude /= std::pow(10.0, exponent);
-        }
-    }
+    magnitude = picture.exponent ? to_mantissa(magnitude, picture, exponent)
+                                 : round_fraction_digits(magnitude, picture.maximum_fraction_digits);
 
-    std::ostringstream stream;
-    stream.imbue(std::locale::classic());
-    stream << std::fixed << std::setprecision(static_cast<int>(picture.maximum_fraction_digits)) << magnitude;
-    std::string digits = stream.str();
+    const std::string digits = to_fixed_digits(magnitude, picture.maximum_fraction_digits);
     const auto decimal = digits.find('.');
     std::string integer = digits.substr(0, decimal);
     std::string fraction = decimal == std::string::npos ? std::string() : digits.substr(decimal + 1);
-    if (picture.exponent && picture.minimum_integer_digits != 0 &&
-        integer.size() > picture.minimum_integer_digits)
-    {
-        const size_t carry = integer.size() - picture.minimum_integer_digits;
-        exponent += static_cast<int>(carry);
-        std::string normalized = integer + fraction;
-        integer = normalized.substr(0, picture.minimum_integer_digits);
-        fraction = normalized.substr(picture.minimum_integer_digits, picture.maximum_fraction_digits);
-    }
-    while (fraction.size() > picture.minimum_fraction_digits && !fraction.empty() && fraction.back() == '0')
+    while (fraction.size() > picture.minimum_fraction_digits && fraction.back() == '0')
         fraction.pop_back();
     if (integer.size() < picture.minimum_integer_digits)
         integer.insert(0, picture.minimum_integer_digits - integer.size(), '0');
     if (picture.minimum_integer_digits == 0 && integer == "0") integer.clear();
-    if (integer.empty() && picture.minimum_integer_digits != 0) integer = "0";
     if (!integer.empty()) integer = group_number_integer(std::move(integer), picture);
 
-    std::string result = picture.prefix;
-    if (negative && !has_negative_picture) result.insert(0, "-");
     result += integer;
     if (!fraction.empty())
         result += "." + fraction;
@@ -3498,11 +3519,9 @@ json evaluate_format_number_function(const std::vector<json>& args)
     const bool negative = !std::isnan(value) && std::signbit(value);
     if (negative && !negative_text.empty())
     {
-        auto formatted = render_number_picture(value, negative_picture, true, true);
-        return formatted.empty() ? json(nullptr) : json(formatted);
+        return render_number_picture(value, negative_picture, false);
     }
-    auto formatted = render_number_picture(value, positive_picture, negative, false);
-    return formatted.empty() ? json(nullptr) : json(formatted);
+    return render_number_picture(value, positive_picture, negative);
 }
 
 json evaluate_is_function(const std::vector<json>& args)

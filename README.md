@@ -70,8 +70,13 @@ Each release includes:
 - ⏳ Limited date/time, list, and context operations
 - ❌ Advanced functions, quantified expressions (some, every)
 
+**Extensions and deviations from DMN 1.5:**
+- `format number(number, picture)` built-in (not in DMN 1.5); the picture follows XPath 3.1 `fn:format-number`
+- A decision table without a matching rule returns `null` (DMN 1.5 §10.3.2.10), except that RULE ORDER,
+  OUTPUT ORDER and COLLECT return an empty list and COLLECT COUNT (C#) returns `0`
+
 **API Stability:**
-- Version 2.2.5 Compile flag for std::chrono usage, and bug-fixes.
+- Version 2.2.5: Optional `std::chrono` (`ORION_ENABLE_TZDB`), `format number`, `not (...)` with whitespace; decision tables without a matching rule return `null` (single hit) or an empty list (multiple hit) instead of `{}`
 - Version 2.2.4 released: No runtime-initialized static state (fixes leak reports in hosts that fence per-command heap usage); thread-safe logger configuration
 - Version 2.1.1 released: FEEL function evaluation improvements
 - Breaking change from v1.x: evaluate() now uses nlohmann::json directly

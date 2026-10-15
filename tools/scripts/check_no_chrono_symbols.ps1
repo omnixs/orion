@@ -15,8 +15,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Library,
 
+    # Matches the std::chrono namespace only (MSVC-decorated or demangled), not e.g. "synchronous".
     [Parameter(Mandatory = $false)]
-    [string]$Pattern = 'chrono|tzdb|locate_zone'
+    [string]$Pattern = '@chrono@std@@|\bstd::(?:__\w+::)?chrono::|tzdb|locate_zone'
 )
 
 Set-StrictMode -Version Latest
@@ -86,6 +87,12 @@ $hits = @(
         ForEach-Object { $_.Display } |
         Sort-Object -Unique
 )
+if ($hits.Count -gt 0) {
+    Write-Host "[FAIL] $Library uses std::chrono ($($hits.Count) symbol(s)):" -ForegroundColor Red
+    $hits | Select-Object -First 20 | ForEach-Object { Write-Host "    $_" }
+    Write-Host "Library code must only use std::chrono inside '#if ORION_TZDB_ENABLED' (see CODING_STANDARDS.md)." -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "[OK] No std::chrono symbols in $Library ($(@($symbols).Count) symbol lines checked)." -ForegroundColor Green
 exit 0
