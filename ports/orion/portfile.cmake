@@ -9,10 +9,16 @@ set(SOURCE_PATH "${CMAKE_CURRENT_LIST_DIR}/../..")
 #     REF v1.0.0
 # )
 
+vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
+    FEATURES
+        tzdb ORION_ENABLE_TZDB
+)
+
 # Only build the library, not tests/apps/benchmarks
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
+        ${FEATURE_OPTIONS}
         -DORION_BUILD_TESTS=OFF
         -DCMAKE_DISABLE_FIND_PACKAGE_Boost=ON
         -DCMAKE_DISABLE_FIND_PACKAGE_benchmark=ON

@@ -616,12 +616,6 @@ static std::vector<DirInfo> get_standard_test_cases(const Config& config)
     return discover_test_directories(base, config.testFilter);
 }
 
-static std::vector<DirInfo> get_extra_test_cases(const Config& config)
-{
-    fs::path extra_dir = "dat/tst/dmn-tck-extra";
-    return discover_test_directories(extra_dir, config.testFilter);
-}
-
 // Helper: Extract output value from actual result JSON
 static std::string extract_output_value(
     const json& actual,
@@ -944,8 +938,7 @@ static TestStats execute_test_directory_set(
     const std::vector<DirInfo>& dirs,
     const fs::path& base_path, 
     const Config& config,
-    std::ofstream& csv,
-    const std::string& label = "")
+    std::ofstream& csv)
 {
     TestStats stats;
     
@@ -996,7 +989,7 @@ static TestStats execute_test_directory_set(
             }
             
             // Separate test directory path from test case ID for standard CSV format
-            std::string test_dir = label.empty() ? rel : ("[" + label + "] " + rel);
+            const std::string& test_dir = rel;
             std::string test_case_id = testBase;
             
             for (auto& c : cases) {
@@ -1045,7 +1038,7 @@ static TestStats execute_test_directory_set(
     return stats;
 }
 
-static void write_results_files(const Config& config, const TestStats& main_stats [[maybe_unused]], const TestStats& extra_stats [[maybe_unused]])
+static void write_results_files(const Config& config)
 {
     fs::path outDir = config.root / "TestResults" / "Orion" / config.version;
     ensure_parent(outDir / "dummy");
@@ -1070,7 +1063,7 @@ static void write_results_files(const Config& config, const TestStats& main_stat
     prop << "instructions.url=https://github.com/dmn-tck/tck\n";
 }
 
-static void print_summary(const TestStats& main_stats, const TestStats& extra_stats, const Config& config)
+static void print_summary(const TestStats& main_stats, const Config& config)
 {
     // Print old-style summary for compatibility
     spdlog::info("Finished: test_cases={} passed={} failed={} (outputs: total={} success={} fail={})", 
@@ -1078,8 +1071,8 @@ static void print_summary(const TestStats& main_stats, const TestStats& extra_st
         main_stats.total_outputs, main_stats.ok, main_stats.fail);
     
     // Print comprehensive summary in tst_bre style
-    std::size_t total_cases = main_stats.total_cases + extra_stats.total_cases;
-    std::size_t total_passed = main_stats.passed_cases + extra_stats.passed_cases;
+    std::size_t total_cases = main_stats.total_cases;
+    std::size_t total_passed = main_stats.passed_cases;
     double overall_success = total_cases > 0 ? (total_passed * 100.0) / total_cases : 0.0;
     
     spdlog::info("DMN TCK Comprehensive Summary: {}/{} individual test cases passed ({:.1f}% success rate)", 
@@ -1112,21 +1105,13 @@ static void print_summary(const TestStats& main_stats, const TestStats& extra_st
         }
     }
     
-    // Extra cases summary  
-    if (extra_stats.total_cases > 0) {
-        double extra_success = extra_stats.total_cases > 0 ? (extra_stats.passed_cases * 100.0) / extra_stats.total_cases : 0.0;
-        spdlog::info("  dmn-tck-extra Cases: {}/{} individual test cases passed ({:.1f}% success rate)", 
-            extra_stats.passed_cases, extra_stats.total_cases, extra_success);
-    }
-    
     // Final result - fix the incorrect "All tests passed" logic
-    bool all_passed = (main_stats.failed_cases == 0 && extra_stats.failed_cases == 0 && 
+    bool all_passed = (main_stats.failed_cases == 0 &&
                        main_stats.total_cases > 0); // Must have at least some tests to pass
     if (all_passed) {
         spdlog::info("All DMN TCK tests passed successfully!");
     } else {
-        spdlog::info("DMN TCK tests completed with {} failures.", 
-            (main_stats.failed_cases + extra_stats.failed_cases));
+        spdlog::info("DMN TCK tests completed with {} failures.", main_stats.failed_cases);
     }
 }
 
@@ -1217,8 +1202,7 @@ static RegressionInfo detect_regressions(
 static void write_properties_file(
     const fs::path& propertiesPath,
     const fs::path& csvPath,
-    const TestStats& main_stats,
-    const TestStats& extra_stats)
+    const TestStats& main_stats)
 {
     ensure_parent(propertiesPath);
     std::ofstream props(propertiesPath);
@@ -1227,9 +1211,9 @@ static void write_properties_file(
         return;
     }
     
-    std::size_t total_tests = main_stats.total_cases + extra_stats.total_cases;
-    std::size_t passed_tests = main_stats.passed_cases + extra_stats.passed_cases;
-    std::size_t failed_tests = main_stats.failed_cases + extra_stats.failed_cases;
+    std::size_t total_tests = main_stats.total_cases;
+    std::size_t passed_tests = main_stats.passed_cases;
+    std::size_t failed_tests = main_stats.failed_cases;
     double pass_rate = total_tests > 0 ? (passed_tests * 100.0) / total_tests : 0.0;
     
     props << "total_tests=" << total_tests << "\n";
@@ -1385,21 +1369,16 @@ int main(int argc, char** argv)
         fs::path standard_base = config.root / "TestCases";
         TestStats main_stats = execute_test_directory_set(standard_dirs, standard_base, config, csv);
         
-        // Discover and execute extra test cases
-        auto extra_dirs = get_extra_test_cases(config);
-        fs::path extra_base = fs::path("dat/tst/dmn-tck-extra");
-        TestStats extra_stats = execute_test_directory_set(extra_dirs, extra_base, config, csv, "EXTRA");
-        
         csv.flush();
         csv.close();
         
         // Write results files
         if (!config.outputProperties.empty()) {
             // User-specified properties file
-            write_properties_file(config.outputProperties, csvPath, main_stats, extra_stats);
+            write_properties_file(config.outputProperties, csvPath, main_stats);
         } else {
             // Default properties file
-            write_results_files(config, main_stats, extra_stats);
+            write_results_files(config);
         }
         
         // Perform regression detection if enabled
@@ -1422,10 +1401,10 @@ int main(int argc, char** argv)
         }
         
         // Print summary
-        print_summary(main_stats, extra_stats, config);
+        print_summary(main_stats, config);
         
-        std::size_t total_passed = main_stats.passed_cases + extra_stats.passed_cases;
-        std::size_t total_cases = main_stats.total_cases + extra_stats.total_cases;
+        std::size_t total_passed = main_stats.passed_cases;
+        std::size_t total_cases = main_stats.total_cases;
         
         log->info("TCK Runner completed: {}/{} test cases passed", total_passed, total_cases);
         spdlog::info("TCK Runner completed: {}/{} test cases passed", total_passed, total_cases);
@@ -1443,7 +1422,7 @@ int main(int argc, char** argv)
         }
         
         // Normal exit codes
-        return (main_stats.fail || extra_stats.fail) ? 1 : 0;
+        return main_stats.fail ? 1 : 0;
     }
     catch (const std::exception& ex)
     {

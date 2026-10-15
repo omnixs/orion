@@ -206,6 +206,7 @@ User should provide:
 - **Error Handling**: `ContractViolation` for programming errors, `std::expected` for business logic
 - **Memory**: RAII, smart pointers, move semantics
 - **Static State**: every static/`thread_local` variable in library code must be `constexpr` or `constinit` (no lazily built tables, allocating singletons or `thread_local` caches); verify with `tools/scripts/check_static_init.ps1`
+- **Optional std::chrono**: the library builds with and without `std::chrono` (CMake `ORION_ENABLE_TZDB`, macro `ORION_TZDB_ENABLED`); keep `std::chrono` inside `#if ORION_TZDB_ENABLED` and test temporal changes in both variants (see CODING_STANDARDS.md "Optional std::chrono")
 - See [CODING_STANDARDS.md](../CODING_STANDARDS.md) for complete guidelines
 
 ## Task Retrospective Process

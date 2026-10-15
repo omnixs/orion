@@ -71,6 +71,13 @@ This checklist defines the quality gates for all code changes in the ORION proje
 - [ ] Any `// static-init-ok:` exemption is justified and approved
 - [ ] `tools/scripts/check_static_init.ps1` passes
 
+**Optional std::chrono (CRITICAL - see CODING_STANDARDS.md "Optional std::chrono (ORION_ENABLE_TZDB)"):**
+- [ ] No `#include <chrono>` / `std::chrono` in library code outside `#if ORION_TZDB_ENABLED`
+- [ ] Wall-clock time uses `std::time()`, calendar math is hand-written (works in both variants)
+- [ ] New temporal code handles an unknown named-zone offset (`std::nullopt`) and documents the `OFF` result
+- [ ] Temporal changes tested with `-DORION_ENABLE_TZDB=ON` and `OFF`; variant-specific cases in `tst/bre/feel/test_time_zone_build_modes.cpp`
+- [ ] `tools/scripts/check_no_chrono_symbols.ps1` passes on the `OFF` library
+
 **No Hardcoded Values (CRITICAL for BRE):**
 - [ ] No test-specific function names (e.g., "PMT", "Payment")
 - [ ] No test-specific property names (e.g., "fee", "amount", "rate")
@@ -243,6 +250,7 @@ Reference: [CODING_STANDARDS.md section or DMN spec section]
 **CRITICAL:** Must fix before merge
 - Memory leaks, dangling references
 - Static/thread-local variables that are not `constexpr`/`constinit` (lazy or dynamic initialization)
+- `std::chrono` used outside `#if ORION_TZDB_ENABLED`, or a change that breaks the `ORION_ENABLE_TZDB=OFF` variant
 - Hardcoded test values in production code
 - DMN spec violations
 - Security issues
@@ -265,6 +273,7 @@ Reference: [CODING_STANDARDS.md section or DMN spec section]
 - No CODING_STANDARDS.md violations
 - No hardcoded test values
 - `tools/scripts/check_static_init.ps1` passes
+- Unit tests pass with `ORION_ENABLE_TZDB=ON` and `OFF` (CI fast workflow)
 - All tests pass (unit + TCK)
 - No performance regressions
 
@@ -272,6 +281,7 @@ Reference: [CODING_STANDARDS.md section or DMN spec section]
 - Any CRITICAL issue unresolved
 - Hardcoded values detected
 - Runtime-initialized static or thread-local state introduced
+- Either `ORION_ENABLE_TZDB` variant fails to build or test
 - DMN compliance violations
 - Test failures or regressions
 

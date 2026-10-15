@@ -100,4 +100,18 @@ BOOST_AUTO_TEST_CASE(evaluator_compile_leaves_text_forms_to_evaluate)
     BOOST_TEST(Evaluator::compile("1 +") == nullptr);
 }
 
+BOOST_AUTO_TEST_CASE(not_tests_allow_whitespace_before_parenthesis)
+{
+    BOOST_TEST(unary_test_matches("not (\"CR\")", "NL"));
+    BOOST_TEST(!unary_test_matches("not (\"CR\")", "CR"));
+    BOOST_TEST(unary_test_matches("not  (\"A\", \"B\")", "C"));
+    BOOST_TEST(!unary_test_matches("not\t(\"A\", \"B\")", "B"));
+    BOOST_TEST(!unary_test_matches("not (> 5)", "6"));
+    BOOST_TEST(unary_test_matches("not (> 5)", "5"));
+    BOOST_TEST(!CompiledUnaryTests::compile("not (\"A\",\"B\")").has_value());
+    BOOST_TEST(!CompiledUnaryTests::compile("not (1),2").has_value());
+    BOOST_TEST(unary_test_matches("\"nothing\"", "nothing"));
+    BOOST_TEST(!unary_test_matches("\"nothing\"", "something"));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

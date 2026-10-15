@@ -37,7 +37,6 @@
 #include <orion/bre/feel/parser.hpp>
 #include <orion/bre/ast_node.hpp>
 #include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
 
 using namespace std;
 using json = nlohmann::json;
@@ -444,5 +443,10 @@ nlohmann::json BusinessRulesEngine::evaluate(const nlohmann::json& input) const
         // The DmnParser should have a parse() method that returns a DmnModel
 
         // ...existing code...
+
+        bool named_time_zones_supported() noexcept
+        {
+            return ORION_TZDB_ENABLED != 0;
+        }
     }
 } // namespace orion::api

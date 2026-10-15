@@ -106,6 +106,21 @@ Test suite "orion_bre" passed
     Test case "dmn_tck_comprehensive" passed
 ```
 
+## Testing Both Time Zone Variants (`ORION_ENABLE_TZDB`)
+
+The library is built with (`ON`, default) or without (`OFF`) the `std::chrono` time zone database.
+When a change touches temporal values, date/time functions, `src/bre/feel/types.cpp` or adds an
+`#include <chrono>` anywhere in library code, run the unit tests in **both** variants:
+
+1. Build and test the default variant (`build`), as above.
+2. Build the `OFF` variant (see build instructions, "Building the variant without `std::chrono`") and
+   run `.\build\Debug\tst_orion.exe --log_level=test_suite` again.
+3. For the `OFF` variant, run `.\tools\scripts\check_no_chrono_symbols.ps1 -Library build\Debug\orion_lib.lib`.
+4. Rebuild the default variant afterwards (both write to `build/<Config>/`).
+
+Variant-specific expectations live in `tst/bre/feel/test_time_zone_build_modes.cpp`
+(`#if ORION_TZDB_ENABLED` / `#else`). CI runs both variants on every push.
+
 ## Troubleshooting
 
 **Test failures:**

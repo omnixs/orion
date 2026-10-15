@@ -29,6 +29,7 @@ constexpr std::array<FormalParameter, 1> kN{{{"n"}}};
 constexpr std::array<FormalParameter, 1> kNumber{{{"number"}}};
 constexpr std::array<FormalParameter, 2> kDividendDivisor{{{"dividend"}, {"divisor"}}};
 constexpr std::array<FormalParameter, 2> kNScale{{{"n"}, {"scale"}}};
+constexpr std::array<FormalParameter, 2> kNumberPicture{{{"number"}, {"picture"}}};
 constexpr std::array<FormalParameter, 1> kString{{{"string"}}};
 constexpr std::array<FormalParameter, 2> kStringMatch{{{"string"}, {"match"}}};
 constexpr std::array<FormalParameter, 3> kSubstring{{{"string"}, {"start position"}, {"length", true}}};
@@ -126,6 +127,7 @@ constexpr auto make_signature_table()
         // multiple overloaded signatures with different parameter names.
         {"duration", kFrom},
         {"number", kNumberFrom},
+        {"format number", kNumberPicture},
         {"string", kFrom},
         {"years and months duration", kFromTo},
 

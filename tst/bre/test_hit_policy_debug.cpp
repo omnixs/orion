@@ -7,9 +7,45 @@
 #include <boost/test/unit_test.hpp>
 #include <orion/api/engine.hpp>
 #include <nlohmann/json.hpp>
+#include <string>
+#include <string_view>
 
 using json = nlohmann::json;
 using namespace orion::api;
+
+namespace {
+    // Single unnamed number output; rules overlap below 16 so multi-hit policies see two matches.
+    std::string age_table(std::string_view hit_policy, std::string_view aggregation)
+    {
+        std::string xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" namespace="test" id="age_table">
+  <decision id="d" name="Decision">
+    <decisionTable id="dt" hitPolicy=")";
+        xml += hit_policy;
+        xml += '"';
+        if (!aggregation.empty()) {
+            xml += R"( aggregation=")";
+            xml += aggregation;
+            xml += '"';
+        }
+        xml += R"(>
+      <input id="in1"><inputExpression typeRef="number"><text>Age</text></inputExpression></input>
+      <output id="o1" typeRef="number"/>
+      <rule id="r1"><inputEntry><text>&lt; 18</text></inputEntry><outputEntry><text>1</text></outputEntry></rule>
+      <rule id="r2"><inputEntry><text>&lt; 16</text></inputEntry><outputEntry><text>2</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>)";
+        return xml;
+    }
+
+    json evaluate_age_table(const std::string& dmn_xml, int age)
+    {
+        BusinessRulesEngine engine;
+        BOOST_TEST_REQUIRE(engine.load_dmn_model(dmn_xml).has_value());
+        return engine.evaluate({{"Age", age}}).at("Decision");
+    }
+}
 
 BOOST_AUTO_TEST_SUITE(hit_policy_debug_tests)
 
@@ -136,6 +172,103 @@ BOOST_AUTO_TEST_CASE(test_output_order_hit_policy) {
     } catch (const std::exception& ex) {
         BOOST_TEST_MESSAGE("❌ Exception caught: " << ex.what());
         BOOST_FAIL("Should not throw exception for OUTPUT_ORDER hit policy");
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_collect_multi_output_no_match_and_spaced_not) {
+    const std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/" namespace="test" id="collect_no_match">
+  <inputData id="i_country" name="country"><variable name="country" typeRef="string"/></inputData>
+  <decision id="d_taxes" name="Taxes">
+    <variable name="Taxes"/>
+    <informationRequirement><requiredInput href="#i_country"/></informationRequirement>
+    <decisionTable id="dt" hitPolicy="COLLECT">
+      <input id="in1"><inputExpression typeRef="string"><text>country</text></inputExpression></input>
+      <output id="o1" name="code" typeRef="string"/>
+      <output id="o2" name="rate" typeRef="number"/>
+      <rule id="r1"><inputEntry><text>"CR"</text></inputEntry><outputEntry><text>"N8"</text></outputEntry><outputEntry><text>1</text></outputEntry></rule>
+      <rule id="r2"><inputEntry><text>not ("FR", "DE")</text></inputEntry><outputEntry><text>"OU"</text></outputEntry><outputEntry><text>5</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+  <decision id="d_count" name="TaxCount">
+    <variable name="TaxCount" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#d_taxes"/></informationRequirement>
+    <literalExpression><text>count(Taxes)</text></literalExpression>
+  </decision>
+</definitions>)";
+
+    BusinessRulesEngine engine;
+    const auto load_result = engine.load_dmn_model(dmn_xml);
+    BOOST_TEST_REQUIRE(load_result.has_value());
+
+    const json both = engine.evaluate({{"country", "CR"}});
+    BOOST_TEST_REQUIRE(both.at("Taxes").is_array());
+    BOOST_TEST_REQUIRE(both.at("Taxes").size() == 2U);
+    BOOST_TEST(both.at("Taxes")[0].at("code") == "N8");
+    BOOST_TEST(both.at("Taxes")[1].at("code") == "OU");
+    BOOST_TEST(both.at("TaxCount") == 2);
+
+    const json negated = engine.evaluate({{"country", "NL"}});
+    BOOST_TEST_REQUIRE(negated.at("Taxes").size() == 1U);
+    BOOST_TEST(negated.at("Taxes")[0].at("code") == "OU");
+
+    for (const auto* country : {"FR", "DE"}) {
+        const json none = engine.evaluate({{"country", country}});
+        BOOST_TEST(none.at("Taxes") == json::array(), country);
+        BOOST_TEST(none.at("TaxCount") == 0, country);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_rule_order_no_match_returns_empty_list) {
+    const std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/" namespace="test" id="rule_order_no_match">
+  <decision id="d" name="Decision">
+    <decisionTable id="dt" hitPolicy="RULE ORDER">
+      <input id="in1"><inputExpression typeRef="number"><text>Age</text></inputExpression></input>
+      <output id="o1" name="result" typeRef="string"/>
+      <output id="o2" name="rank" typeRef="number"/>
+      <rule id="r1"><inputEntry><text>&lt; 18</text></inputEntry><outputEntry><text>"MINOR"</text></outputEntry><outputEntry><text>1</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>)";
+
+    BusinessRulesEngine engine;
+    BOOST_TEST_REQUIRE(engine.load_dmn_model(dmn_xml).has_value());
+    BOOST_TEST(engine.evaluate({{"Age", 30}}).at("Decision") == json::array());
+}
+
+BOOST_AUTO_TEST_CASE(test_single_hit_no_match_returns_null) {
+    // DMN 1.5 Section 10.3.2.10: no matching rule and no default output value -> null
+    for (const auto* hit_policy : {"FIRST", "UNIQUE", "ANY", "PRIORITY"}) {
+        BOOST_TEST(evaluate_age_table(age_table(hit_policy, ""), 30).is_null(), hit_policy);
+    }
+
+    const std::string dmn_xml = R"(<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20240513/MODEL/" namespace="test" id="first_no_match">
+  <decision id="d" name="Decision">
+    <decisionTable id="dt" hitPolicy="FIRST">
+      <input id="in1"><inputExpression typeRef="number"><text>Age</text></inputExpression></input>
+      <output id="o1" name="result" typeRef="string"/>
+      <output id="o2" name="rank" typeRef="number"/>
+      <rule id="r1"><inputEntry><text>&lt; 18</text></inputEntry><outputEntry><text>"MINOR"</text></outputEntry><outputEntry><text>1</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>)";
+    BOOST_TEST(evaluate_age_table(dmn_xml, 30).is_null());
+}
+
+BOOST_AUTO_TEST_CASE(test_collect_no_match_aggregates_empty_list) {
+    // ORION extension: no match behaves like aggregating an empty list (C -> [], C# -> 0, others null)
+    const auto collect = age_table("COLLECT", "");
+    BOOST_TEST(evaluate_age_table(collect, 10) == json::array({1, 2}));
+    BOOST_TEST(evaluate_age_table(collect, 30) == json::array());
+
+    const auto count = age_table("COLLECT", "COUNT");
+    BOOST_TEST(evaluate_age_table(count, 10) == 2);
+    BOOST_TEST(evaluate_age_table(count, 30) == 0);
+
+    for (const auto* aggregation : {"SUM", "MIN", "MAX"}) {
+        BOOST_TEST(evaluate_age_table(age_table("COLLECT", aggregation), 30).is_null(), aggregation);
     }
 }
 

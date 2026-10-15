@@ -203,14 +203,28 @@ namespace orion::bre::feel {
         return test_val == cand_val;
     }
 
+    static std::optional<size_t> not_test_open_paren(std::string_view test)
+    {
+        if (!test.starts_with("not"))
+        {
+            return std::nullopt;
+        }
+        const auto open = test.find_first_not_of(" \t\r\n", 3);
+        if (open == std::string_view::npos || test[open] != '(')
+        {
+            return std::nullopt;
+        }
+        return open;
+    }
+
     // Helper: Handle not() function - returns true if NONE of the inner tests match
-    static bool match_not_function(std::string_view test, std::string_view candidate)
+    static bool match_not_function(std::string_view test, size_t open, std::string_view candidate)
     {
         if (!test.ends_with(")"))
         {
             return false;
         }
-        auto inner = test.substr(4, test.size() - 5);
+        auto inner = test.substr(open + 1, test.size() - open - 2);
         for (auto& part : orion::common::split(inner, ','))
         {
             if (unary_test_matches(orion::common::trim(part), candidate))
@@ -301,9 +315,9 @@ namespace orion::bre::feel {
         }
 
         // Try not() function
-        if (test.starts_with("not("))
+        if (const auto open = not_test_open_paren(test))
         {
-            return match_not_function(test, candidate);
+            return match_not_function(test, *open, candidate);
         }
 
         // Try comma-separated list
@@ -367,7 +381,7 @@ namespace orion::bre::feel {
     {
         // Only lists take the match_list() route in unary_test_matches()
         std::string trimmed = orion::common::trim(test);
-        if (trimmed.starts_with("not(") || trimmed.find(',') == std::string::npos)
+        if (not_test_open_paren(trimmed) || trimmed.find(',') == std::string::npos)
         {
             return std::nullopt;
         }
@@ -376,7 +390,7 @@ namespace orion::bre::feel {
         for (const auto& part : orion::common::split(trimmed, ','))
         {
             std::string item = orion::common::trim(part);
-            const bool literal = !item.empty() && item != "-" && !item.starts_with("not(") &&
+            const bool literal = !item.empty() && item != "-" && !not_test_open_paren(item) &&
                                  !match_comparison_pattern(item) && !match_range_pattern(item);
             if (!literal)
             {

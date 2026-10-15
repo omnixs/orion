@@ -64,6 +64,12 @@ They combine C++23-specific guidance with repository expectations relevant to C+
 
 ---
 
+## Optional std::chrono (library code)
+- The library must build and work with `-DORION_ENABLE_TZDB=ON` and `OFF`. Use `std::chrono` only inside `#if ORION_TZDB_ENABLED`; use `std::time()` for wall-clock time.
+- Test temporal changes in both variants; variant-specific tests go in `tst/bre/feel/test_time_zone_build_modes.cpp`. Details: `CODING_STANDARDS.md` section "Optional std::chrono (ORION_ENABLE_TZDB)".
+
+---
+
 ## Performance Guidance
 - Avoid allocations on hot paths; use zero-copy parsing where possible.
 - Reserve container capacity if the size is known in advance.

@@ -13,8 +13,12 @@
 **What it does:**
 - Runs the static initialization guard (`tools/scripts/check_static_init.ps1`): fails if library code
   introduces a static/thread-local variable that is not `constexpr`/`constinit`
-- Builds ORION in Debug mode
-- Runs all unit tests (Boost.Test suite)
+- Builds ORION in Debug mode, once with `-DORION_ENABLE_TZDB=ON` and once with `OFF`
+  (with and without the `std::chrono` time zone database)
+- Runs all unit tests (Boost.Test suite) for both variants
+- Verifies `std::chrono` symbols in the library match the variant: none when the time zone
+  database is disabled or unavailable, present when it is enabled
+  (`tools/scripts/check_no_chrono_symbols.ps1 -CMakeCache build/CMakeCache.txt`)
 - Validates basic functionality across platforms
 - Provides fast feedback for development
 

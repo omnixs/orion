@@ -28,11 +28,11 @@ static std::string load_dmn_file(const fs::path& file_path) {
     return ss.str();
 }
 
-// Helper function to find the airline ticketing DMN file
-static fs::path find_airline_dmn() {
+// Helper function to find an airline ticketing DMN file under tst/data
+static fs::path find_airline_dmn(const std::string& file_name = "airline_ticketing_simple.dmn") {
     std::vector<fs::path> candidates = {
-        fs::path("dat") / "tst" / "dmn-tck-extra" / "integration" / "airline_ticketing_simple.dmn",
-        fs::path("..") / "dat" / "tst" / "dmn-tck-extra" / "integration" / "airline_ticketing_simple.dmn"
+        fs::path("tst") / "data" / file_name,
+        fs::path("..") / "tst" / "data" / file_name
     };
     
     for (const auto& candidate : candidates) {
@@ -44,7 +44,7 @@ static fs::path find_airline_dmn() {
     // Try searching from current path
     fs::path cur = fs::current_path();
     for (int i = 0; i < 6; ++i) {
-        fs::path probe = cur / "dat" / "tst" / "dmn-tck-extra" / "integration" / "airline_ticketing_simple.dmn";
+        fs::path probe = cur / "tst" / "data" / file_name;
         if (fs::exists(probe)) {
             return fs::canonical(probe);
         }
@@ -55,7 +55,7 @@ static fs::path find_airline_dmn() {
         }
     }
     
-    throw std::runtime_error("Cannot find airline_ticketing_simple.dmn file");
+    throw std::runtime_error("Cannot find " + file_name + " file");
 }
 
 // Test fixture for airline ticketing tests
@@ -477,6 +477,31 @@ BOOST_FIXTURE_TEST_CASE(test_edge_case_child_first_no_bags, AirlineTicketingFixt
     BOOST_REQUIRE(result_json.contains("TotalPrice"));
     // TotalPrice computed by DRG evaluation
     BOOST_CHECK_EQUAL(result_json["TotalPrice"].get<double>(), 500.0);
+}
+
+// ==================== Modeler Export ====================
+
+// Same decision logic as exported by a DMN modeler: "dmn:" prefixed elements, DMN 1.2 namespace,
+// extension elements, rule annotations, an unnamed output column, a multi-line literal
+// expression and a DMNDI diagram section.
+BOOST_FIXTURE_TEST_CASE(test_modeler_export_matches_simple_model, AirlineTicketingFixture) {
+    BusinessRulesEngine exported;
+    const auto load_result = exported.load_dmn_model(load_dmn_file(find_airline_dmn("airline_ticketing_modeler_export.dmn")));
+    BOOST_TEST_REQUIRE(load_result.has_value(), (load_result ? std::string() : load_result.error()));
+
+    for (const auto* passenger : {"Adult", "Child", "Senior"}) {
+        for (const auto* travel_class : {"Economy", "Business", "First"}) {
+            for (const int bags : {0, 2, 5}) {
+                const json input = {{"PassengerType", passenger}, {"Class", travel_class}, {"BaggageCount", bags}};
+                const json expected = engine.evaluate(input);
+                const json actual = exported.evaluate(input);
+                for (const auto* decision : {"BaseFare", "BaggageFee", "TotalPrice"}) {
+                    BOOST_TEST(actual.at(decision).get<double>() == expected.at(decision).get<double>(),
+                               decision << " for " << input.dump());
+                }
+            }
+        }
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

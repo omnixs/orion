@@ -39,13 +39,15 @@ jobs:
       run: ./tools/scripts/check_static_init.ps1
 
   build-and-test:
-    name: ${{ matrix.os }} - Debug - Unit Tests
+    name: ${{ matrix.os }} - Debug - Unit Tests (tzdb ${{ matrix.tzdb }})
     runs-on: ${{ matrix.os }}
     
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
+        # ORION_ENABLE_TZDB: with and without the std::chrono time zone database
+        tzdb: [ON, OFF]
         include:
           - os: ubuntu-24.04
             triplet: x64-linux
@@ -128,7 +130,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=Debug \
           -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}/scripts/buildsystems/vcpkg.cmake \
           -DVCPKG_TARGET_TRIPLET=x64-linux \
-          -DORION_BUILD_TESTS=ON
+          -DORION_BUILD_TESTS=ON \
+          -DORION_ENABLE_TZDB=${{ matrix.tzdb }}
     
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
@@ -141,7 +144,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=Debug ^
           -DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg_root }}\scripts\buildsystems\vcpkg.cmake ^
           -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
-          -DORION_BUILD_TESTS=ON
+          -DORION_BUILD_TESTS=ON ^
+          -DORION_ENABLE_TZDB=${{ matrix.tzdb }}
     
     - name: Build (Linux)
       if: runner.os == 'Linux'
@@ -168,3 +172,8 @@ jobs:
       working-directory: ${{ github.workspace }}
       env:
         ORION_TCK_RUN_ALL: 0
+
+    # OFF (or ON without a time zone database) must have no std::chrono symbols; ON with one must have them.
+    - name: Check std::chrono symbols match ORION_ENABLE_TZDB (tzdb ${{ matrix.tzdb }})
+      shell: pwsh
+      run: ./tools/scripts/check_no_chrono_symbols.ps1 -Library ${{ runner.os == 'Windows' && 'build/orion_lib.lib' || 'build/liborion_lib.a' }} -CMakeCache build/CMakeCache.txt

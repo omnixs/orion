@@ -9,6 +9,12 @@ linked as transitive dependencies.
 Optional: Enable spdlog support by installing with the [spdlog] feature:
   vcpkg install orion[spdlog]
 
+Named FEEL time zones (e.g. @Europe/Paris) use the std::chrono time zone database via the
+default [tzdb] feature. To build Orion without std::chrono, disable default features:
+  "dependencies": [ { "name": "orion", "default-features": false } ]
+Check the variant at compile time with ORION_TZDB_ENABLED (0/1, via orion::orion_lib),
+in CMake with orion_TZDB_ENABLED, or at runtime with orion::api::named_time_zones_supported().
+
 Example usage in your project:
   #include <orion/api/engine.hpp>
   #include <orion/api/logger.hpp>

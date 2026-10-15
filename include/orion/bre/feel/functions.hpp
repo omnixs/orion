@@ -495,6 +495,16 @@ namespace orion::bre::feel {
     [[nodiscard]] json evaluate_string_function(const std::vector<json>& args);
 
     /**
+     * @brief Format a number with a picture string (ORION extension, not a DMN 1.5 built-in)
+     * @param args Vector containing exactly 2 arguments [number, picture]
+     * @return Formatted string, or null for a non-number, non-string picture or invalid picture
+     *
+     * Picture syntax follows XPath 3.1 fn:format-number with the default decimal format,
+     * e.g. format number(1234.5, "#,##0.00") → "1,234.50".
+     */
+    [[nodiscard]] json evaluate_format_number_function(const std::vector<json>& args);
+
+    /**
      * @brief Semantic equality check
      * @param args Vector containing exactly 2 arguments [value1, value2]
      * @return true if values are semantically equal (same type and value)
