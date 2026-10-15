@@ -31,8 +31,8 @@ static std::string load_dmn_file(const fs::path& file_path) {
 // Helper function to find the airline ticketing DMN file
 static fs::path find_airline_dmn() {
     std::vector<fs::path> candidates = {
-        fs::path("dat") / "tst" / "dmn-tck-extra" / "integration" / "airline_ticketing_simple.dmn",
-        fs::path("..") / "dat" / "tst" / "dmn-tck-extra" / "integration" / "airline_ticketing_simple.dmn"
+        fs::path("tst") / "data" / "airline_ticketing_simple.dmn",
+        fs::path("..") / "tst" / "data" / "airline_ticketing_simple.dmn"
     };
     
     for (const auto& candidate : candidates) {
@@ -44,7 +44,7 @@ static fs::path find_airline_dmn() {
     // Try searching from current path
     fs::path cur = fs::current_path();
     for (int i = 0; i < 6; ++i) {
-        fs::path probe = cur / "dat" / "tst" / "dmn-tck-extra" / "integration" / "airline_ticketing_simple.dmn";
+        fs::path probe = cur / "tst" / "data" / "airline_ticketing_simple.dmn";
         if (fs::exists(probe)) {
             return fs::canonical(probe);
         }
